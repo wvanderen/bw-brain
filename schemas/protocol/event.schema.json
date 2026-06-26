@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/protocol/event.schema.json",
+  "title": "Event",
+  "description": "An observational event fired by the bridge (sender-originated, no ack expected). Frozen from docs/seed.md §Event example (selection.changed). timestamp is REQUIRED on events (sender-originated). $comment: only selection.changed is frozen in Phase 1 (the 1-event spike honestly validates this); additional event types are Phase 2-extensible (Pitfall 4 — do not over-freeze guesses).",
+  "$comment": "Phase 1 freezes selection.changed only. Additional event types (transport.changed, track.* observers, etc.) land in Phase 2 once the in-app capability probe (PROBE-01) confirms the observer surface. The envelope-level oneOf discriminator + this schema's type enum are the extension point.",
+  "type": "object",
+  "required": ["version", "type", "timestamp"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["selection.changed"]
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix-seconds, sender-originated. Required on every event."
+    },
+    "payload": {
+      "type": "object",
+      "description": "selection.changed payload. All fields optional — selection can be empty (deselection).",
+      "additionalProperties": false,
+      "properties": {
+        "trackId": { "type": "string" },
+        "clipId": { "type": "string" },
+        "deviceId": { "type": "string" }
+      }
+    }
+  }
+}

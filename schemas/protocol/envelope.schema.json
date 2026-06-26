@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/protocol/envelope.schema.json",
+  "title": "Envelope",
+  "description": "The versioned JSON-Lines wire envelope. This is the single cross-language source of truth both halves (Java bridge + TS daemon) bind FROM. A oneOf discriminator branches into the 5 message-type schemas (event/request/response/edit/handshake). Source: docs/seed.md §Proposed local protocol generalized + jsonlines.org + JSON Schema 2020-12 (RESEARCH.md §Code Examples).",
+  "type": "object",
+  "required": ["version", "type"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Semantic major.minor protocol version. The major component drives the version-handshake gate (Pattern 3); enables protocol-drift detection (SC#3)."
+    },
+    "type": {
+      "type": "string",
+      "description": "Message type. Constrained per message-type sub-schema via enum (event/request/response/edit/handshake). Acts as the wire-level discriminator for the TS discriminated-union model (AGENTS.md line 35)."
+    },
+    "id": {
+      "type": "string",
+      "description": "Request/response correlation id. Required on requests + responses + edits (they are requests); optional on events (sender-originated, no ack expected) and handshake."
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Unix-seconds timestamp, sender-originated. Required on events; optional elsewhere."
+    },
+    "ok": {
+      "type": "boolean",
+      "description": "Success flag. Required on responses + hello.response; absent on requests/events/edits."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Message payload. Open object at the envelope level; constrained per message-type sub-schema. For the spike the payload shape is frozen only for the ~4 seed-example messages (Pitfall 4: do not over-freeze)."
+    }
+  },
+  "oneOf": [
+    { "$ref": "event.schema.json" },
+    { "$ref": "request.schema.json" },
+    { "$ref": "response.schema.json" },
+    { "$ref": "edit.schema.json" },
+    { "$ref": "handshake.schema.json" }
+  ]
+}

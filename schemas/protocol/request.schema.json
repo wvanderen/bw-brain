@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/protocol/request.schema.json",
+  "title": "Request",
+  "description": "A request message from client to bridge/daemon. id is REQUIRED (correlation key — echoed on the response). Frozen from docs/seed.md §Request example (get.selected_clip). $comment: payload is left open for parameterized requests in the spike; tighten in Phase 2 (Pitfall 4).",
+  "$comment": "Phase 1 freezes get.selected_clip only. Additional get.* requests land in Phase 2 (M1 read-only context). The id field is the request/response correlation key — required on every request, echoed on its response.",
+  "type": "object",
+  "required": ["version", "type", "id"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["get.selected_clip"]
+    },
+    "id": {
+      "type": "string",
+      "description": "Request/response correlation id. REQUIRED on every request."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Optional request parameters. Open for the spike; tightened per request type in Phase 2."
+    }
+  }
+}

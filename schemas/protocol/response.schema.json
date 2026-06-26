@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/protocol/response.schema.json",
+  "title": "Response",
+  "description": "A response to a prior request. id REQUIRED (echoes the originating request); ok boolean REQUIRED; payload open for the spike. Frozen from docs/seed.md §Response example ({id, ok:true, payload:{clipId, notes}}).",
+  "$comment": "Phase 1 freezes the response envelope shape only ({id, ok, payload}). The payload discriminated union (per originating request type) is Phase 2 — tightening now would lock guesses (Pitfall 4). ok=false responses carry an error payload shape defined in Phase 2.",
+  "type": "object",
+  "required": ["version", "type", "id", "ok"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["response"]
+    },
+    "id": {
+      "type": "string",
+      "description": "Echoes the originating request id. REQUIRED."
+    },
+    "ok": {
+      "type": "boolean",
+      "description": "Success flag. REQUIRED on every response."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Response payload. Open for the spike; tightened per request type in Phase 2."
+    }
+  }
+}

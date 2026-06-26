@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/protocol/handshake.schema.json",
+  "title": "Handshake",
+  "description": "Version-negotiation handshake — the first messages exchanged on every new connection (RESEARCH.md Pattern 3). Client emits hello; server validates the major version and replies hello.response before any other traffic. Prevents protocol-drift silent corruption (SC#3 / §Security).",
+  "$comment": "hello carries the client's declared capabilities (events/requests/...). hello.response carries the server's negotiated version. Major-version mismatch → reject (no hello.response or ok:false) — exercised in Plan 02's handshake unit test. The version pattern matches the envelope's (major.minor).",
+  "type": "object",
+  "required": ["version", "type"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["hello", "hello.response"]
+    },
+    "id": {
+      "type": "string"
+    },
+    "ok": {
+      "type": "boolean",
+      "description": "Required on hello.response; absent on hello."
+    },
+    "payload": {
+      "type": "object",
+      "description": "hello payload = {capabilities: string[]}; hello.response payload = {serverVersion: string}. Discriminated by type.",
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "hello: client-declared capabilities (e.g. ['events','requests'])."
+        },
+        "serverVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$",
+          "description": "hello.response: server's negotiated protocol version."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "hello.response" } } },
+      "then": {
+        "required": ["ok"],
+        "properties": {
+          "payload": {
+            "required": ["serverVersion"]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "hello" } } },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": ["capabilities"]
+          }
+        }
+      }
+    }
+  ]
+}
