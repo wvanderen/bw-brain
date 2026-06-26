@@ -1,32 +1,41 @@
 # Bitwig Control Surface API — Verified Capabilities
 
-> **Status: SKELETON.** This document is the PROBE-01 output (SC#2) — the
-> design-ready input Phase 2's bridge work locks against. **Every `Observed:`
-> field is currently a TODO marker pointing at the in-app probe** in Plan 03
-> Task 2. The autonomous executor deliberately does NOT fabricate observed
-> Bitwig behavior (D-02 — observed reality is the spike's *output*, not its
-> *input*). A human with Bitwig Studio open must run the probes and fill in
-> every `Observed:` field; the structural validator (`scripts/check-capabilities-doc.mjs`)
-> currently passes only because every section already carries a DRAFT Mitigation
-> (D-04) — the truth of each Mitigation is also pending the observation.
+> **Status: PARTIALLY VERIFIED — SC#1 + SC#3 PROVEN LIVE.** This document is the
+> PROBE-01 output (SC#2) — the design-ready input Phase 2's bridge work locks
+> against.
 >
-> **Plan:** 01-schema-ipc-spike / 03 — Track A (in-app capability probes).
-> **Last scaffolded:** 2026-06-26 (autonomous Task 1 of Plan 03).
+> **What is now VERIFIED in-app (2026-06-26):** the highest-risk item — raw
+> `java.net` TCP from the Bitwig extension JVM — is **CONFIRMED** via a live
+> end-to-end `selection.changed` round-trip (see §Transport Decision). The JS
+> control-surface `host` surface is characterized (no networking/file I/O). The
+> API version + extension-packaging mechanism are confirmed.
+>
+> **What remains TODO-in-app:** the two D-01 DEEP probes — **Undo Behavior (§1)**
+> and **Note-Editing Scope (§2)** — plus the single-pass Automation target (§3)
+> and Stable-ID existence (§6). These need dedicated note-add/undo probe runs in
+> Bitwig before Phase 2/3 edit design locks. They do NOT gate the Phase 2 bridge
+> transport (already de-risked).
+>
+> **Plan:** 01-schema-ipc-spike / 03.
+> **Last updated:** 2026-06-26 (live SC#1 round-trip + Java extension pivot).
 
 ## Header — API version + JsApi surface (open questions A6 + A2)
 
-- **Bitwig Studio installed:** 6.0.6 (per RESEARCH.md §Environment Availability).
-- **Exact Control Surface API version exposed (A6):** **TODO-in-app** — open
-  Bitwig → Help → Developer Resources (the in-app scripting guide; the external
-  web page `bitwig.com/developer-resources/` returns 404 per STATE.md blocker).
-  Record the exact `extension-api` coordinate here (expected: `21`, but observe
-  — do not assume; A6 is "Low" risk because 6.0.6 is newer than DrivenByMoss's
-  5.3+ target and near-certainly a superset).
-- **JsApi (JavaScript Controller Script) networking surface (A2):** **TODO-in-app**
-  — confirmed in the in-app guide and recorded in the Transport Decision section
-  below. This is the single most important spike-day-1 finding: it determines
-  which transport option Plan 03 Task 3 uses (raw TCP from Java, OSC stand-in,
-  file/println relay, or stdio fallback).
+- **Bitwig Studio installed:** 6.0.6.
+- **Exact Control Surface API version exposed (A6):** **VERIFIED** — the in-app
+  Javadoc at `Bitwig Studio.app/Contents/Resources/Documentation/control-surface/api/`
+  references API versions up to **25**. An extension declaring
+  `getRequiredAPIVersion() = 21` loaded and ran cleanly on this host. (Note: the
+  in-app "scripting guide" is the **Java** control-surface API Javadoc
+  `com.bitwig.extension.*` — there is no separate in-app JS scripting guide; the
+  JS `host.*` surface is documented only via shipped example controller scripts.)
+- **JsApi (JavaScript Controller Script) networking surface (A2):** **VERIFIED
+  (unfavorable for JS)** — the JS control-surface `host` exposes **NO networking
+  and NO file I/O**. The only `ControllerHost` methods touching outside-world
+  state are `getPreferences()` / `getProject()` (settings/project objects, not
+  files/sockets). `host.println` writes only to the in-app controller console
+  (no disk log is produced). Consequence: the JS extension can probe capability
+  surfaces but **cannot** carry the transport — see §Transport Decision.
 
 ---
 
@@ -180,8 +189,17 @@ debounce / coalesce on rapid changes?
 **Probe recipe:** register `addSelectionObserver` + a name observer; mutate
 rapidly; measure fire rate / coalescing.
 
-**Observed:** **TODO-in-app** (Plan 03 Task 2). Record firing pattern + which
-thread.
+**Observed:** **PARTIALLY VERIFIED** — value observers (e.g.
+`CursorTrack.position().addValueObserver(cb, step)`) fire on the controller
+thread and DO fire on registration with the current value (the spike's
+`skipFirstFire` guard exists because of this). The enqueue-then-drain-off-thread
+pattern (Pitfall 3) is **proven**: the extension offers the JSON line to a queue
+and a separate writer thread does the socket I/O; the audio engine never
+stalled. The bank-level `addSelectionObserver` referenced in DrivenByMoss is NOT
+in the public control-surface API — see §Transport Decision for the
+`CursorTrack.position()` path that replaced it. Per-channel
+`addIsSelectedInMixerObserver` exists (Channel). Rapid-mutation fire-rate /
+coalescing measurement still TODO-in-app, but does not gate Phase 2.
 
 **Mitigation:** DRAFT (pending observation) — observers enqueue onto the
 daemon's bounded per-connection queue (cap 256, Plan 02 reader); a
@@ -247,19 +265,53 @@ stdio"):**
    ready"). Viability depends on whether `host.println()` output is reachable
    from an external process — confirm in-spike.
 
-**JsApi (JS) networking finding (A2):** **TODO-in-app** — record here whether
-the JS Controller Script exposes any of: raw socket, OSC client/server, file
-I/O, or only `host.println`. This is the first finding gathered on spike day 1
-because it determines whether Track A (the JS extension) can carry the
-transport itself, or whether Track B (the Java probe / DrivenByMoss OSC
-stand-in) is required.
+**JsApi (JS) networking finding (A2):** **VERIFIED** — the JS Controller Script
+exposes **none** of {raw socket, OSC client/server, file I/O}. Only
+`host.println` (in-app console, no disk log). This forced the spike's pivot from
+the planned JS extension (D-07) to a Java `.bwextension`, which runs in the real
+Bitwig JVM and therefore gets `java.net` sockets.
 
-**Confirmed transport:** **TODO-in-app** (Plan 03 Task 3). Record:
-- Which transport was confirmed (raw TCP / OSC stand-in / stdio relay).
-- The observed rationale (what was tried, what worked, what failed).
-- The captured `selection.changed` round-trip evidence (which byte path,
-  latency impression, any gotchas).
-- Loopback-only confirmation (Pitfall 5 must hold on the Bitwig side too).
+**Confirmed transport:** **RAW TCP (Option 1) — CONFIRMED LIVE.** A throwaway
+Java extension (`spike/java/`, packaged as `SpikeProbe.bwextension`) opened a
+`java.net.Socket` to the daemon's loopback server and a real `selection.changed`
+JSON-Lines line round-tripped end-to-end:
+
+```
+{"version":"1.0","type":"selection.changed","timestamp":1782512568,"payload":{"trackId":"trk_1"}}
+```
+
+- **Which transport:** raw `java.net.Socket` (TCP client in the extension →
+  `TcpServerTransport` bound `127.0.0.1:7878` in the daemon). JSON-Lines over
+  loopback, exactly the locked contract — **no OSC shim, no stdio relay**.
+- **Observed rationale:** the JS `host` has no socket I/O (above); the Java
+  extension JVM is not sandboxed (OSC + JNA proven in RESEARCH), so `java.net`
+  works. Build required: compile against `Contents/Java/bitwig.jar` + a
+  ServiceLoader registration (see below).
+- **Round-trip evidence:** the line above was emitted by the extension's
+  `CursorTrack.position()` observer on a UI track selection, reassembled by the
+  daemon `LineBuffer`, Ajv-validated against the frozen envelope, and printed +
+  exit 0 by `bw-brain-spike dump`. One line = one selection.
+- **Loopback-only (Pitfall 5):** held — the extension connects to `127.0.0.1`
+  only; the daemon binds loopback only. No `0.0.0.0` anywhere.
+
+**Extension-packaging finding (how Bitwig discovers `.bwextension` jars):**
+**VERIFIED** — Bitwig uses Java's ServiceLoader, NOT a manifest attribute and NOT
+class scanning. The jar must contain
+`META-INF/services/com.bitwig.extension.ExtensionDefinition` listing the
+definition FQCN. (Confirmed by inspecting Bitwig's own bundled
+`Resources/Extensions/*.bwextension` and the `DriverTemplates/java-controller`
+template.) A plain jar without this file is silently ignored.
+
+**Selection-observation finding (informs §5 + §4):** **VERIFIED** — there is NO
+bank-level `addSelectionObserver` in the public control-surface API, and
+`TrackBank.getTrack(int)` / `getChannel(int)` are BOTH deprecated in API 21 (no
+clean single replacement). The working surface is a **`CursorTrack`** (created
+via the non-deprecated `createCursorTrack(int,int)`) which follows the GUI
+selection; `cursorTrack.position()` (an `IntegerValue`) fires
+`addValueObserver` on selection change. Per-channel selection also exists via
+`addIsSelectedInMixerObserver` / `addIsSelectedInEditorObserver` (selection is
+context-split between mixer and editor). `CursorClip` is `createCursorClip(int
+gridWidth, int gridHeight)` — **2 args**, not 3 (the JS arity error).
 
 **Mitigation:** DRAFT (pending observation) — the daemon framing pipe (Plan 02)
 is already transport-agnostic (Transport interface + TCP + stdio impls), so

@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Schema & IPC Spike
 status: at-human-checkpoint
-stopped_at: Completed 1-03-PLAN.md Task 1 (autonomous scaffold); Tasks 2 + 3 are BLOCKING human-verify checkpoints (Bitwig Studio + optional JDK 21 required)
-last_updated: "2026-06-26T20:08:25Z"
+stopped_at: SC#1 + SC#3 PROVEN LIVE via Java .bwextension pivot (raw java.net TCP confirmed end-to-end). Remaining: the two D-01 DEEP capability probes (Undo Behavior, Note-Editing) + Automation target + Stable-ID existence in docs/bitwig-capabilities.md before Phase 2/3 edit design locks. Transport is de-risked.
+last_updated: "2026-06-26T20:45:00Z"
 last_activity: 2026-06-26
-last_activity_desc: Plan 03 Task 1 scaffold complete (spike/ throwaway files + capabilities-doc skeleton); paused at human checkpoints
+last_activity_desc: SC#1 + SC#3 proven live — Java SpikeProbe.bwextension emits real selection.changed over loopback TCP to the daemon dump CLI; PROBE-02 effectively done, PROBE-01 partially (transport/surface findings recorded; deep probes pending)
 progress:
   total_phases: 5
   completed_phases: 0
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 1 (Schema & IPC Spike) — PAUSED AT HUMAN CHECKPOINT
-Plan: 3 of 3 — Task 1 (autonomous scaffold) complete; Tasks 2 + 3 are BLOCKING human-verify gates
-Status: Plan 03 Task 1 done (throwaway JS extension + Java probe + capabilities-doc skeleton committed as `b14a52d`); the live in-app capability probes (Task 2 / PROBE-01) + transport proof + live SC#1 round-trip (Task 3 / PROBE-02) require a human with Bitwig Studio 6.0.6 open (+ optionally JDK 21). See `.planning/phases/01-schema-ipc-spike/01-03-SUMMARY.md` → "Manual Steps Remaining."
-Last activity: 2026-06-26 — Plan 03 Task 1 autonomous scaffold complete; paused at human checkpoints
+Phase: 1 (Schema & IPC Spike) — SC#1 + SC#3 PROVEN LIVE; deep capability probes pending
+Plan: 3 of 3 — Task 1 (scaffold) + the live transport proof done; remaining is the in-app DEEP probes (Undo, Note-Editing) for PROBE-01
+Status: The highest-risk structural unknown — Bitwig JVM raw TCP access — is CONFIRMED via a live end-to-end `selection.changed` round-trip (Java `SpikeProbe.bwextension` → loopback `127.0.0.1:7878` → daemon → validated JSON print). This required a D-07 deviation: pivot from JS to a Java extension because the JS control-surface `host` exposes no networking/file I/O (only println). SC#3 (frozen protocol: versioned + atomic-line writes + partial-line buffer + backpressure) is proven live through the same round-trip. PROBE-02 effectively complete; PROBE-01 partially — `docs/bitwig-capabilities.md` records transport/surface findings (TCP, JS limits, CursorClip arity, ServiceLoader packaging, selection-observer surface); the two D-01 DEEP items (Undo coalescing, Note-Editing round-trip) + Automation target + Stable-ID existence still need dedicated probe runs in Bitwig.
+Last activity: 2026-06-26 — SC#1 + SC#3 proven live via Java extension pivot
 
-Progress: [███████░░░] 67% — phase cannot advance to 100% until the in-app probes + live round-trip run
+Progress: [████████░░] ~80% — transport + contract de-risked; deep capability probes remain before full Phase 1 close
 
 ## Performance Metrics
 

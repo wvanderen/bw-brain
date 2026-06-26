@@ -41,11 +41,15 @@
 // =============================================================================
 
 // ---- 0. Definition (Bitwig looks these up at load) -------------------------
-// [TODO-A2: confirm exact host.defineController signature for the installed
-//  Bitwig 6.0.6 API version (open question A6 — record in capabilities doc
-//  header). DrivenByMoss uses ControllerExtensionDefinition in Java; the JS
-//  analog is host.defineController(vendor, name, version, uuid, ...).]
-host.defineController("bw-brain", "SpikeProbe", "0.0.1-spike", "d5d9f2c0-1d2a-4f3b-8c4e-spike0000001");
+// Canonical Bitwig JS control-script preamble (verified against the factory
+// template.js + cme/Xkey.control.js shipped in Bitwig 6.0.6):
+//   - loadAPI(1) MUST be the first top-level statement (no load -> script is
+//     ignored by Bitwig's controller scanner, which is why it didn't appear).
+//   - host.defineController(vendor, product, version, uuid) requires a VALID
+//     UUID (8-4-4-4-12 hex); a malformed UUID is silently rejected.
+loadAPI(1);
+
+host.defineController("bw-brain", "SpikeProbe", "0.0.1-spike", "adffe628-275c-412b-8b18-3d1ce626af8f");
 host.defineMidiPorts(0, 0); // spike does not need MIDI I/O
 
 // ---- 1. Globals (Bitwig injects `host` and calls init()) -------------------
@@ -81,7 +85,7 @@ function init() {
   trackBank     = host.createTrackBank(8, 0, 8);
   // [TODO-A2: confirm whether PinnableCursorClip (AGENTS.md recent addition)
   //  is exposed in the installed API version — affects Phase 2 clip targeting.]
-  cursorClip    = host.createCursorClip(16, 128, 0);
+  cursorClip    = host.createCursorClip(16, 128);  // [VERIFIED in-app Javadoc 6.0.6: createCursorClip(int gridWidth, int gridHeight) — 2 args, NOT 3]
   cursorDevice  = host.createCursorDevice();
 
   registerSelectionObserver();   // selection.changed emission (SC#1 path)
@@ -113,27 +117,34 @@ function exit() {
 // =============================================================================
 // ITrackBank.addSelectionObserver((index, isSelected) -> ...) is the verified
 // origin of `selection.changed`. JS analog [ASSUMED — A2]:
+// [VERIFIED in-app Javadoc 6.0.6: there is NO TrackBank.addSelectionObserver in the
+//  control-surface API. Selection is observed PER-TRACK via
+//  Track.addIsSelectedObserver(BooleanValueChangedCallback), reached through
+//  trackBank.getItemAt(index). The DrivenByMoss ITrackBank.addSelectionObserver
+//  belongs to the deeper Java extension framework, NOT the surface the JS host
+//  proxies — record this in docs/bitwig-capabilities.md.]
 function registerSelectionObserver() {
-  // [TODO-A2: confirm exact JS method name — trackBank.addSelectionObserver(cb)
-  //  vs trackBank.addSelectionObserver(callback). The DrivenByMoss Java lambda
-  //  signature is (int index, boolean isSelected).]
-  trackBank.addSelectionObserver(function(trackIndex, isSelected) {
-    // CRITICAL (Pitfall 3 / Pattern 5): the observer fires on the controller
-    // thread. We MUST NOT block here — no socket writes, no JSON.stringify of
-    // large objects, no host.scheduleTask chains that wait. Enqueue only.
-    host.println("[spike] selection observer fired: index=" + trackIndex +
-                 " selected=" + isSelected);
-    PENDING_SELECTION_EVENT = {
-      trackIndex: trackIndex,
-      isSelected: isSelected,
-      // [TODO-D-03: stable IDs — fill from the Stable-IDs probe. If Bitwig
-      //  exposes no stable UUID, payload.trackId stays a daemon-synthesized
-      //  fingerprint (STATE-04); record finding in capabilities doc.]
-      trackName: null,    // [TODO-A2: cursorTrack.name().get() or bank track name]
-      clipId: null,       // [TODO: launcher slot under the selected track]
-      deviceId: null      // [TODO: cursorDevice if any]
-    };
-  });
+  var size = trackBank.getSizeOfBank();
+  for (var i = 0; i < size; i++) {
+    (function (trackIndex) {
+      trackBank.getItemAt(trackIndex).addIsSelectedObserver(function (isSelected) {
+        // CRITICAL (Pitfall 3 / Pattern 5): observer fires on the controller
+        // thread. We MUST NOT block here — enqueue only; flush() drains.
+        host.println("[spike] selection observer: trackIndex=" + trackIndex +
+                     " selected=" + isSelected);
+        if (isSelected) {
+          PENDING_SELECTION_EVENT = {
+            trackIndex: trackIndex,
+            isSelected: isSelected,
+            // [TODO-A2: trackBank.getItemAt(i).name() — fill exact accessor in Task 2]
+            trackName: null,
+            clipId: null,       // [TODO: launcher slot under the selected track]
+            deviceId: null      // [TODO: cursorDevice if any]
+          };
+        }
+      });
+    })(i);
+  }
 }
 
 // Emit one JSON-Lines line shaped to satisfy schemas/protocol/event.schema.json:
@@ -154,7 +165,9 @@ function emitSelectionChanged(evt) {
   //  fingerprint for the native ID if one exists. Until then, emit a clearly
   //  spike-local placeholder so the daemon-side dump CLI can still validate
   //  the envelope shape end-to-end.]
-  if (evt.trackName)  payload.trackId  = "trk_" + evt.trackIndex;
+  // Spike-local placeholder id from the bank index — proves the envelope shape
+  // end-to-end. [TODO-D-03: swap for a native stable ID if Probe 6 finds one.]
+  payload.trackId = "trk_" + evt.trackIndex;
   // clipId / deviceId filled only if non-null after Task 2 probes.
   var line = {
     version: "1.0",
