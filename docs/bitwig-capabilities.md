@@ -344,3 +344,32 @@ OSC-as-proof, Phase 2 must still build the real raw-TCP bridge because the
 frozen JSON-Lines contract is incompatible with OSC's UDP value-pairs (the
 OSC stand-in only proves "the JVM can network," not "JSON-Lines over TCP
 works").
+
+---
+
+## Deferred to pre-Phase-3 (intentional — recorded, not silently dropped)
+
+The spike's de-risking purpose is achieved: raw TCP is confirmed (SC#1 live),
+the JSON-Lines contract is frozen and proven across both halves (SC#3 live), and
+every **architectural** question above is settled by the verified API surface.
+The following are **behavioral** refinements that mutate a real Bitwig project,
+refine Phase 3 UX/implementation guidance only, and do not change any
+architecture decision. They are deferred to a dedicated throwaway project just
+before Phase 3 (Reversible MIDI Patching) design locks:
+
+- **Undo coalescing timing + per-note-vs-batch undo step count (§1).** Recipe:
+  on a throwaway launcher clip, add 1 note → `Application.undo()` → observe; add
+  5 notes in a tight loop → undo once → count survivors. Refines the user-facing
+  "undo step count" guidance; architecture (daemon-authoritative revert) is
+  fixed regardless.
+- **Live NoteStep round-trip / launcher-vs-arranger editability / free-beat
+  positioning (§2).** Recipe: obtain a `NoteStep`, set velocity/duration, read
+  back; repeat on an arranger clip; probe arbitrary-beat positioning vs the
+  `createCursorClip(int gridWidth, int gridHeight)` grid. Confirms the edit
+  primitive; surface already verified.
+- **Automation target envelope + transport-play requirement (§3).** Recipe:
+  `cursorDevice.getParameter(0).set(value)` under transport-play vs not; observe
+  which envelope moves. Phase 5 (Automation & Device Workflows) concern.
+
+These are **not** gaps in the transport/contract de-risk (Phase 2 is unblocked);
+they are the natural pre-Phase-3 edit-design verification.

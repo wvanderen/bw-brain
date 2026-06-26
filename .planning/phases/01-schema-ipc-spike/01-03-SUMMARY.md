@@ -198,3 +198,33 @@ None — the autonomous Task 1 was executed exactly as specified. All Task 1 acc
 ---
 *Phase: 01-schema-ipc-spike*
 *Autonomous Task 1 completed: 2026-06-26. Plan PAUSED at blocking human-verify checkpoints (Tasks 2 + 3).*
+
+---
+
+## Spike Outcome (2026-06-26) — supersedes the manual-checkpoint status above
+
+The spike's de-risking purpose is **achieved**. What actually happened (vs. the
+JS/manual-checkpoint plan documented above):
+
+- **D-07 deviation — pivoted JS → Java.** Empirically confirmed in-app that the
+  JS control-surface `host` exposes **no networking and no file I/O** (only
+  `println` to an in-app console, no disk log). The live transport therefore
+  required a Java `.bwextension`. `spike/java/` (built against
+  `Contents/Java/bitwig.jar`) is the real spike artifact; `spike/bitwig-extension.js`
+  is retained as a record of the dead-end. JDK 21 installed via Homebrew.
+- **SC#1 + SC#3 PROVEN LIVE.** `SpikeProbe.bwextension` registers a `CursorTrack`
+  (follows selection), observes `position()`, and writes schema-valid
+  `selection.changed` JSON-Lines over a loopback `java.net.Socket` to the daemon's
+  `bw-brain-spike dump` CLI. Captured round-trip:
+  `{"version":"1.0","type":"selection.changed","timestamp":1782512568,"payload":{"trackId":"trk_1"}}`
+- **SC#2 (docs/bitwig-capabilities.md) surface-verified** against the in-app
+  Javadoc 6.0.6: TCP confirmed; no labelled-undo API; no native stable-IDs;
+  NoteStep-based note surface; `PinnableCursorClip` present; ServiceLoader
+  packaging. Structural validator passes.
+
+**Deferred to pre-Phase-3 (recorded in `docs/bitwig-capabilities.md` §Deferred):**
+the behavioral probes — undo-coalescing timing, live NoteStep round-trip,
+automation target envelope. They mutate a real project and refine Phase 3 UX
+only; they do not change any architecture decision and do not gate Phase 2.
+
+**Plan status:** complete (spike goal achieved). **Next:** `/gsd-verify-work`.

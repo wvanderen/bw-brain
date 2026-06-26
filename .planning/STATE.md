@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 1
 current_phase_name: Schema & IPC Spike
-status: at-human-checkpoint
-stopped_at: SC#1 + SC#3 PROVEN LIVE via Java .bwextension pivot (raw java.net TCP confirmed end-to-end). Remaining: the two D-01 DEEP capability probes (Undo Behavior, Note-Editing) + Automation target + Stable-ID existence in docs/bitwig-capabilities.md before Phase 2/3 edit design locks. Transport is de-risked.
-last_updated: "2026-06-26T20:45:00Z"
+status: ready-to-verify
+stopped_at: Phase 1 spike de-risked — SC#1 + SC#3 PROVEN LIVE (Java .bwextension, raw TCP confirmed end-to-end). All architectural unknowns resolved (no labelled-undo, no native stable-IDs, NoteStep surface, JS has no I/O). Behavioral probes (undo coalescing, note round-trip, automation target) intentionally deferred to pre-Phase-3 (recorded in docs/bitwig-capabilities.md). Ready for /gsd-verify-work.
+last_updated: "2026-06-26T21:05:00Z"
 last_activity: 2026-06-26
-last_activity_desc: SC#1 + SC#3 proven live — Java SpikeProbe.bwextension emits real selection.changed over loopback TCP to the daemon dump CLI; PROBE-02 effectively done, PROBE-01 partially (transport/surface findings recorded; deep probes pending)
+last_activity_desc: Phase 1 wrapped — transport + contract de-risked; behavioral probes deferred to pre-Phase-3; ready for /gsd-verify-work
 progress:
   total_phases: 5
   completed_phases: 0
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 1 (Schema & IPC Spike) — SC#1 + SC#3 PROVEN LIVE; deep capability probes pending
-Plan: 3 of 3 — Task 1 (scaffold) + the live transport proof done; remaining is the in-app DEEP probes (Undo, Note-Editing) for PROBE-01
-Status: The highest-risk structural unknown — Bitwig JVM raw TCP access — is CONFIRMED via a live end-to-end `selection.changed` round-trip (Java `SpikeProbe.bwextension` → loopback `127.0.0.1:7878` → daemon → validated JSON print). This required a D-07 deviation: pivot from JS to a Java extension because the JS control-surface `host` exposes no networking/file I/O (only println). SC#3 (frozen protocol: versioned + atomic-line writes + partial-line buffer + backpressure) is proven live through the same round-trip. PROBE-02 effectively complete; PROBE-01 partially — `docs/bitwig-capabilities.md` records transport/surface findings (TCP, JS limits, CursorClip arity, ServiceLoader packaging, selection-observer surface); the two D-01 DEEP items (Undo coalescing, Note-Editing round-trip) + Automation target + Stable-ID existence still need dedicated probe runs in Bitwig.
-Last activity: 2026-06-26 — SC#1 + SC#3 proven live via Java extension pivot
+Phase: 1 (Schema & IPC Spike) — DE-RISKED; ready for /gsd-verify-work
+Plan: 3 of 3 — all complete (01-03 spike goal achieved: TCP proven + contract frozen + capability surfaces verified)
+Status: Phase 1's purpose is achieved. SC#1 + SC#3 proven live via a Java `.bwextension` pivot (raw `java.net` TCP confirmed end-to-end; the JS control-surface `host` has no networking/file I/O, so Java is mandatory). Every architectural unknown is resolved against the in-app Javadoc 6.0.6: no labelled-undo API (daemon-authoritative revert confirmed), no native stable-IDs (STATE-04 fingerprint-mapping required), NoteStep-based note surface, `PinnableCursorClip` present, ServiceLoader extension packaging. Behavioral probes (undo-coalescing timing, live NoteStep round-trip, automation target) are intentionally deferred to pre-Phase-3 — recorded in `docs/bitwig-capabilities.md` §Deferred. Next: `/gsd-verify-work` to close Phase 1, then Phase 2 (Read-Only Context Foundation).
+Last activity: 2026-06-26 — Phase 1 wrapped; ready for verify
 
-Progress: [████████░░] ~80% — transport + contract de-risked; deep capability probes remain before full Phase 1 close
+Progress: [█████████░] ~95% — awaits /gsd-verify-work to formally close
 
 ## Performance Metrics
 
