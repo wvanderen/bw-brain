@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "ESM-native NodeNext config (AGENTS.md: Node 24 LTS target, TS 5.7+, native ESM).",
+    "HARD RULE: all relative imports in .ts sources MUST end in .js",
+    "(NodeNext resolution quirk — required at runtime even though the source is .ts).",
+    "Example: import { LineBuffer } from './protocol/line-buffer.js';  // source file is line-buffer.ts",
+    "resolveJsonModule: true is required so reader.ts can import ../schemas/protocol/*.schema.json with `with { type: 'json' }`."
+  ],
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

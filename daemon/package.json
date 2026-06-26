@@ -1,0 +1,28 @@
+{
+  "name": "bw-brain-daemon",
+  "version": "0.0.0",
+  "private": true,
+  "description": "bw-brain local-first Bitwig intelligence layer — daemon/CLI/normalization runtime (Phase 1 kept scaffolding, D-05/D-06).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "gen:types": "json2ts -i '../schemas/protocol/**/*.json' -o src/gen/",
+    "test": "vitest run",
+    "dump": "tsx src/cli/dump.ts",
+    "check:capabilities": "node ../scripts/check-capabilities-doc.mjs"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "commander": "15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "json-schema-to-typescript": "15.0.4",
+    "tsx": "4.22.4",
+    "typescript": "^5.7",
+    "vitest": "4.1.9"
+  }
+}

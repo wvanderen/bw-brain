@@ -1,0 +1,12 @@
+# daemon/.gitignore
+# Build output + installed deps — never tracked.
+node_modules/
+dist/
+
+# Vitest cache + tmp artifacts.
+.vitest-cache/
+*.tsbuildinfo
+
+# Local env overrides (never leak secrets).
+.env
+.env.local
