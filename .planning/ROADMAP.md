@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `docs/bitwig-capabilities.md` exists and is grounded in in-app verification of the scripting guide — documenting note-editing scope, automation write, bank paging, observer granularity, and undo behavior — so bridge design locks against API reality, not assumption.
   3. The JSON-Lines protocol contract (`schemas/protocol/*`) is frozen enough to build against: versioned messages, atomic-line writes, a partial-line buffer, and an explicit backpressure rule.
 
-**Plans**: 2/3 plans executed
+**Plans**: 2/3 plans executed (Plan 03 at human checkpoint)
 Plans:
 **Wave 1**
 
@@ -45,7 +45,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Bitwig-side spike: in-app capability probes → docs/bitwig-capabilities.md + transport proof + live SC#1 round-trip (MANUAL checkpoints, Wave 3)
+- [~] 01-03-PLAN.md — Bitwig-side spike: in-app capability probes → docs/bitwig-capabilities.md + transport proof + live SC#1 round-trip. **Task 1 (autonomous scaffold) complete — `b14a52d`; Tasks 2 + 3 are BLOCKING human-verify checkpoints** (Bitwig Studio 6.0.6 + optional JDK 21). PROBE-01 and PROBE-02 are PENDING the manual work. See `01-03-SUMMARY.md` → "Manual Steps Remaining."
 
 **Research needed**: TCP socket access in the Bitwig JVM (the single highest-risk structural unknown — MEDIUM confidence); in-app verification of the Bitwig Developer Resources scripting guide to confirm exact API version + recent additions.
 
