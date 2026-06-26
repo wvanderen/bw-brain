@@ -1,0 +1,163 @@
+# Requirements: bw-brain
+
+**Defined:** 2026-06-25
+**Core Value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
+
+## v1 Requirements
+
+Requirements for initial release across all 4 milestones (M1 read-only context → M2 reversible patching → M3 arrangement intelligence → M4 automation/devices). Each maps to roadmap phases (phase assignment finalized during roadmap creation).
+
+### Foundation — Bridge & Context (M1)
+
+- [ ] **BRIDGE-01**: Java `.bwextension` runs inside Bitwig and mirrors live selection (track/clip/device/region) and transport state to an external process via newline-delimited JSON over localhost
+- [ ] **BRIDGE-02**: Bridge mirrors tracks, clips, launcher-clip notes, device chains (including loaded VST/AU plugins), and exposed parameters via the Bitwig observer API
+- [ ] **BRIDGE-03**: Bridge emits change events (`selection.changed`, etc.) and applies edit primitives (note add/remove, parameter set) labelled with the extension name
+- [ ] **PROBE-01**: Bitwig capability probe produces `docs/bitwig-capabilities.md` documenting the verified API surface (note editing scope, automation write, bank paging, observer granularity, undo behavior) before bridge design locks
+- [ ] **PROBE-02**: IPC spike confirms Bitwig JVM localhost TCP (or stdio relay) access and freezes the JSON-Lines protocol contract both halves build against
+
+### Foundation — State Model & CLI (M1)
+
+- [ ] **STATE-01**: Daemon ingests bridge snapshots and normalizes them into a raw project-state model (project, transport, selection, tracks, clips, devices, automation) validated against `schemas/project-state.schema.json`
+- [ ] **STATE-02**: Daemon derives composition state (sections, trackRoles, motifs, energyCurve, automationSalience) from raw state, each with confidence scores
+- [ ] **STATE-03**: Daemon maintains an intent-state model (`projectIntent`: summary, constraints, targets) that constrains transforms and suggestions
+- [ ] **STATE-04**: Daemon synthesizes stable IDs for observed Bitwig objects (Bitwig exposes none) via fingerprint mapping, with reconnect/reconcile-on-connect semantics
+- [ ] **CLI-01**: Eight CLI commands (`bw-focus`, `bw-project`, `bw-device`, `bw-midi`, `bw-arrange`, `bw-automation`, `bw-edit`, `bw-diff`) emit compact JSON, fail clearly, and suppress prose unless `--explain` is set
+- [ ] **CLI-02**: `bw-focus export`, `bw-project summary`, `bw-project region` return selected/project/region context as JSON
+- [ ] **CLI-03**: `bw-midi inspect` and `bw-device inspect` return notes/velocity/timing and chain/parameters (including loaded VST/AU plugins) of the selected clip/device as JSON
+
+### Foundation — Memory (M1, cross-cutting)
+
+- [ ] **MEM-01**: Daemon maintains durable project memory in `.bw-brain/` (`state-cache.json`, `intent.json`, `roles.json`, `patch-history.jsonl`) with atomic writes
+- [ ] **MEM-02**: Ephemeral session memory (experiment thread, candidate patches) never writes to the durable store — a hard architectural boundary
+
+### Edit Pipeline (M2)
+
+- [ ] **EDIT-01**: Patch object schema (`scope → operations → rationale → reversibility → risk`) is defined at `schemas/patch.schema.json` and validated at every boundary (daemon entry/exit, CLI emit, bridge apply)
+- [ ] **EDIT-02**: `bw-edit preview` renders a diff of what a patch would change without applying it
+- [ ] **EDIT-03**: `bw-diff` surfaces notes added/removed/changed, automation targets touched, and scope (track/clip/region) between two states
+- [ ] **EDIT-04**: `bw-edit apply` applies a patch only after preview unless `--force` is used; every applied patch is recorded with a daemon-authoritative undo entry
+- [ ] **EDIT-05**: Undo is daemon-authoritative: `patch-history.jsonl` + `bw-edit revert` replay inverse operations (Bitwig native undo is caveated, not relied upon)
+- [ ] **EDIT-06**: Risk class gating classifies edits low/medium/high; only low-risk edits are one-step, medium/high require explicit confirmation
+
+### MIDI Transforms (M2)
+
+- [ ] **MIDI-01**: Motif signature (pitch-class + rhythm quantization) and preserve-motif-identity mode are implemented; every creative transform runs in preserve-motif mode by default
+- [ ] **MIDI-02**: `bw-midi vary` produces motif-preserving A/B/C variant patch candidates
+- [ ] **MIDI-03**: `bw-midi counterline` generates a companion voice respecting harmonic center and motif identity
+- [ ] **MIDI-04**: `bw-midi voice-leading-fix` produces a low-risk cleanup patch (parallel fifths, leading tones, spacing)
+- [ ] **MIDI-05**: Velocity/timing humanization produces a low-risk humanization patch
+
+### Arrangement Intelligence (M3)
+
+- [ ] **ARRANGE-01**: `bw-arrange sections` performs bottom-up temporal segmentation of the project with confidence scores
+- [ ] **ARRANGE-02**: `bw-arrange repetition-report` produces a self-similarity report over the arrangement
+- [ ] **ARRANGE-03**: `bw-arrange energy-curve` produces a per-bar energy curve
+- [ ] **ARRANGE-04**: Transition suggestions detect energy mismatches and repetition gaps between sections and propose small reversible patches
+- [ ] **ARRANGE-05**: Track-role classification labels tracks (kick/bass/lead/pad/fx/hats/percussion) with confidence, stored in `roles.json`
+
+### Automation & Devices (M4)
+
+- [ ] **AUTO-01**: `bw-automation inspect` reports per-track automation salience (most expressive parameters)
+- [ ] **AUTO-02**: `bw-device macros-suggest` proposes macro/XY assignments ranked by observed expressiveness
+- [ ] **AUTO-03**: `bw-automation propose` generates a bounded automation curve patch for a selected parameter/region (medium risk → confirmation required)
+- [ ] **AUTO-04**: Device inspection and automation workflows cover third-party VST/AU plugins loaded in the Bitwig device chain, not just native Bitwig devices
+
+### UX & Architecture (cross-cutting, M1–M4)
+
+- [ ] **UX-01**: Pi `/analyze` skill reads selection/section/intent and produces critique + 2–4 next actions (M1)
+- [ ] **UX-02**: Pi `/vary`, `/apply` skills drive the edit pipeline and a diff pane renders patch diffs (M2)
+- [ ] **UX-03**: Pi `/review` skill + arrangement pane render section timeline + energy sparkline (M3)
+- [ ] **UX-04**: Pi `/device` skill + device pane render chain summary + macro opportunities (M4)
+- [ ] **UX-05**: State pane renders selected track/clip/device + section label (M1)
+- [ ] **UX-06**: Every suggestion/transform output includes an `assumptions[]` field stating its assumptions
+- [ ] **ARCH-01**: Genre-pluggable profile interface is designed in M2; electronic/techno ships as the first profile, expanded in M4
+- [ ] **ARCH-02**: Generic reasoning core runs without a profile (defaults to generic electronic); profiles enhance, never gate, the core
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Future Profiles & Surfaces
+
+- **ARCH-03**: Genre profiles beyond electronic/techno (e.g. house, ambient, drum-and-bass) as swappable profile packs
+- **ARCH-04**: Evaluate bw-brain-as-VST/AU as an alternative integration model for non-Bitwig DAWs (architecture study, not commitment)
+- **UX-07**: Additional/composable TUI panes beyond state/diff/arrangement/device
+- **MEM-03**: Cross-project memory and motif library (shared motifs/patterns across projects)
+- **NOTF-01**: Optional on-demand notifications for analysis completion (not real-time/always-listening)
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Background auto-edits (heuristic edits without explicit user action) | Destroys the trust model — producer can't tell which changes are theirs; one bad heuristic wrecks the song silently |
+| Cloud dependency / remote model calls | Violates local-first defining constraint; latency, privacy, offline-work breaks |
+| MCP (Model Context Protocol) integration | Large tool registry that fights the "small toolbelt, bash-and-code-are-composable" stance; makes the contract less inspectable |
+| Direct mutation without a patch object | No preview, no undo, no risk class, no audit trail — one bad call = wrecked song |
+| Genre-specific hard-coding | Couples architecture to one genre; future profiles become forks |
+| Heavy musical reasoning inside the Bitwig bridge | Stalls the audio engine; bridge crashes take down Bitwig |
+| Generative "casino MIDI" (random generation without motif preservation) | Before accuracy works, creativity is just noise |
+| Audio mastering / stem separation / audio MIR | bw-brain is MIDI/state/automation intelligence, not audio DSP |
+| Mobile/web client | Terminal-first; web doubles the surface area and breaks local-first |
+| Real-time / always-listening mode | Burns CPU, fights the audio engine, produces low-value suggestion stream |
+| Multi-track mutation without explicit scope | Unbounded scope = unbounded risk; breaks the patch model |
+| Patch without preview unless forced (`--force`) | Trust is earned; default is always preview |
+
+## Traceability
+
+Milestone intent shown; exact phase assignment finalized during roadmap creation.
+
+| Requirement | Milestone | Phase | Status |
+|-------------|-----------|-------|--------|
+| BRIDGE-01 | M1 | TBD | Pending |
+| BRIDGE-02 | M1 | TBD | Pending |
+| BRIDGE-03 | M1 | TBD | Pending |
+| PROBE-01 | M1 | TBD | Pending |
+| PROBE-02 | M1 | TBD | Pending |
+| STATE-01 | M1 | TBD | Pending |
+| STATE-02 | M1 | TBD | Pending |
+| STATE-03 | M1 | TBD | Pending |
+| STATE-04 | M1 | TBD | Pending |
+| CLI-01 | M1 | TBD | Pending |
+| CLI-02 | M1 | TBD | Pending |
+| CLI-03 | M1 | TBD | Pending |
+| MEM-01 | M1 | TBD | Pending |
+| MEM-02 | M1 | TBD | Pending |
+| UX-01 | M1 | TBD | Pending |
+| UX-05 | M1 | TBD | Pending |
+| UX-06 | M1+ | TBD | Pending |
+| EDIT-01 | M2 | TBD | Pending |
+| EDIT-02 | M2 | TBD | Pending |
+| EDIT-03 | M2 | TBD | Pending |
+| EDIT-04 | M2 | TBD | Pending |
+| EDIT-05 | M2 | TBD | Pending |
+| EDIT-06 | M2 | TBD | Pending |
+| MIDI-01 | M2 | TBD | Pending |
+| MIDI-02 | M2 | TBD | Pending |
+| MIDI-03 | M2 | TBD | Pending |
+| MIDI-04 | M2 | TBD | Pending |
+| MIDI-05 | M2 | TBD | Pending |
+| UX-02 | M2 | TBD | Pending |
+| ARCH-01 | M2 | TBD | Pending |
+| ARCH-02 | M2+ | TBD | Pending |
+| ARRANGE-01 | M3 | TBD | Pending |
+| ARRANGE-02 | M3 | TBD | Pending |
+| ARRANGE-03 | M3 | TBD | Pending |
+| ARRANGE-04 | M3 | TBD | Pending |
+| ARRANGE-05 | M3 | TBD | Pending |
+| UX-03 | M3 | TBD | Pending |
+| AUTO-01 | M4 | TBD | Pending |
+| AUTO-02 | M4 | TBD | Pending |
+| AUTO-03 | M4 | TBD | Pending |
+| AUTO-04 | M4 | TBD | Pending |
+| UX-04 | M4 | TBD | Pending |
+
+**Coverage:**
+- v1 requirements: 42 total
+- Mapped to milestones: 42
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-06-25*
+*Last updated: 2026-06-25 after initial definition*
