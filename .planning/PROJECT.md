@@ -84,7 +84,7 @@ The assistant reliably understands and describes the selected Bitwig context (cl
 | Scope this GSD project to all 4 milestones | Milestones are tightly coupled (shared bridge/daemon/data model); decomposing as one roadmap keeps the foundation coherent | — Pending |
 | Pi/OpenClaw is a real, installed runtime | Pi package layer is in scope and buildable from M1; first-class UX is not deferred | — Pending |
 | Pluggable genre profiles, generic reasoning core | Avoids hard-coded genre assumptions; electronic/techno is the first profile, not the architecture | — Pending |
-| Java bridge first, then harden | Official Bitwig extension path; sturdier long-running bridge; JS prototyping allowed | — Pending |
+| Java bridge from day one (no JS prototyping) | Official Bitwig extension path; sturdier long-running bridge. Spike (Phase 1) confirmed JS control-surface `host` exposes NO networking/file I/O — JS is unusable for the transport, so Java `.bwextension` is mandatory, not just preferred | ✓ Phase 1 — JS prototyping ruled out; Java pivot proven live |
 | No MCP — thin JSON-Lines bridge | Matches "small toolbelt over large tool registries"; keeps the contract inspectable and composable | — Pending |
 
 ## Evolution
@@ -105,4 +105,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-25 after initialization*
+*Last updated: 2026-06-26 after Phase 1*
