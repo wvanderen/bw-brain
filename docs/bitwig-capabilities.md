@@ -8,13 +8,18 @@
 > `java.net` TCP from the Bitwig extension JVM — is **CONFIRMED** via a live
 > end-to-end `selection.changed` round-trip (see §Transport Decision). The JS
 > control-surface `host` surface is characterized (no networking/file I/O). The
-> API version + extension-packaging mechanism are confirmed.
+> API version + extension-packaging mechanism are confirmed. The **API surfaces**
+> for Undo (no labelled-undo API → daemon-authoritative revert confirmed),
+> Note-Editing (`NoteStep`-based + `PinnableCursorClip` present), and Stable-IDs
+> (no native id/uuid/hash accessor → STATE-04 fingerprint-mapping required) are
+> verified against the in-app Javadoc.
 >
-> **What remains TODO-in-app:** the two D-01 DEEP probes — **Undo Behavior (§1)**
-> and **Note-Editing Scope (§2)** — plus the single-pass Automation target (§3)
-> and Stable-ID existence (§6). These need dedicated note-add/undo probe runs in
-> Bitwig before Phase 2/3 edit design locks. They do NOT gate the Phase 2 bridge
-> transport (already de-risked).
+> **What remains TODO-in-app:** the **behavioral** half of the two D-01 DEEP
+> probes — Undo coalescing timing + per-note-vs-batch undo step count (§1), and
+> the live NoteStep round-trip / launcher-vs-arranger / free-beat-positioning
+> (§2) — plus the Automation target envelope (§3). These need a running probe in
+> Bitwig with a selected clip. They refine Phase 3 edit design but do NOT gate
+> Phase 2 (read-only) and do NOT gate the now-confirmed transport.
 >
 > **Plan:** 01-schema-ipc-spike / 03.
 > **Last updated:** 2026-06-26 (live SC#1 round-trip + Java extension pivot).
@@ -45,10 +50,10 @@
 trust model (PROJECT.md). Every future edit and the entire revert path hinge on
 what is recorded here; single-pass is not enough.
 
-**Verified surface `[VERIFIED: AGENTS.md capabilities table + DrivenByMoss]`:**
-`Application.undo()` / `redo()` exist on the Java API (AGENTS.md line 172 lists
-`undo(), redo(), zoom, focus panel, new project` — "no per-op label"). The
-DrivenByMoss framework wraps these.
+**Verified surface `[VERIFIED: in-app Javadoc 6.0.6]`:** `Application.undo()`,
+`redo()`, `canUndo()` (BooleanValue), `canRedo()`, `undoAction()` /
+`redoAction()` (return `HardwareActionBindable`). The DrivenByMoss framework
+wraps these.
 
 **Design questions the probe must answer (RESEARCH.md §Capability Probe Design
 Questions, Probe 1):**
@@ -56,30 +61,35 @@ Questions, Probe 1):**
 - Does ANY undo API accept a **label**? (seed.md + PROJECT.md assume
   `undoLabel`; the trust-spine schema requires it on every `apply.patch`.)
 - Does the host **coalesce** consecutive edits on a time window (~1s)?
-- Does `CursorClip.addNote()` create **one undo step per note** or **one per
-  batch**? (Critical: if per-note, applying a 20-note patch = 20 undo steps the
-  user must click through.)
+- Does adding notes create **one undo step per note** or **one per batch**?
+  (Critical: if per-note, applying a 20-note patch = 20 undo steps the user
+  must click through.)
 
 **Probe recipe (DEEP — multi-step, per D-01):**
-1. Add a note via `CursorClip.addNote(...)` → invoke `Application.undo()` →
+1. Add a note via `CursorClip`/`NoteStep` → invoke `Application.undo()` →
    observe one-step removal.
 2. Add 5 notes in a tight loop → undo once → observe coalescing vs per-note.
-3. Probe for a labelled-undo API (`application.undo(label)` /
-   `host.beginUndoTask(name)`).
+3. (Already answered by surface scan — see Observed.)
 Record timing + the exact host.println output.
 
-**Observed:** **TODO-in-app** (Plan 03 Task 2). Do not fabricate — record the
-verified in-app finding here once the probe runs. Undo + note-editing are the
-two DEEP items per D-01.
+**Observed:** **PARTIALLY VERIFIED.** Surface scan of `Application` (in-app
+Javadoc 6.0.6) confirms undo/redo/canUndo/canRedo exist, and **there is NO
+labelled-undo API** — no `undo(label)`, no `beginUndoTask(name)`; `undoAction()`
+returns a bindable but still **unlabelled** action. Consequence: Bitwig undo is
+structural-only; the `undoLabel` field in the frozen `edit.schema.json` is
+**bw-brain's own audit label, not a Bitwig feature.** The temporal questions
+(coalescing window, per-note vs per-batch undo step count) still need the live
+multi-step probe (add N notes → undo once → count survivors); pending in-app run.
 
-**Mitigation:** DRAFT (pending observation) — if native undo turns out to be
-unreliable, unlabelled, or per-step, the daemon-authoritative revert model
-(`patch-history.jsonl` + inverse operations, EDIT-05) is the **only** safe
-path; native Bitwig undo is caveated harder in user docs and never the spine.
-The frozen `edit.schema.json` already enforces `undoLabel` on every
-`apply.patch` (Plan 01 trust-spine), so the contract is correct regardless of
-the undo finding — only the user-facing documentation of undo granularity
-changes. Record the final decision here after observation.
+**Mitigation:** **CONFIRMED design path** — because there is no native labelled
+undo and the coalescing behavior is not contractual, the daemon-authoritative
+revert model (`patch-history.jsonl` + inverse operations, EDIT-05) is the
+**only** safe, reliable, auditable path; native Bitwig undo is caveated in user
+docs and never the spine. The frozen `edit.schema.json` already enforces
+`undoLabel` on every `apply.patch` — that label is bw-brain's, recorded in
+`patch-history.jsonl`, independent of Bitwig's undo granularity. The live
+coalescing probe (when run) only refines the user-facing "undo step count"
+guidance, not the architecture.
 
 ---
 
@@ -88,35 +98,42 @@ changes. Record the final decision here after observation.
 **Priority:** D-01 — DEEP verify. The core MIDI edit surface; every Phase 3
 patch operation depends on it.
 
-**Verified surface `[VERIFIED: AGENTS.md + DrivenByMoss ClipModule/INoteClip]`:**
-`CursorClip` exposes `addNote`, `removeNote`, `getNotes`, and `NoteStep` with
-velocity / duration / pan / pressure / releaseVelocity / timbre. `INoteClip`
-(DrivenByMoss) exposes `quantize`, `setName`, `setColor`, `togglePinned`,
-`doesExist`.
+**Verified surface `[VERIFIED: in-app Javadoc 6.0.6]`:** note editing is
+**`NoteStep`-based** — `NoteStep` exposes `velocity`, `duration`, `pressure`,
+`releaseVelocity`, `velocitySpread`, `pan`, `timbre`, `start`, `pitch` with
+matching setters (e.g. `setVelocity(double)`, `setDuration(double)`).
+`CursorClip extends Clip extends ...`; `PinnableCursorClip extends CursorClip,
+PinnableCursor` (**confirmed present** — AGENTS.md "recent addition"). The
+public note-edit surface is NoteStep (step navigation via `Clip.scrollToStep(int)`
+etc.); DrivenByMoss's `INoteClip.addNote(...)` is the internal interface, not the
+public binding — the Phase 2 bridge must use the NoteStep surface (get a step,
+mutate its fields).
 
 **Design questions (RESEARCH.md Probe 2):**
 - Can notes be edited in **launcher clips** AND **arranger clips**? (ROADMAP
   Phase 4 flags "Bitwig's API cannot edit the arranger" — confirm.)
-- Step-sequencer grid vs free note grid — does `addNote` accept arbitrary
-  `start` / `length` in beats?
-- Is `PinnableCursorClip` (AGENTS.md "recent addition") present on the
-  installed host, and does pinning matter for editing the right clip?
+- Free-beat positioning — can a `NoteStep` start at an arbitrary beat, or is it
+  grid-locked to the step grid (the `gridWidth`/`gridHeight` from
+  `createCursorClip(int,int)`)?
+- Does pinning (`PinnableCursorClip`) matter for targeting the right clip?
 
-**Probe recipe (DEEP):** launcher-clip round-trip — `CursorClip.addNote({pitch,
-start, length, velocity})` → `getNotes()` → confirm the round-trip is
-byte-identical; then repeat for arranger clip; then probe arbitrary
-start/length.
+**Probe recipe (DEEP):** launcher-clip round-trip — obtain a `NoteStep`, set
+its velocity/duration, read back → confirm the values persist; then repeat for
+arranger clip; then probe arbitrary-beat positioning vs the configured grid.
 
-**Observed:** **TODO-in-app** (Plan 03 Task 2). Single-pass is not enough —
-probe launcher + arranger + arbitrary-beat positioning per D-01.
+**Observed:** **PARTIALLY VERIFIED.** Surface confirms NoteStep is the edit
+primitive + its full field set. The behavioral round-trip (values persist?
+launcher vs arranger? grid-locked vs free-beat?) needs the live probe with a
+selected clip — pending in-app run. Does not block Phase 2 transport.
 
 **Mitigation:** DRAFT (pending observation) — if arranger-clip editing turns
 out to be unsupported (likely per ROADMAP Phase 4), Phase 3 patch operations
 are routed exclusively through launcher clips and arranger edits are deferred
 until a workaround is designed; user-facing docs explicitly scope "edits apply
 to launcher clips only" until that lands. Free-beat positioning is the
-non-negotiable minimum — if `addNote` is grid-locked, the patch model needs
-a different primitive (record which one).
+non-negotiable minimum — if `NoteStep.start` is grid-locked, the patch model
+needs a finer grid (`createCursorClip` gridWidth sized to the project's shortest
+note) and that is recorded here.
 
 ---
 
@@ -221,22 +238,29 @@ required at all.
 expose any stable UUID or hash, or only `name + index` (which shift on
 reorder)?
 
-**Verified:** `OSCControllerDefinition` uses a fixed UUID for the **extension**,
-not for tracks `[VERIFIED: OSCControllerDefinition.java]`.
+**Verified:** **NO stable-id accessor exists on `Track`** — a full method scan
+of `com.bitwig.extension.controller.api.Track` (in-app Javadoc 6.0.6) shows
+only `position()` (IntegerValue, shifts on reorder) and `name()` (settable
+string) as identity-like accessors; there is **no `id()`/`uuid()`/`guid()`/`hash()`**
+on Track (or on the Clip/Device surfaces surveyed). `OSCControllerDefinition`'s
+fixed UUID is for the **extension**, not for tracks `[VERIFIED]`.
 
-**Probe recipe:** dump a track's `name + index` (+ any UUID-like property you
+**Probe recipe:** dump a track's `name + position` (+ any UUID-like property you
 can find), reorder it in the Bitwig UI, re-dump → did the identity follow the
 track or the slot?
 
-**Observed:** **TODO-in-app** (Plan 03 Task 2). Enumerate every property on a
-Track / Clip / Device object looking for anything UUID/hash-shaped.
+**Observed:** **PARTIALLY VERIFIED.** Surface scan is conclusive that no native
+stable-ID accessor is exposed, so identity is `(name, position)` which is
+**slot-bound, not object-bound** (position is the slot index). Behavioral
+confirmation via live UI reorder still recommended but the surface already
+settles the design question.
 
-**Mitigation:** DRAFT (pending observation) — if no stable native IDs exist
-(likely), STATE-04 (fingerprint mapping: name + type + neighbors + content
-hash) is **required**; the daemon synthesizes stable IDs and reconciles them
-on reconnect. This is already budgeted in the roadmap as STATE-04; a positive
-finding (stable IDs DO exist) would let Phase 2 simplify the mapping but the
-defensive design does not change. Cheap to confirm, high downstream value
+**Mitigation:** **CONFIRMED design path** — STATE-04 (fingerprint mapping:
+name + type + neighbors + content hash) is **required**; the daemon synthesizes
+stable IDs and reconciles them on reconnect/reorder. This is budgeted in the
+roadmap as STATE-04. A positive native-ID finding would have let Phase 2
+simplify the mapping; the verified absence means the defensive design stands as
+planned. Cheap to behaviorally confirm on a reorder, high downstream value
 (D-03).
 
 ---
