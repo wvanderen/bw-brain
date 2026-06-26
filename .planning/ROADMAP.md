@@ -33,11 +33,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `docs/bitwig-capabilities.md` exists and is grounded in in-app verification of the scripting guide — documenting note-editing scope, automation write, bank paging, observer granularity, and undo behavior — so bridge design locks against API reality, not assumption.
   3. The JSON-Lines protocol contract (`schemas/protocol/*`) is frozen enough to build against: versioned messages, atomic-line writes, a partial-line buffer, and an explicit backpressure rule.
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Freeze the JSON-Lines protocol contract (6 JSON Schema 2020-12 files) + daemon ESM scaffold + generated TS types + capabilities-doc validator (autonomous, Wave 1)
+- [x] 01-01-PLAN.md — Freeze the JSON-Lines protocol contract (6 JSON Schema 2020-12 files) + daemon ESM scaffold + generated TS types + capabilities-doc validator (autonomous, Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -129,7 +129,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Schema & IPC Spike | 0/TBD | Not started | - |
+| 1. Schema & IPC Spike | 1/3 | In Progress|  |
 | 2. Read-Only Context Foundation (M1) | 0/TBD | Not started | - |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | Not started | - |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |

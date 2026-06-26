@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 1
 current_phase_name: Schema & IPC Spike
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-26T18:32:05.086Z"
+stopped_at: Completed 1-01-PLAN.md (contract frozen)
+last_updated: "2026-06-26T19:00:14.787Z"
 last_activity: 2026-06-26
-last_activity_desc: Roadmap created (5 phases derived from 42 v1 requirements; 100% coverage)
+last_activity_desc: Phase 1 execution started
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -24,30 +24,30 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-25)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 1 — Schema & IPC Spike (de-risk Bitwig TCP + freeze the JSON-Lines contract)
+**Current focus:** Phase 1 — Schema & IPC Spike
 
 ## Current Position
 
-Phase: 1 of 5 (Schema & IPC Spike)
-Plan: 0 of TBD in current phase
-Status: Ready to execute
-Last activity: 2026-06-26 — Roadmap created (5 phases derived from 42 v1 requirements; 100% coverage)
+Phase: 1 (Schema & IPC Spike) — EXECUTING
+Plan: 2 of 3
+Status: Plan 01 complete (contract frozen); ready for Plan 02
+Last activity: 2026-06-26 — Plan 01 (schema freeze + daemon scaffold) complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 19 min
+- Total execution time: ~0.3 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Schema & IPC Spike | 0/TBD | — | — |
+| 1. Schema & IPC Spike | 1/3 | 19 min | 19 min |
 | 2. Read-Only Context Foundation (M1) | 0/TBD | — | — |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | — | — |
 | 4. Arrangement Intelligence (M3) | 0/TBD | — | — |
@@ -55,8 +55,8 @@ Progress: [░░░░░░░░░░] 0%
 
 **Recent Trend:**
 
-- Last 5 plans: —
-- Trend: —
+- Last 5 plans: 1-01 (19 min)
+- Trend: baseline established
 
 *Updated after each plan completion*
 
@@ -70,6 +70,9 @@ Recent decisions affecting current work:
 - [Roadmap]: 5-phase vertical-slice structure (de-risk spike → M1 → M2 → M3 → M4) honoring accurate-first sequencing; large M1/M2 phases kept as single vertical slices (decomposed into plans rather than split into horizontal layers).
 - [Roadmap]: Phase 1 leads with PROBE-01 + PROBE-02 — the single highest-risk structural unknown (Bitwig TCP) gates all bridge work.
 - [Roadmap]: UX-06 (assumptions[] field) placed in Phase 2 as a foundational guardrail established from M1.
+- [Phase 1 / Plan 01]: Frozen protocol breadth = envelope spine + version handshake + 4 seed-example message shapes (selection.changed, get.selected_clip, {id,ok,payload} response, apply.patch); speculative catalog marked Phase 2-extensible per Pitfall 4. Calibrated against SC#3.
+- [Phase 1 / Plan 01]: Trust-spine enforced at schema level — edit.schema.json requires payload.undoLabel (minLength 1) + payload.operations (minItems 1); the bridge can refuse unlabeled edits by validation alone. PROJECT.md guardrail + AGENTS.md line 17.
+- [Phase 1 / Plan 01]: Codegen via scripts/gen-types.mjs ($id-aware bundler) instead of the literal json2ts CLI — @apidevtools/json-schema-ref-parser cannot resolve cross-file $refs against the absolute https $id scheme and json2ts compiles each file independently. Contract schemas stay pristine; runtime Ajv resolves $ref by $id natively.
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-26T16:26:55.219Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-schema-ipc-spike/01-CONTEXT.md
+Last session: 2026-06-26T18:59:29.111Z
+Stopped at: Completed 1-01-PLAN.md (contract frozen)
+Resume file: None
