@@ -12,9 +12,19 @@
 // apply at runtime — Ajv implements 2020-12 $id-based $ref resolution).
 //
 // ESM + NodeNext: all relative imports end in .js (AGENTS.md convention).
+//
+// NOTE on the Ajv import + the absence of addFormats:
+//  - `ajv 8.20.0` ships no `exports` map, so the deep subpath `ajv/dist/2020`
+//    resolves at runtime but NOT under tsc NodeNext ESM mode. The NAMED import
+//    `{ Ajv2020 }` (with the `.js` extension) resolves cleanly under both.
+//  - `ajv-formats` is intentionally NOT applied: no frozen schema uses the
+//    `format` keyword (verified — they use `pattern` only), so addFormats would
+//    register nothing the contract needs. Under NodeNext the ajv-formats CJS
+//    default-export interop is also not callable as a static import; dropping it
+//    removes a dead dependency and a tsc failure. Re-add (with a cast) if a
+//    future schema introduces a `format:` keyword.
 import { describe, it, expect } from "vitest";
-import Ajv2020 from "ajv/dist/2020";
-import addFormats from "ajv-formats";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import envelopeSchema from "../../../schemas/protocol/envelope.schema.json" with { type: "json" };
 import eventSchema from "../../../schemas/protocol/event.schema.json" with { type: "json" };
 import requestSchema from "../../../schemas/protocol/request.schema.json" with { type: "json" };
@@ -25,7 +35,6 @@ import handshakeSchema from "../../../schemas/protocol/handshake.schema.json" wi
 // Ajv2020 = JSON Schema Draft 2020-12 mode (AGENTS.md line 37: use 2020-12 not
 // draft-07). The default `new Ajv()` is draft-07 and would reject our `$schema`.
 const ajv = new Ajv2020({ allErrors: true, strict: false });
-addFormats(ajv);
 ajv.addSchema(eventSchema);
 ajv.addSchema(requestSchema);
 ajv.addSchema(responseSchema);
