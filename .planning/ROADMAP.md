@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `docs/bitwig-capabilities.md` exists and is grounded in in-app verification of the scripting guide — documenting note-editing scope, automation write, bank paging, observer granularity, and undo behavior — so bridge design locks against API reality, not assumption.
   3. The JSON-Lines protocol contract (`schemas/protocol/*`) is frozen enough to build against: versioned messages, atomic-line writes, a partial-line buffer, and an explicit backpressure rule.
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 Plans:
 **Wave 1**
 
@@ -41,7 +41,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Daemon framing pipe: transport abstraction (localhost-only TCP + stdio) + LineBuffer + version handshake + Ajv-at-boundary reader + bounded-queue backpressure + `bw-brain-spike dump` CLI proof (autonomous, Wave 2)
+- [x] 01-02-PLAN.md — Daemon framing pipe: transport abstraction (localhost-only TCP + stdio) + LineBuffer + version handshake + Ajv-at-boundary reader + bounded-queue backpressure + `bw-brain-spike dump` CLI proof (autonomous, Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -129,7 +129,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Schema & IPC Spike | 1/3 | In Progress|  |
+| 1. Schema & IPC Spike | 2/3 | In Progress|  |
 | 2. Read-Only Context Foundation (M1) | 0/TBD | Not started | - |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | Not started | - |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
