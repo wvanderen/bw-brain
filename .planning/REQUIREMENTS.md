@@ -106,58 +106,66 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Milestone intent shown; exact phase assignment finalized during roadmap creation.
+Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). Phase 1 is a de-risk spike leading with the Bitwig capability probe + IPC spike; Phases 2–5 map to milestones M1–M4.
 
 | Requirement | Milestone | Phase | Status |
 |-------------|-----------|-------|--------|
-| BRIDGE-01 | M1 | TBD | Pending |
-| BRIDGE-02 | M1 | TBD | Pending |
-| BRIDGE-03 | M1 | TBD | Pending |
-| PROBE-01 | M1 | TBD | Pending |
-| PROBE-02 | M1 | TBD | Pending |
-| STATE-01 | M1 | TBD | Pending |
-| STATE-02 | M1 | TBD | Pending |
-| STATE-03 | M1 | TBD | Pending |
-| STATE-04 | M1 | TBD | Pending |
-| CLI-01 | M1 | TBD | Pending |
-| CLI-02 | M1 | TBD | Pending |
-| CLI-03 | M1 | TBD | Pending |
-| MEM-01 | M1 | TBD | Pending |
-| MEM-02 | M1 | TBD | Pending |
-| UX-01 | M1 | TBD | Pending |
-| UX-05 | M1 | TBD | Pending |
-| UX-06 | M1+ | TBD | Pending |
-| EDIT-01 | M2 | TBD | Pending |
-| EDIT-02 | M2 | TBD | Pending |
-| EDIT-03 | M2 | TBD | Pending |
-| EDIT-04 | M2 | TBD | Pending |
-| EDIT-05 | M2 | TBD | Pending |
-| EDIT-06 | M2 | TBD | Pending |
-| MIDI-01 | M2 | TBD | Pending |
-| MIDI-02 | M2 | TBD | Pending |
-| MIDI-03 | M2 | TBD | Pending |
-| MIDI-04 | M2 | TBD | Pending |
-| MIDI-05 | M2 | TBD | Pending |
-| UX-02 | M2 | TBD | Pending |
-| ARCH-01 | M2 | TBD | Pending |
-| ARCH-02 | M2+ | TBD | Pending |
-| ARRANGE-01 | M3 | TBD | Pending |
-| ARRANGE-02 | M3 | TBD | Pending |
-| ARRANGE-03 | M3 | TBD | Pending |
-| ARRANGE-04 | M3 | TBD | Pending |
-| ARRANGE-05 | M3 | TBD | Pending |
-| UX-03 | M3 | TBD | Pending |
-| AUTO-01 | M4 | TBD | Pending |
-| AUTO-02 | M4 | TBD | Pending |
-| AUTO-03 | M4 | TBD | Pending |
-| AUTO-04 | M4 | TBD | Pending |
-| UX-04 | M4 | TBD | Pending |
+| BRIDGE-01 | M1 | Phase 2 | Pending |
+| BRIDGE-02 | M1 | Phase 2 | Pending |
+| BRIDGE-03 | M1 | Phase 2 | Pending |
+| PROBE-01 | M1 | Phase 1 | Pending |
+| PROBE-02 | M1 | Phase 1 | Pending |
+| STATE-01 | M1 | Phase 2 | Pending |
+| STATE-02 | M1 | Phase 2 | Pending |
+| STATE-03 | M1 | Phase 2 | Pending |
+| STATE-04 | M1 | Phase 2 | Pending |
+| CLI-01 | M1 | Phase 2 | Pending |
+| CLI-02 | M1 | Phase 2 | Pending |
+| CLI-03 | M1 | Phase 2 | Pending |
+| MEM-01 | M1 | Phase 2 | Pending |
+| MEM-02 | M1 | Phase 2 | Pending |
+| UX-01 | M1 | Phase 2 | Pending |
+| UX-05 | M1 | Phase 2 | Pending |
+| UX-06 | M1+ | Phase 2 | Pending |
+| EDIT-01 | M2 | Phase 3 | Pending |
+| EDIT-02 | M2 | Phase 3 | Pending |
+| EDIT-03 | M2 | Phase 3 | Pending |
+| EDIT-04 | M2 | Phase 3 | Pending |
+| EDIT-05 | M2 | Phase 3 | Pending |
+| EDIT-06 | M2 | Phase 3 | Pending |
+| MIDI-01 | M2 | Phase 3 | Pending |
+| MIDI-02 | M2 | Phase 3 | Pending |
+| MIDI-03 | M2 | Phase 3 | Pending |
+| MIDI-04 | M2 | Phase 3 | Pending |
+| MIDI-05 | M2 | Phase 3 | Pending |
+| UX-02 | M2 | Phase 3 | Pending |
+| ARCH-01 | M2 | Phase 3 | Pending |
+| ARCH-02 | M2+ | Phase 3 | Pending |
+| ARRANGE-01 | M3 | Phase 4 | Pending |
+| ARRANGE-02 | M3 | Phase 4 | Pending |
+| ARRANGE-03 | M3 | Phase 4 | Pending |
+| ARRANGE-04 | M3 | Phase 4 | Pending |
+| ARRANGE-05 | M3 | Phase 4 | Pending |
+| UX-03 | M3 | Phase 4 | Pending |
+| AUTO-01 | M4 | Phase 5 | Pending |
+| AUTO-02 | M4 | Phase 5 | Pending |
+| AUTO-03 | M4 | Phase 5 | Pending |
+| AUTO-04 | M4 | Phase 5 | Pending |
+| UX-04 | M4 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 42 total
-- Mapped to milestones: 42
+- Mapped to phases: 42
 - Unmapped: 0 ✓
+- Orphaned/duplicated: 0 ✓
+
+**Per-phase distribution:**
+- Phase 1 (Schema & IPC Spike): 2 — PROBE-01, PROBE-02
+- Phase 2 (Read-Only Context Foundation / M1): 15 — BRIDGE ×3, STATE ×4, CLI ×3, MEM ×2, UX-01, UX-05, UX-06
+- Phase 3 (Reversible MIDI Patching / M2): 14 — EDIT ×6, MIDI ×5, UX-02, ARCH-01, ARCH-02
+- Phase 4 (Arrangement Intelligence / M3): 6 — ARRANGE ×5, UX-03
+- Phase 5 (Automation & Device Workflows / M4): 5 — AUTO ×4, UX-04
 
 ---
 *Requirements defined: 2026-06-25*
-*Last updated: 2026-06-25 after initial definition*
+*Last updated: 2026-06-26 after roadmap creation (phase assignments finalized)*
