@@ -36,19 +36,19 @@ describe("normalize (STATE-01 — second-stage schema validator)", () => {
   });
 
   it("returns null for a payload missing the required version", () => {
-    const bad = validRaw() as Record<string, unknown>;
+    const bad = validRaw() as unknown as Record<string, unknown>;
     delete bad.version;
     expect(normalize(bad)).toBeNull();
   });
 
   it("returns null for a payload missing the required project block", () => {
-    const bad = validRaw() as Record<string, unknown>;
+    const bad = validRaw() as unknown as Record<string, unknown>;
     delete bad.project;
     expect(normalize(bad)).toBeNull();
   });
 
   it("returns null for a payload missing the required selection block", () => {
-    const bad = validRaw() as Record<string, unknown>;
+    const bad = validRaw() as unknown as Record<string, unknown>;
     delete bad.selection;
     expect(normalize(bad)).toBeNull();
   });

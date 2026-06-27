@@ -117,6 +117,9 @@ describe("StaleWatchdog (SC#3 freshness state machine)", () => {
       const w = new StaleWatchdog();
       w.onBridgeMessage();
       vi.advanceTimersByTime(STALE_THRESHOLD_MS + 1);
+      // tick() transitions the stored freshness live -> stale; assertFresh()
+      // checks that stored field (it does not recompute).
+      expect(w.tick()).toBe("stale");
       let caught: unknown;
       try {
         w.assertFresh();
