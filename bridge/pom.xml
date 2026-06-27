@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- bridge/pom.xml
+  Maven build for the bw-brain production Java `.bwextension` bridge.
+  Source: DrivenByMoss reference pom.xml (verified) + AGENTS.md §Technology Stack +
+  02-RESEARCH.md §Code Examples "Maven shade -> .bwextension" (lines 952-1014).
+
+  Toolchain (AGENTS.md-locked): extension-api:21 (provided, NOT bundled into the
+  shade), jackson-databind 2.22.0 (JSON-Lines IPC), junit-jupiter 5.11.0 (tests),
+  maven-shade-plugin 3.6.2 -> copy-rename to bw-brain.bwextension.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.bwbrain</groupId>
+  <artifactId>bw-brain-bridge</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+
+  <name>bw-brain bridge</name>
+  <description>Production Bitwig Controller Extension mirroring live project state to the bw-brain daemon over loopback JSON-Lines TCP.</description>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <repositories>
+    <!-- Bitwig's official Maven repository (AGENTS.md + DrivenByMoss pom.xml). -->
+    <repository>
+      <id>bitwig</id>
+      <url>https://maven.bitwig.com</url>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <!-- Bitwig Control Surface API: provided by the Bitwig host JVM at runtime,
+         NEVER bundled into the shaded .bwextension (excluded by the shade filter). -->
+    <dependency>
+      <groupId>com.bitwig</groupId>
+      <artifactId>extension-api</artifactId>
+      <version>21</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- JSON serialize/parse for JSON-Lines IPC. JVM standard; DrivenByMoss uses
+         the same coordinate. ObjectMapper + BufferedReader.readLine() streams
+         newline-delimited JSON cleanly. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.22.0</version>
+    </dependency>
+
+    <!-- Bridge unit tests (pure logic: outbox drain, line shape, pull-response
+         builders). Cannot integration-test against live Bitwig without a harness. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.11.0</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.15.0</version>
+        <configuration>
+          <release>21</release>
+        </configuration>
+      </plugin>
+
+      <!-- Surefire: JUnit 5 platform. Auto-detected in modern surefire, pinned
+           explicitly so the bridge test phase never silently skips. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+        <configuration>
+          <parallel>classes</parallel>
+          <threadCount>2</threadCount>
+        </configuration>
+      </plugin>
+
+      <!-- Shade -> rename to .bwextension. The ServiceLoader resource
+           (META-INF/services/com.bitwig.extension.ExtensionDefinition) is preserved;
+           the provided extension-api is excluded so the host's copy is used. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <filters>
+                <filter>
+                  <artifact>com.bitwig:extension-api</artifact>
+                  <excludes><exclude>**</exclude></excludes>
+                </filter>
+              </filters>
+              <outputFile>${project.build.directory}/bw-brain.bwextension</outputFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

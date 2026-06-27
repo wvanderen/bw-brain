@@ -1,0 +1,4 @@
+# Maven build output — never commit. Regenerate via `mvn package`.
+/target/
+# Shade-plugin byproduct.
+/dependency-reduced-pom.xml
