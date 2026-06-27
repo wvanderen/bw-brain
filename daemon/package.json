@@ -7,10 +7,20 @@
   "engines": {
     "node": ">=22.19"
   },
+  "bin": {
+    "bw-brain": "./src/cli/bw-brain.ts",
+    "bw-focus": "./src/cli/bw-brain.ts",
+    "bw-project": "./src/cli/bw-brain.ts",
+    "bw-midi": "./src/cli/bw-brain.ts",
+    "bw-device": "./src/cli/bw-brain.ts",
+    "bw-diff": "./src/cli/bw-brain.ts",
+    "bw-arrange": "./src/cli/bw-brain.ts",
+    "bw-automation": "./src/cli/bw-brain.ts",
+    "bw-edit": "./src/cli/bw-brain.ts"
+  },
   "scripts": {
     "gen:types": "node ../scripts/gen-types.mjs",
     "test": "vitest run",
-    "dump": "tsx src/cli/dump.ts",
     "check:capabilities": "node ../scripts/check-capabilities-doc.mjs"
   },
   "dependencies": {
