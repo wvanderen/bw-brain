@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 130,
+    "timeSignature": "4/4",
+    "transport": { "playing": true, "positionBeats": 64 }
+  },
+  "selection": {
+    "trackSid": "trk_4444444444444444",
+    "clipSid": "clip_5555555555555555",
+    "deviceSid": "dev_6666666666666666"
+  },
+  "tracks": [{ "sid": "trk_4444444444444444", "name": "Lead", "type": "track" }],
+  "clips": [{ "sid": "clip_5555555555555555", "name": "Lead Hook", "type": "clip", "lengthBeats": 16 }],
+  "devices": [{ "sid": "dev_6666666666666666", "name": "Lead Synth", "type": "device" }]
+}

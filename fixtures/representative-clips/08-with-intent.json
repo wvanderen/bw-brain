@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 130,
+    "timeSignature": "4/4",
+    "keySignature": "A minor",
+    "transport": { "playing": true, "positionBeats": 16 }
+  },
+  "selection": {
+    "trackSid": "trk_aaaaaaaaaaaaaaaa",
+    "clipSid": "clip_bbbbbbbbbbbbbbbb",
+    "deviceSid": "dev_cccccccccccccccc"
+  },
+  "tracks": [{ "sid": "trk_aaaaaaaaaaaaaaaa", "name": "Kick", "type": "track" }],
+  "clips": [{ "sid": "clip_bbbbbbbbbbbbbbbb", "name": "Kick Pattern", "type": "clip", "lengthBeats": 16 }],
+  "devices": [{ "sid": "dev_cccccccccccccccc", "name": "Kick Drum", "type": "device" }]
+}

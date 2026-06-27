@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 128,
+    "timeSignature": "4/4",
+    "transport": { "playing": true, "positionBeats": 48 }
+  },
+  "selection": {
+    "trackSid": "trk_a1b2c3d4e5f60718",
+    "clipSid": "clip_18293a4b5c6d7e8f",
+    "deviceSid": "dev_f8e7d6c5b4a39281"
+  },
+  "tracks": [{ "sid": "trk_a1b2c3d4e5f60718", "name": "Perc", "type": "track" }],
+  "clips": [{ "sid": "clip_18293a4b5c6d7e8f", "name": "Perc Loop", "type": "clip", "lengthBeats": 32 }],
+  "devices": [{ "sid": "dev_f8e7d6c5b4a39281", "name": "Percussion", "type": "device" }]
+}

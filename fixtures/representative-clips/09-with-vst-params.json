@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 128,
+    "timeSignature": "4/4",
+    "transport": { "playing": true, "positionBeats": 8 }
+  },
+  "selection": {
+    "trackSid": "trk_4444444444444444",
+    "clipSid": "clip_5555555555555555",
+    "deviceSid": "dev_aaaaaabbbbbbcccc"
+  },
+  "tracks": [{ "sid": "trk_4444444444444444", "name": "Lead", "type": "track" }],
+  "clips": [{ "sid": "clip_5555555555555555", "name": "Lead Hook", "type": "clip", "lengthBeats": 16 }],
+  "devices": [{ "sid": "dev_aaaaaabbbbbbcccc", "name": "Serum", "type": "device", "vendor": "Xfer Records", "parameters": [
+    { "name": "Cutoff", "value": 0.65 },
+    { "name": "Resonance", "value": 0.30 },
+    { "name": "Drive", "value": 0.45 }
+  ]}]
+}

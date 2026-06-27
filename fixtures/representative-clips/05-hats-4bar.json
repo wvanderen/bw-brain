@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 130,
+    "timeSignature": "4/4",
+    "transport": { "playing": true, "positionBeats": 16 }
+  },
+  "selection": {
+    "trackSid": "trk_aaaabbbbccccdddd",
+    "clipSid": "clip_eeefff0001111222"
+  },
+  "tracks": [{ "sid": "trk_aaaabbbbccccdddd", "name": "Hats", "type": "track" }],
+  "clips": [{ "sid": "clip_eeefff0001111222", "name": "Hats Loop", "type": "clip", "lengthBeats": 16 }],
+  "devices": []
+}

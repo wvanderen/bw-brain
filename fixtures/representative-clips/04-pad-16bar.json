@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 125,
+    "timeSignature": "4/4",
+    "transport": { "playing": false, "positionBeats": 0 }
+  },
+  "selection": {
+    "trackSid": "trk_7777777777777777",
+    "clipSid": "clip_8888888888888888",
+    "deviceSid": "dev_9999999999999999"
+  },
+  "tracks": [{ "sid": "trk_7777777777777777", "name": "Pad", "type": "track" }],
+  "clips": [{ "sid": "clip_8888888888888888", "name": "Pad Chords", "type": "clip", "lengthBeats": 64 }],
+  "devices": [{ "sid": "dev_9999999999999999", "name": "Pad Synth", "type": "device" }]
+}

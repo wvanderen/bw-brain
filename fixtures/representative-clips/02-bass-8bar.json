@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 128,
+    "timeSignature": "4/4",
+    "transport": { "playing": false, "positionBeats": 32 }
+  },
+  "selection": {
+    "trackSid": "trk_1111111111111111",
+    "clipSid": "clip_2222222222222222",
+    "deviceSid": "dev_3333333333333333"
+  },
+  "tracks": [{ "sid": "trk_1111111111111111", "name": "Bass", "type": "track" }],
+  "clips": [{ "sid": "clip_2222222222222222", "name": "Bassline", "type": "clip", "lengthBeats": 32 }],
+  "devices": [{ "sid": "dev_3333333333333333", "name": "Bass Synth", "type": "device" }]
+}

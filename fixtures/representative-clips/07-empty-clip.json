@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Techno Demo",
+    "tempo": 120,
+    "timeSignature": "4/4",
+    "transport": { "playing": false, "positionBeats": 0 }
+  },
+  "selection": {
+    "trackSid": "trk_deadbeefcafebabe",
+    "deviceSid": "dev_0123456789abcdef"
+  },
+  "tracks": [{ "sid": "trk_deadbeefcafebabe", "name": "Snare", "type": "track" }],
+  "clips": [],
+  "devices": [{ "sid": "dev_0123456789abcdef", "name": "Snare Drum", "type": "device" }]
+}
