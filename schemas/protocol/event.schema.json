@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/protocol/event.schema.json",
   "title": "Event",
   "description": "An observational event fired by the bridge (sender-originated, no ack expected). Frozen from docs/seed.md §Event example (selection.changed). timestamp is REQUIRED on events (sender-originated). $comment: only selection.changed is frozen in Phase 1 (the 1-event spike honestly validates this); additional event types are Phase 2-extensible (Pitfall 4 — do not over-freeze guesses).",
-  "$comment": "Phase 1 freezes selection.changed only. Additional event types (transport.changed, track.* observers, etc.) land in Phase 2 once the in-app capability probe (PROBE-01) confirms the observer surface. The envelope-level oneOf discriminator + this schema's type enum are the extension point.",
+  "$comment": "Phase 2 freezes the 5-event observational set: selection.changed (cursor triple), track.name_changed / clip.name_changed / device.name_changed (windowed-bank + cursor name observers), transport.changed (Transport observers). PROBE-01 (Phase 1) confirmed the observer surface; Plan 02 (bridge) emits all 5. Pitfall 1: every entry here MUST also appear in daemon/src/protocol/reader.ts OBSERVATIONAL_EVENT_TYPES — the equality is unit-tested in schemas.test.ts so the drop-oldest backpressure classifies new events correctly. The envelope-level oneOf discriminator + this schema's type enum remain the extension point for future phases.",
   "type": "object",
   "required": ["version", "type", "timestamp"],
   "additionalProperties": false,
@@ -14,7 +14,7 @@
     },
     "type": {
       "type": "string",
-      "enum": ["selection.changed"]
+      "enum": ["selection.changed", "track.name_changed", "clip.name_changed", "device.name_changed", "transport.changed"]
     },
     "timestamp": {
       "type": "number",

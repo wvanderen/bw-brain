@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/project-state.schema.json",
+  "title": "ProjectState",
+  "description": "STATE-01 raw project-state contract. The daemon normalizes bridge snapshots into this shape; every RawState the daemon holds is valid against this schema. Source: docs/seed.md §A 'Raw project state' generalized into JSON Schema 2020-12 (RESEARCH.md §Code Examples 'raw-state schema seed').",
+  "$comment": "Phase 2 freezes the raw-state contract Plans 03/04/05 implement against. TRUST-SPINE: selection.trackSid/clipSid/deviceSid carry the ^trk_/^clip_/^dev_ fingerprint pattern (STATE-04) — a bare Bitwig slot index like 'trk_5' is structurally invalid (Pitfall 2 defense, RESEARCH.md lines 800-805). stateFreshness is optional HERE (the raw-state can be persisted without it) but REQUIRED on every cli-query result (result.schema.json) so SC#3 staleness surfaces to every CLI consumer. automation is reserved EMPTY in M1 (maxItems 0 — D-04: automation mirror deferred). additionalProperties:false at EVERY object level (PATTERNS.md Assignment 1).",
+  "type": "object",
+  "required": ["version", "project", "selection"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Schema contract version (major.minor). Drives version-drift detection."
+    },
+    "stateFreshness": {
+      "type": "string",
+      "enum": ["live", "stale", "disconnected"],
+      "description": "SC#3 staleness marker. Optional on the persisted raw-state; REQUIRED on cli-query results. 'live' = bridge recently observed; 'stale' = bridge silent past watchdog threshold; 'disconnected' = bridge gone."
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "tempo", "timeSignature"],
+      "additionalProperties": false,
+      "description": "Project-level metadata mirrored from Bitwig.",
+      "properties": {
+        "name": { "type": "string", "description": "Bitwig project name." },
+        "tempo": { "type": "number", "description": "BPM." },
+        "timeSignature": { "type": "string", "description": "e.g. '4/4'." },
+        "keySignature": { "type": "string", "description": "Optional, e.g. 'A minor'." },
+        "transport": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Transport state (pushed by Transport observers).",
+          "properties": {
+            "playing": { "type": "boolean" },
+            "positionBeats": { "type": "number" },
+            "loop": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "start": { "type": "number" },
+                "length": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The GUI selection (cursor triple). All fields optional — selection can be empty (deselection). *Sid fields are STATE-04 fingerprint IDs, NOT Bitwig slot indices (Pitfall 2).",
+      "properties": {
+        "trackSid": {
+          "type": "string",
+          "pattern": "^(trk|clip|dev)_[0-9a-f]{16}$",
+          "description": "STATE-04 fingerprint of the selected track. NEVER a bare slot index."
+        },
+        "clipSid": {
+          "type": "string",
+          "pattern": "^(trk|clip|dev)_[0-9a-f]{16}$",
+          "description": "STATE-04 fingerprint of the pinned/selected clip."
+        },
+        "deviceSid": {
+          "type": "string",
+          "pattern": "^(trk|clip|dev)_[0-9a-f]{16}$",
+          "description": "STATE-04 fingerprint of the selected device."
+        },
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": "number", "description": "Region start in beats." },
+            "end": { "type": "number", "description": "Region end in beats." }
+          }
+        }
+      }
+    },
+    "tracks": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Windowed TrackBank[N=8] snapshot (D-01). Open objects — element shape tightened when STATE-04 fingerprint map lands."
+    },
+    "clips": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Pull-result cache (bw-midi inspect NoteStep dump). Open objects — element shape tightened in Phase 3."
+    },
+    "devices": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Pull-result cache (bw-device inspect CursorRemoteControlsPage walk, incl. VST/AU per D-02). Open objects — element shape tightened in Phase 5."
+    },
+    "automation": {
+      "type": "array",
+      "items": { "type": "object" },
+      "maxItems": 0,
+      "description": "D-04: automation mirror is deferred to Phase 5 (AUTO-01). The slot is RESERVED EMPTY in M1 — maxItems 0 enforces this at the schema level so producers cannot leak automation data prematurely."
+    }
+  }
+}

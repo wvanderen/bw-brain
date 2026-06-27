@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/intent.schema.json",
+  "title": "ProjectIntent",
+  "description": "STATE-03 projectIntent contract. The user-authored intent state that keeps the assistant from ruining the song. Source: docs/seed.md §C 'Intent state' + CONTEXT.md D-09.",
+  "$comment": "Phase 2 freezes the intent shape (summary/constraints/targets). D-09: M1 is read-only + user-authored — the daemon does an atomic validated read of ~/.bw-brain/intent.json; NO inference (no defaults, no LLM-generated intent). summary is REQUIRED + minLength 1 (a blank intent file is structurally invalid). additionalProperties:false throughout (trust-spine — the schema is the gate). Editing UX (a future /intent command vs hand-edit) is the agent's discretion; M1 only needs to read it correctly.",
+  "type": "object",
+  "required": ["version", "projectIntent"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "description": "Schema contract version (major.minor)."
+    },
+    "projectIntent": {
+      "type": "object",
+      "required": ["summary"],
+      "additionalProperties": false,
+      "description": "The user's authored intent for this project. summary is the only required field — a one-line statement of what the project is / should be.",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "MANDATORY non-empty one-line summary, e.g. 'techno track, dark, 130 BPM'. Cannot be blank."
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Hard constraints the assistant must not violate, e.g. 'preserve bass motif'."
+        },
+        "targets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Goals the assistant should aim for, e.g. 'build tension toward the drop'."
+        }
+      }
+    }
+  }
+}
