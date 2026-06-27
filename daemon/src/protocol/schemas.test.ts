@@ -541,6 +541,50 @@ describe("extended event/request enums (Phase 2 bridge surface)", () => {
     expect(ok).toBe(false);
   });
 
+  // Plan 02 (bridge) payload-union extension: the 4 new event types carry
+  // observed state (name/playing/slot) that the Phase-1 selection.changed-only
+  // payload could not represent. These lock the additive contract Plan 03a
+  // normalizes against. additionalProperties stays false (T-2-02-E).
+  it("event.schema.json: track.name_changed carries a name payload (Plan 02 extension)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "track.name_changed",
+      timestamp: 1,
+      payload: { slot: 0, name: "Kick" },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event.schema.json: transport.changed carries a boolean playing payload", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "transport.changed",
+      timestamp: 1,
+      payload: { playing: true },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event.schema.json: selection.changed carries a raw slot (Pitfall 2 — not a stable id)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "selection.changed",
+      timestamp: 1,
+      payload: { slot: 3 },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event.schema.json: rejects an unknown payload property (additionalProperties: false preserved)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "track.name_changed",
+      timestamp: 1,
+      payload: { bogus: true },
+    });
+    expect(ok).toBe(false);
+  });
+
   it("request.schema.json: get.project_summary now validates (enum extended)", () => {
     const ok = validateRequest({ version: "1.0", type: "get.project_summary", id: "r1" });
     expect(ok, JSON.stringify(validateRequest.errors)).toBe(true);
