@@ -95,7 +95,8 @@ describe("UnixDomainSocketServerTransport (D-07 — Pitfall 5 UDS-form 0600 gate
 
     const received = await new Promise<string>((resolve) => {
       transport!.onMessage((chunk) => {
-        resolve(typeof chunk === "string" ? chunk : chunk.toString());
+        const text = typeof chunk === "string" ? chunk : (chunk as Buffer).toString("utf8");
+        resolve(text);
       });
       const client = net.createConnection({ path: socketPath });
       client.setEncoding("utf8");
