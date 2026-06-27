@@ -347,7 +347,101 @@ works").
 
 ---
 
-## Deferred to pre-Phase-3 (intentional — recorded, not silently dropped)
+## Phase 2 (Plan 02-02 Task 3) — Pending Live Verification
+
+> **Status: PENDING HUMAN OBSERVATION.** The autonomous executor (Plan 02-02
+> Tasks 1 + 2) built the production Java bridge and verified it compiles, unit-
+> tests green, and packages to `bridge/target/bw-brain.bwextension`. What
+> CANNOT be done autonomously — and is recorded here for the end-of-phase UAT
+> gate (`workflow.human_verify_mode: end-of-phase`) — is loading it inside a
+> running Bitwig Studio and observing the live behavior. **Nothing in this
+> section is an observed finding yet.** Every bullet below is a manual step a
+> human with Bitwig 6.0.6 open must perform; the observed outcome is recorded
+> here once run. (Phase-1 D-02 discipline: observed Bitwig behavior is the
+> deliverable, never fabricated.)
+
+**Built artifact (autonomous, verified):** `bridge/target/bw-brain.bwextension`
+(Maven shade package, 2.3 MB, ServiceLoader resource present,
+`com/bitwig/` excluded — extension-api:21 provided).
+
+### Sub-check 1 — INSTALL + LIVE SC#1 ROUND-TRIP (BRIDGE-01/03)
+
+**Observed: PENDING.** Steps:
+1. `cp bridge/target/bw-brain.bwextension "$HOME/Documents/Bitwig Studio/Extensions/"`
+   (the throwaway `SpikeProbe.bwextension` is already there from Phase 1 — remove
+   it or leave it; the production bridge has a distinct UUID + name "bw-brain").
+2. Restart Bitwig → Settings → Controllers → add **"bw-brain"**. Confirm the
+   extension loads (no error in the Bitwig controller log).
+3. Start the daemon (Plan 03/04 must be merged first; until then, a raw reader
+   on `127.0.0.1:7878` — e.g. the Phase-1 `bw-brain-spike dump` CLI, or `nc
+   127.0.0.1 7878` — captures the raw event stream).
+4. In Bitwig, change selection (tracks/clips/devices) and toggle transport
+   play/stop. Observe the daemon/reader receiving **all 5 event types**
+   (`selection.changed`, `track.name_changed`, `clip.name_changed`,
+   `device.name_changed`, `transport.changed`) as schema-valid JSON-Lines. This
+   is the production-bridge SC#1 round-trip (Phase-1 proven over the spike; now
+   over the real bridge with the full observer set).
+5. Run `bw-midi inspect` against a clip with notes → confirm the `get.selected_clip`
+   NoteStep dump arrives (the bridge enumerates `Clip.getStep(x,y,0)` over the
+   16×128 grid, velocity>0 heuristic). Run `bw-project summary` → confirm the
+   8-track windowed snapshot arrives via `get.project_summary`.
+
+**What to record when run:** whether all 5 event types round-trip, whether
+`bw-midi inspect` returns a non-empty `notes` array for a clip with notes, and
+whether `bw-project summary` returns 8 track entries. The clip `name` field is
+expected to be empty until the live probe confirms the launcher-clip name
+accessor (the bridge uses `getLoopLength()` as a clip-change proxy — see Plan
+02-02 Observers.java comment).
+
+### Sub-check 2 — VST/AU PARAMETER EXPOSURE (Open Question A1 / BRIDGE-02 / CLI-03)
+
+**Observed: PENDING.** This is the ONE behavioral probe that gates CLI-03's
+VST/AU claim (RESEARCH.md Pitfall 10). Steps:
+1. Load a free VST instrument (e.g. Vital, Surge, or any installed third-party
+   synth) onto the selected track. Select its device.
+2. Run `bw-device inspect` (Plan 04). Observe whether the device-chain response
+   carries parameters.
+
+**API reality found during autonomous build (recorded for the live probe):**
+`CursorDevice` exposes **no** `getRemoteControls()` / parameter-page accessor in
+`extension-api:21`'s public surface (verified via `javap` this session). The
+bridge's `get.selected_device_chain` handler therefore returns an **empty `pages`
+list** until the live probe resolves the real parameter-enumeration path.
+Candidate paths to confirm live:
+- (a) `cursorDevice.channel().createCursorRemoteControlsPage(...)` — but that
+  binds to the channel (track), not the device;
+- (b) `cursorDevice` may expose parameters via a different accessor surfaced only
+  at runtime (in-app Javadoc 6.0.6);
+- (c) direct `cursorDevice.getParameter(int index)` enumeration (the documented
+  fallback per RESEARCH.md Pitfall 10).
+
+**What to record when run:** either (A1 CONFIRMED) the CursorRemoteControlsPage
+walk returns the VST's parameters (D-02 delivered as designed — wire the real
+accessor), or (A1 NEGATED) the page is empty for the VST (fall back to direct
+`cursorDevice.getParameter(int)` enumeration; record the fallback here).
+
+### Sub-check 3 — SC#3 BRIDGE-RELOAD RECONCILE SMOKE (STATE-04)
+
+**Observed: PENDING.** Steps:
+1. With the daemon running and state live (some selection active), toggle the
+   **bw-brain** extension OFF then ON in Bitwig Settings → Controllers
+   (simulates a bridge reload/restart).
+2. Observe the daemon: it should detect the disconnect
+   (`stateFreshness → disconnected`), then on reconnect reconcile stable IDs via
+   the fingerprint map (Plan 03a) and return `stateFreshness → live` WITHOUT
+   corrupting `state-cache.json`. Confirm the same track selected before+after
+   the reload carries the SAME stable ID (the fingerprint survived the
+   reconnect).
+
+**What to record when run:** the observed reconcile behavior — whether toggling
+the extension off/on lets the daemon reconcile stable IDs via fingerprint and
+return `stateFreshness` to live without state-cache corruption. This is the live
+half of SC#3 (the automated half is the Plan-03a held-out 20-track-reorder
+property test).
+
+---
+
+
 
 The spike's de-risking purpose is achieved: raw TCP is confirmed (SC#1 live),
 the JSON-Lines contract is frozen and proven across both halves (SC#3 live), and
