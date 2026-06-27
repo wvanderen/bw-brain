@@ -12,8 +12,8 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 - [ ] **BRIDGE-01**: Java `.bwextension` runs inside Bitwig and mirrors live selection (track/clip/device/region) and transport state to an external process via newline-delimited JSON over localhost
 - [ ] **BRIDGE-02**: Bridge mirrors tracks, clips, launcher-clip notes, device chains (including loaded VST/AU plugins), and exposed parameters via the Bitwig observer API
 - [ ] **BRIDGE-03**: Bridge emits change events (`selection.changed`, etc.) and applies edit primitives (note add/remove, parameter set) labelled with the extension name
-- [ ] **PROBE-01**: Bitwig capability probe produces `docs/bitwig-capabilities.md` documenting the verified API surface (note editing scope, automation write, bank paging, observer granularity, undo behavior) before bridge design locks
-- [ ] **PROBE-02**: IPC spike confirms Bitwig JVM localhost TCP (or stdio relay) access and freezes the JSON-Lines protocol contract both halves build against
+- [x] **PROBE-01**: Bitwig capability probe produces `docs/bitwig-capabilities.md` documenting the verified API surface (note editing scope, automation write, bank paging, observer granularity, undo behavior) before bridge design locks
+- [x] **PROBE-02**: IPC spike confirms Bitwig JVM localhost TCP (or stdio relay) access and freezes the JSON-Lines protocol contract both halves build against
 
 ### Foundation — State Model & CLI (M1)
 
@@ -154,12 +154,14 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 | UX-04 | M4 | Phase 5 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 42 total
 - Mapped to phases: 42
 - Unmapped: 0 ✓
 - Orphaned/duplicated: 0 ✓
 
 **Per-phase distribution:**
+
 - Phase 1 (Schema & IPC Spike): 2 — PROBE-01, PROBE-02
 - Phase 2 (Read-Only Context Foundation / M1): 15 — BRIDGE ×3, STATE ×4, CLI ×3, MEM ×2, UX-01, UX-05, UX-06
 - Phase 3 (Reversible MIDI Patching / M2): 14 — EDIT ×6, MIDI ×5, UX-02, ARCH-01, ARCH-02

@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 2
 current_phase_name: M1
-status: Ready to plan
-stopped_at: Phase 2 context gathered
-last_updated: "2026-06-27T14:48:58.542Z"
-last_activity: 2026-06-26
-last_activity_desc: Phase 01 complete, transitioned to Phase 2
+status: Ready to execute
+stopped_at: Phase 2 planned (6 plans, 3 waves)
+last_updated: "2026-06-27T16:00:00.000Z"
+last_activity: 2026-06-27
+last_activity_desc: Phase 2 planned — 6 plans across 3 waves, verified (1 revision)
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 3
+  total_plans: 9
   completed_plans: 3
   percent: 20
 ---
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 ## Current Position
 
 Phase: 2 — Read-Only Context Foundation (M1)
-Plan: Not started
-Status: Phase 01 (Schema & IPC Spike) is COMPLETE — UAT passed 10/10, 0 issues. The spike's de-risking goal is achieved: SC#1 + SC#3 proven live via a Java `.bwextension` pivot (raw `java.net` loopback TCP confirmed end-to-end — the JS control-surface `host` has no networking/file I/O, so Java is mandatory). All architectural unknowns resolved against the in-app Javadoc 6.0.6: no labelled-undo API (daemon-authoritative revert confirmed), no native stable-IDs (STATE-04 fingerprint-mapping required in Phase 2), NoteStep-based note surface, `PinnableCursorClip` present, ServiceLoader extension packaging. Behavioral probes (undo-coalescing timing, live NoteStep round-trip, automation target) intentionally deferred to pre-Phase-3 — recorded in `docs/bitwig-capabilities.md` §Deferred. The frozen JSON-Lines contract + daemon framing pipe + Ajv-at-boundary reader are the kept spine Phase 2 extends. Ready to discuss/plan Phase 2.
-Last activity: 2026-06-26 — Phase 01 complete, transitioned to Phase 2
+Plan: 6 plans across 3 waves (planned, verified)
+Status: Phase 2 is PLANNED — 6 plans across 3 waves, plan-checker passed after 1 revision (02-03 scope-split into 02-03a trust-spine primitives + 02-03b stateful layer). Wave 1 = {02-01 schemas/enums, 02-02 Java bridge + human-verify}; Wave 2 = {02-03a STATE-04 primitives, 02-04 multicall CLI}; Wave 3 = {02-03b stateful layer + UDS, 02-05 Pi /analyze + human-verify}. All 15 requirements covered, 11/11 decisions covered, Nyquist VALIDATION.md populated. Ready to execute.
+Last activity: 2026-06-27 — Phase 2 planned (6 plans, 3 waves, verified)
 
 Progress: [██░░░░░░░░] ~20% — 1/5 phases complete; Phase 2 next
 
