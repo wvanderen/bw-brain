@@ -63,7 +63,7 @@ Plans:
   4. Pi `/analyze` produces a critique + 2–4 next actions grounded in live selection/section/intent, every suggestion carries an `assumptions[]` field, and the state pane renders selected track/clip/device + section label.
   5. Durable project memory (`.bw-brain/`) and ephemeral session memory stay cleanly separated — experiment threads never write to the durable store (hard architectural boundary).
 
-**Plans**: 5 plans across 3 waves
+**Plans**: 6 plans across 3 waves
 **UI hint**: yes
 **Research needed**: bridge capability probe (Pitfall 1 — highest-risk item in the project); exact `CursorClip`/`CursorTrack`/`CursorDevice` observer surface; controller-thread scheduling semantics.
 Plans:
@@ -72,13 +72,14 @@ Plans:
 - [ ] 02-01-PLAN.md — Wire contracts foundation: 4 new JSON Schemas (project-state, intent, cli-query/{query,result}) + extend event/request enums + gen-types multi-dir + reader OBSERVATIONAL_EVENT_TYPES (Pitfall 1) (autonomous, Wave 1)
 - [ ] 02-02-PLAN.md — Java `.bwextension` bridge (Maven + ServiceLoader + full observer set + get.* pull handlers + live VST/AU + reload-reconcile human-verify) (autonomous: false — Task 3 blocking checkpoint, Wave 1)
 
-**Wave 2** *(blocked on Wave 1 — zero file overlap between 02-03 and 02-04)*
+**Wave 2** *(blocked on Wave 1 — trust-spine primitives lock before stateful consumers; zero file overlap between 02-03a and 02-04)*
 
-- [ ] 02-03-PLAN.md — Daemon state layer + query server + memory boundary: STATE-04 fingerprint/reconcile/watchdog (SC#3 held-out tests) + STATE-01 normalizer + STATE-02 analyzer framework (IntentAnalyzer only) + STATE-03 intent store + MEM-01/02 + D-07 UDS listener (autonomous, Wave 2)
+- [ ] 02-03a-PLAN.md — STATE-04 trust-spine PURE primitives: fingerprint + reconcile + atomicWriteJson + state-cache + their SC#3 held-out property tests (20-track reorder reconcile, N=20-parallel atomic write, fingerprint determinism) (autonomous, Wave 2)
 - [ ] 02-04-PLAN.md — Multicall CLI thin client: `bw-brain` binary + 8 subcommands (5 live + 3 stubs) + UDS query-client + bw-diff pure logic (SC#1 round-trip) + dump.ts deleted (autonomous, Wave 2)
 
-**Wave 3** *(blocked on Waves 1+2 — full live stack required)*
+**Wave 3** *(blocked on Waves 1+2 — 02-03b consumes 02-03a primitives; 02-05 consumes 02-03b query-server; full live stack required)*
 
+- [ ] 02-03b-PLAN.md — Stateful daemon layer + D-07 UDS query channel: stale-watchdog (SC#3 surfacing) + analyzer-registry (IntentAnalyzer only, D-08) + intent-store (D-09) + normalizer (STATE-01) + MEM-02 boundary (SC#5) + UDS transport (Pitfall 5 0600) + query-server (autonomous, Wave 3)
 - [ ] 02-05-PLAN.md — Pi `/analyze` pack (SKILL.md wrapping the CLI) + describe() literal grounded description engine + SC#1 ~20-clip accuracy harness (>0.9 token-overlap) + live Pi smoke (D-12) + spike/ deletion (D-05/D-06) (autonomous: false — Task 3 blocking checkpoint, Wave 3)
 
 ### Phase 3: Reversible MIDI Patching (M2)

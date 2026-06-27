@@ -1,24 +1,16 @@
 ---
 phase: 02-read-only-context-foundation-m1
-plan: 03
+plan: 03b
 type: execute
-wave: 2
-depends_on: [02-01]
+wave: 3
+depends_on: [02-03a, 02-01]
 files_modified:
-  - daemon/src/state/fingerprint.ts
-  - daemon/src/state/fingerprint.test.ts
-  - daemon/src/state/reconcile.ts
-  - daemon/src/state/reconcile.test.ts
   - daemon/src/state/stale-watchdog.ts
   - daemon/src/state/stale-watchdog.test.ts
   - daemon/src/state/analyzer-registry.ts
   - daemon/src/state/analyzer-registry.test.ts
   - daemon/src/state/intent-store.ts
   - daemon/src/state/intent-store.test.ts
-  - daemon/src/store/atomic-write.ts
-  - daemon/src/store/atomic-write.test.ts
-  - daemon/src/store/state-cache.ts
-  - daemon/src/store/state-cache.test.ts
   - daemon/src/store/boundary.ts
   - daemon/src/store/boundary.test.ts
   - daemon/src/ingest/normalizer.ts
@@ -28,30 +20,31 @@ files_modified:
   - daemon/src/query/query-server.ts
   - daemon/src/query/query-server.test.ts
 autonomous: true
-requirements: [STATE-01, STATE-02, STATE-03, STATE-04, MEM-01, MEM-02, CLI-01]
+requirements: [STATE-01, STATE-02, STATE-03, MEM-02, CLI-01]
 must_haves:
   truths:
     - "Raw bridge snapshots normalize into a RawState validated against schemas/project-state.schema.json at the daemon boundary (STATE-01)"
     - "The analyzer registry runs exactly ONE analyzer (IntentAnalyzer) in M1; sections/trackRoles/motifs/energyCurve/automationSalience all stay empty until their phase (STATE-02 framework-only, D-08)"
     - "projectIntent loads from <project>/.bw-brain/intent.json via an atomic validated read; no inference, no defaults (STATE-03, D-09)"
-    - "Stable IDs are synthesized via fingerprint(name+type+neighbors+contentHash) and survive a 20-track reorder on reconnect (STATE-04, SC#3 — held-out property test)"
-    - "state-cache.json is written atomically (temp+rename); N concurrent writes never produce a half-written file (SC#3 — property test)"
     - "The stale-watchdog surfaces stateFreshness live|stale|disconnected on every CLI result and would refuse edits in M2 (SC#3 — the trust-spine gate)"
     - "The daemon-local UDS listener at ~/.bw-brain/daemon.sock has file mode 0600 — only the same user can connect (D-07, Pitfall 5)"
     - "The daemon has NO op that writes ephemeral data to the durable store (MEM-02 — boundary unit test asserts the cli-query schema carries no ephemeral-write op)"
   artifacts:
-    - path: "daemon/src/state/fingerprint.ts"
-      provides: "pure fingerprint(input) -> sha256[16] hex stableId (STATE-04)"
-      contains: "createHash"
-    - path: "daemon/src/state/reconcile.ts"
-      provides: "pure reconcile(observed, persisted) reconciling stable IDs on bridge reconnect (SC#3)"
-      contains: "ReconcileResult"
-    - path: "daemon/src/store/atomic-write.ts"
-      provides: "atomicWriteJson(path, data) via POSIX temp+rename (SC#3, MEM-01)"
-      contains: "rename"
     - path: "daemon/src/state/stale-watchdog.ts"
       provides: "StaleWatchdog state machine: live|stale|disconnected + assertFresh() (SC#3)"
       contains: "stateFreshness"
+    - path: "daemon/src/state/analyzer-registry.ts"
+      provides: "Analyzer interface + AnalyzerRegistry (drops confidence<0.5) + M1_ANALYZERS=[IntentAnalyzer] (D-08)"
+      contains: "IntentAnalyzer"
+    - path: "daemon/src/state/intent-store.ts"
+      provides: "loadIntent(path): ProjectIntent | null — atomic validated read, no inference (D-09)"
+      contains: "loadIntent"
+    - path: "daemon/src/ingest/normalizer.ts"
+      provides: "normalize(payload): RawState | null — drop-never-throw second-stage validator (STATE-01)"
+      contains: "validateProjectState"
+    - path: "daemon/src/store/boundary.ts"
+      provides: "checkMemoryBoundary(querySchema): string[] — MEM-02 architectural gate"
+      contains: "checkMemoryBoundary"
     - path: "daemon/src/transport/uds.ts"
       provides: "UnixDomainSocketServerTransport implementing Transport, socket mode 0600 (D-07)"
       contains: "0o600"
@@ -67,17 +60,21 @@ must_haves:
       to: "schemas/cli-query/{query,result}.schema.json"
       via: "Ajv validates inbound queries + outbound results at the UDS boundary"
       pattern: "cli-query"
-    - from: "daemon/src/state/reconcile.ts"
-      to: "daemon/src/store/state-cache.ts"
-      via: "reconcile updates the persisted StableIdMap which state-cache atomically writes"
-      pattern: "atomicWriteJson"
+    - from: "daemon/src/query/query-server.ts"
+      to: "daemon/src/state/stale-watchdog.ts"
+      via: "every query result carries stateFreshness from watchdog.tick() (SC#3 surfacing)"
+      pattern: "watchdog\\.tick"
+    - from: "daemon/src/transport/uds.ts"
+      to: "daemon/src/transport/transport.ts"
+      via: "UnixDomainSocketServerTransport implements the Phase-1 Transport interface (D-07 new peer, not a reuse of bridge TCP)"
+      pattern: "implements Transport"
 ---
 
 <objective>
-Build the daemon's state layer — the highest-complexity M1 design. This plan delivers: (a) STATE-01 raw-state normalization against the Plan-01 schema; (b) STATE-04 fingerprint synthesis + reconnect reconcile + stale-watchdog (the SC#3 trust-spine gate — designed from the verified "no native stable IDs" finding); (c) STATE-02 framework-only analyzer registry with exactly ONE analyzer (IntentAnalyzer) per D-08; (d) STATE-03 user-authored intent read; (e) MEM-01 atomic durable writes + MEM-02 ephemeral/durable boundary (SC#5); (f) D-07 daemon-local UDS query channel (the new listener separate from bridge port 7878). Every novel design in M1 lives here — fingerprint reconcile semantics, the stale-watchdog policy, the atomic-write primitive, and the UDS transport. All are pure functions or small state machines with property tests (the SC#3 held-out fixtures).
+Build the daemon's stateful layer + the D-07 daemon-local UDS query channel, consuming the trust-spine primitives (fingerprint, reconcile, atomicWriteJson, state-cache) shipped by 02-03a. This plan delivers: (a) STATE-01 raw-state normalization against the Plan-01 schema; (b) STATE-02 framework-only analyzer registry with exactly ONE analyzer (IntentAnalyzer) per D-08; (c) STATE-03 user-authored intent read; (d) MEM-02 ephemeral/durable boundary (SC#5); (e) D-07 daemon-local UDS query channel (the new listener separate from bridge port 7878). The stale-watchdog consumes the SC#3 truth (atomic state-cache + stable fingerprint map exist below it) and surfaces stateFreshness live|stale|disconnected on every CLI result.
 
-Purpose: The daemon is the long-running source of truth (D-07). It must survive a bridge reload without corrupting state — that requirement decomposes into fingerprint stability across reorder/rename, atomic state-cache writes, and a watchdog that marks state stale when the bridge is silent. This is the trust spine every later phase's edit pipeline depends on. Honors D-04 (automation empty), D-08 (no analyzers in M1, only IntentAnalyzer), D-09 (intent user-authored read-only), D-10 (assumptions[] plumbing from day one).
-Output: 12 new daemon source files + their tests, including the 3 SC#3-critical held-out property tests (20-track reorder reconcile, N-parallel atomic write, watchdog transitions).
+Purpose: Wave 3 lands AFTER 02-03a has locked the trust-spine primitives with held-out property tests. This lets the stateful layer (stale-watchdog, analyzer-registry, intent-store, normalizer) and the UDS transport + query-server be developed against PROVEN fingerprint/atomic-write/state-cache semantics rather than inheriting unverified scaffolding. Honors D-04 (automation empty), D-07 (UDS separate from bridge TCP), D-08 (no analyzers in M1 except IntentAnalyzer), D-09 (intent user-authored read-only), D-10 (assumptions[] plumbing from day one).
+Output: 14 new daemon source files + their tests, including the stale-watchdog transition suite, the MEM-02 boundary unit test (SC#5), and the Pitfall-5 UDS 0600-mode unit test.
 </objective>
 
 <execution_context>
@@ -95,10 +92,15 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
 @.planning/phases/02-read-only-context-foundation-m1/02-PATTERNS.md
 @.planning/phases/02-read-only-context-foundation-m1/02-VALIDATION.md
 @.planning/phases/02-read-only-context-foundation-m1/02-01-SUMMARY.md
-@daemon/src/protocol/reader.ts
-@daemon/src/protocol/handshake.ts
+@.planning/phases/02-read-only-context-foundation-m1/02-03a-SUMMARY.md
+@daemon/src/state/fingerprint.ts
+@daemon/src/state/reconcile.ts
+@daemon/src/store/atomic-write.ts
+@daemon/src/store/state-cache.ts
 @daemon/src/transport/tcp.ts
 @daemon/src/transport/transport.ts
+@daemon/src/protocol/reader.ts
+@scripts/check-capabilities-doc.mjs
 @schemas/project-state.schema.json
 @schemas/intent.schema.json
 @schemas/cli-query/query.schema.json
@@ -108,58 +110,7 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
 <tasks>
 
 <task type="auto" tdd="true">
-  <name>Task 1: STATE-04 pure functions — fingerprint + reconcile + atomic-write + state-cache + their SC#3 held-out property tests</name>
-  <files>daemon/src/state/fingerprint.ts, daemon/src/state/fingerprint.test.ts, daemon/src/state/reconcile.ts, daemon/src/state/reconcile.test.ts, daemon/src/store/atomic-write.ts, daemon/src/store/atomic-write.test.ts, daemon/src/store/state-cache.ts, daemon/src/store/state-cache.test.ts</files>
-  <read_first>
-    - daemon/src/protocol/handshake.ts (lines 16-46 — the PURE-FUNCTION pattern: documented interface, @example, no side effects, no I/O; fingerprint.ts + reconcile.ts mirror this shape exactly per PATTERNS.md Assignment 6 lines 261-297)
-    - daemon/src/protocol/handshake.test.ts (lines 15-26 — the pure-function unit-test pattern with @example assertions; replicate for fingerprint.test.ts)
-    - daemon/src/protocol/line-buffer.test.ts (lines 15-25, 34-57 — the seeded-RNG property-test pattern; replicate for the reconcile 20-track-reorder + atomic-write N-parallel tests per Shared Pattern H)
-    - .planning/phases/02-read-only-context-foundation-m1/02-RESEARCH.md (Pattern 2 "STATE-04 Fingerprint + Reconcile" lines 432-549 — fingerprint composition name+type+neighbors+contentHash; reconcile-on-reconnect matched/reassigned/new/vanished; atomic state-cache write temp+rename; Pitfall 2/4/6 defenses)
-    - .planning/phases/02-read-only-context-foundation-m1/02-RESEARCH.md (§Code Examples "Atomic write" lines 1172-1186 — the canonical implementation to transcribe verbatim per PATTERNS.md Assignment 10 lines 367-391)
-    - .planning/phases/02-read-only-context-foundation-m1/02-PATTERNS.md (Assignment 6 lines 261-297 fingerprint/reconcile pure-function shape; Assignment 10 lines 367-391 atomic-write verbatim; Shared Pattern F lines 699-713 atomic-write non-negotiables)
-    - .planning/phases/02-read-only-context-foundation-m1/02-CONTEXT.md (D-04 automation field reserved empty; STATE-04 fingerprint = name+type+neighbors+contentHash, no native IDs)
-  </read_first>
-  <behavior>
-    - fingerprint: same {name,type,neighbors,contentHash} input always produces the same 16-char hex id (deterministic); two inputs differing only in neighbors produce different ids; two inputs differing only in contentHash produce different ids; the id matches ^(trk|clip|dev)_[0-9a-f]{16}$ when prefixed by type.
-    - reconcile: a 20-track raw state observed twice (no changes) matches all 20 stable IDs (no spurious new/vanished); reordering the 20 tracks changes neighbor pairs but the fingerprint fuzzy-fallback (name+type match) reassigns correctly so IDs survive; renaming a track from "Kick" to "Kick Main" with unchanged note content reassigns via content-hash match; a genuinely-new track gets a minted sid; a vanished track stays in the persisted map for the grace period.
-    - atomicWriteJson: writing the same path N=20 times in parallel always leaves a final file that (a) parses as valid JSON, (b) is byte-equal to exactly ONE of the N inputs (no half-written merge); the temp file is in the same directory as the destination (Pitfall 4 defense).
-    - state-cache: loadOrInit creates .bw-brain/ if absent; save writes via atomicWriteJson; after a save, loadOrInit returns the saved state.
-  </behavior>
-  <action>
-    Create daemon/src/state/fingerprint.ts as a pure function module (PATTERNS.md Assignment 6 — mirror handshake.ts lines 16-46 structure). Export: interface FingerprintInput { name: string; type: "track"|"clip"|"device"; neighbors: string[]; contentHash: string }; export function fingerprint(input: FingerprintInput): string. Body: per RESEARCH.md lines 448-454: canonical JSON.stringify({n:name, t:type, nb:neighbors, ch:contentHash}) (keys insertion-sorted), createHash("sha256").update(canon).digest("hex").slice(0,16). Add a JSDoc @example. Import { createHash } from "node:crypto". Add a helper mintSid(type, input) returning `${type prefix}_${fingerprint(input)}` where type prefix is trk/clip/dev.
-
-    Create daemon/src/state/fingerprint.test.ts (vitest): determinism test (same input twice -> same id); distinctness tests (differ in neighbors -> different id; differ in contentHash -> different id; differ in name -> different id); @example assertion; the id matches the project-state.schema.json selection.*Sid regex.
-
-    Create daemon/src/state/reconcile.ts as a pure function module. Export: interface StableIdMap { byFingerprint: Map<string,string>; byNameAndType: Map<string,string>; lastSeen: Map<string,number> }; interface ReconcileResult { matched: Array<{sid,obj}>; reassigned: Array<{sid,obj,reason}>; new: Array<{sid,obj}>; vanished: Array<{sid}> }; export function reconcile(observed: RawState, persisted: StableIdMap, now: number): ReconcileResult. Body per RESEARCH.md lines 467-492: for each observed object, compute fingerprint; if persisted.byFingerprint has it -> matched; else if byNameAndType has `${type}:${name}` -> reassigned (rebind fingerprint to existing sid); else mint new sid + register. Vanished = in persisted but not observed (kept; caller expires after grace). Import fingerprint from "./fingerprint.js" (NodeNext .js ext). Import RawState type from "../../gen/project-state.js" (the Plan-01-generated type).
-
-    Create daemon/src/state/reconcile.test.ts: the SC#3 held-out property test. Build a synthetic 20-track RawState (varying names Kick/Bass/Lead/.../Hats). Test 1: reconcile(state, emptyMap) -> 20 new sids. Test 2: reconcile(state, persistedFromTest1) -> 20 matched, 0 new. Test 3 (REORDER — the SC#3 critical case): reverse the track order in a new observed state, reconcile against persisted -> assert >=18 of 20 sids match (fuzzy fallback covers the neighbor-change; the held-out bar). Test 4 (RENAME + content-stable): rename "Kick" -> "Kick Main" with unchanged contentHash -> reassigned to the same sid. Test 5 (NEW track): add a 21st track -> 20 matched + 1 new. Test 6 (VANISHED): remove 2 tracks -> 2 vanished entries.
-
-    Create daemon/src/store/atomic-write.ts transcribing RESEARCH.md lines 1172-1186 verbatim (PATTERNS.md Assignment 10 line 380). Export async function atomicWriteJson(path: string, data: unknown): Promise<void>. Imports: { writeFile, rename, mkdir, dirname, basename } from "node:fs/promises"; { randomBytes } from "node:crypto"; { join } from "node:path". Body: const dir = dirname(path); await mkdir(dir, {recursive:true}); const tmp = join(dir, `.${basename(path)}.${randomBytes(6).toString("hex")}.tmp`); await writeFile(tmp, JSON.stringify(data,null,2), "utf8"); await rename(tmp, path). The temp file MUST be join(dir, ...) — never /tmp (Pitfall 4 defense — cross-filesystem rename is non-atomic).
-
-    Create daemon/src/store/atomic-write.test.ts: the SC#3 held-out property test. Use os.tmpdir() + a subdirectory per test (cleanup in afterEach). Test: fire N=20 parallel atomicWriteJson calls to the SAME path with distinct data objects; read the final file; assert (a) it parses as valid JSON, (b) it deep-equals exactly ONE of the 20 inputs (no half-written merge). Add a sequential-write test (write A, write B, read -> B). Add a test that .bw-brain/ is auto-created when absent.
-
-    Create daemon/src/store/state-cache.ts: loadOrInit(path) -> reads + JSON.parse (returns empty default if file absent); save(path, state) -> calls atomicWriteJson. Wraps the StableIdMap + last-known RawState snapshot. Imports atomicWriteJson from "./atomic-write.js".
-
-    Create daemon/src/store/state-cache.test.ts: save then load round-trip; loadOrInit on a missing path returns the empty default without throwing; .bw-brain/ dir creation.
-  </action>
-  <verify>
-    <automated>cd /Users/eggfam/dev/bw-brain/daemon && npx vitest run src/state/fingerprint.test.ts src/state/reconcile.test.ts src/store/atomic-write.test.ts src/store/state-cache.test.ts</automated>
-  </verify>
-  <acceptance_criteria>
-    - fingerprint.ts is pure (no I/O, no side effects); fingerprint({name:"Kick",type:"track",neighbors:["Bass","Lead"],contentHash:"abc"}) is deterministic across calls.
-    - reconcile.test.ts has a passing 20-track-reorder case asserting >=18 of 20 sids survive the reorder (the SC#3 held-out bar).
-    - reconcile.test.ts has passing rename-with-stable-content + new-track + vanished-track cases.
-    - atomic-write.ts temp file path is join(dirname(dest), ...) (grep the source: the tmp variable is constructed via join(dir, ...), never a /tmp literal — Pitfall 4 defense).
-    - atomic-write.test.ts has a passing N=20-parallel-writes property test asserting the final file parses + deep-equals one input.
-    - state-cache.ts save() calls atomicWriteJson (not fs.writeFile directly).
-    - `npx vitest run` for these 4 test files is green.
-    - `npx tsc --noEmit` passes (NodeNext strict, .js imports).
-  </acceptance_criteria>
-  <done>The 4 STATE-04 pure-function modules + their tests are green, including the 3 SC#3-critical held-out property tests (20-track reorder reconcile, N-parallel atomic write, deterministic fingerprint). The trust-spine primitives are proven before the stateful layer (Task 2) uses them.</done>
-</task>
-
-<task type="auto" tdd="true">
-  <name>Task 2: STATE-02/03/04 stateful + MEM-02 boundary — stale-watchdog + analyzer-registry (IntentAnalyzer only) + intent-store + normalizer + boundary</name>
+  <name>Task 1: STATE-02/03/04 stateful + MEM-02 boundary — stale-watchdog + analyzer-registry (IntentAnalyzer only) + intent-store + normalizer + boundary</name>
   <files>daemon/src/state/stale-watchdog.ts, daemon/src/state/stale-watchdog.test.ts, daemon/src/state/analyzer-registry.ts, daemon/src/state/analyzer-registry.test.ts, daemon/src/state/intent-store.ts, daemon/src/state/intent-store.test.ts, daemon/src/ingest/normalizer.ts, daemon/src/ingest/normalizer.test.ts, daemon/src/store/boundary.ts, daemon/src/store/boundary.test.ts</files>
   <read_first>
     - daemon/src/transport/tcp.ts (lines 43-48 — the STATEFUL-CLASS pattern: private readonly fields, constructor, lifecycle; stale-watchdog.ts mirrors this shape per PATTERNS.md Assignment 7 lines 300-330)
@@ -214,11 +165,11 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
     - `npx vitest run src/state/ src/store/ src/ingest/` is green.
     - `npx tsc --noEmit` passes.
   </acceptance_criteria>
-  <done>The stateful daemon layer is complete: watchdog transitions correct (SC#3), analyzer framework ships empty-but-pluggable with IntentAnalyzer only (STATE-02/D-08), intent is read-only user-authored (STATE-03/D-09), raw-state normalizes against the schema (STATE-01), and the MEM-02 boundary is enforced as a unit test (SC#5). Ready for Task 3 to expose this via the UDS query channel.</done>
+  <done>The stateful daemon layer is complete: watchdog transitions correct (SC#3 surfacing), analyzer framework ships empty-but-pluggable with IntentAnalyzer only (STATE-02/D-08), intent is read-only user-authored (STATE-03/D-09), raw-state normalizes against the schema (STATE-01), and the MEM-02 boundary is enforced as a unit test (SC#5). Ready for Task 2 to expose this via the UDS query channel.</done>
 </task>
 
 <task type="auto" tdd="true">
-  <name>Task 3: D-07 UDS transport + query-server (cli-query Ajv validation + op dispatch + stateFreshness surfacing)</name>
+  <name>Task 2: D-07 UDS transport + query-server (cli-query Ajv validation + op dispatch + stateFreshness surfacing)</name>
   <files>daemon/src/transport/uds.ts, daemon/src/transport/uds.test.ts, daemon/src/query/query-server.ts, daemon/src/query/query-server.test.ts</files>
   <read_first>
     - daemon/src/transport/tcp.ts (FULL FILE — the closest analog; copy the SECURITY INVARIANT header block, the constructor guard, the net.createServer per-connection handling, the send() atomic-line write, the onMessage/close shape; uds.ts mirrors this with path-based listen + chmod 0600 instead of host:port)
@@ -238,7 +189,7 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
 
     Create daemon/src/transport/uds.test.ts: start a transport on os.tmpdir()+"/test-bw-brain.sock"; assert fs.statSync(socketPath) exists; assert (fs.statSync(socketPath).mode & 0o777) === 0o600 (the Pitfall-5 UDS-form gate); connect a net.createConnection({path:socketPath}); send a message; assert the client receives JSON.parse-able line; close asserts the socket file is unlinked. Use afterEach cleanup.
 
-    Create daemon/src/query/query-server.ts (PATTERNS.md Assignment 12). Import { Ajv2020 } from "ajv/dist/2020.js"; import querySchema from "../../../schemas/cli-query/query.schema.json" with { type:"json" }; import resultSchema from "../../../schemas/cli-query/result.schema.json" with { type:"json" }; const ajv = new Ajv2020({allErrors:true, strict:false}); ajv.addSchema(querySchema); ajv.addSchema(resultSchema); const validateQuery = ajv.getSchema(querySchema.$id)!; Export interface QueryServerDeps { transport: Transport; watchdog: StaleWatchdog; getState: () => RawState | null; getIntent: () => ProjectIntent | null; }. Export function startQueryServer(deps: QueryServerDeps): void — wires deps.transport.onMessage((chunk) => { parse + validateQuery; if invalid -> send result{ok:false, error:"invalid_query", stateFreshness: deps.watchdog.tick()}; else dispatch on msg.op: "focus.export" -> send result{ok:true, stateFreshness, payload: focusView(deps.getState()), assumptions:[...]}; "project.summary" -> ...; "project.region" -> ...; "midi.inspect" -> ...; "device.inspect" -> ...; "diff" -> ...; default -> send result{ok:false, error:"not_implemented", availableFrom: "M2", stateFreshness} }). The stateFreshness field is REQUIRED on every result (schemas/cli-query/result.schema.json gate from Plan 01). The assumptions[] array is attached to every result carrying a derived field (UX-06). The actual op-handler bodies (focusView, projectSummary, etc.) are THIN — they read from deps.getState()/getIntent() which Task 2's normalizer + intent-store populate. For M1, if getState() returns null (bridge not yet connected), return stateFreshness from the watchdog (likely "disconnected") + payload null + assumptions[{claim:"bridge not connected", confidence:1.0, source:"selection"}].
+    Create daemon/src/query/query-server.ts (PATTERNS.md Assignment 12). Import { Ajv2020 } from "ajv/dist/2020.js"; import querySchema from "../../../schemas/cli-query/query.schema.json" with { type:"json" }; import resultSchema from "../../../schemas/cli-query/result.schema.json" with { type:"json" }; const ajv = new Ajv2020({allErrors:true, strict:false}); ajv.addSchema(querySchema); ajv.addSchema(resultSchema); const validateQuery = ajv.getSchema(querySchema.$id)!; Export interface QueryServerDeps { transport: Transport; watchdog: StaleWatchdog; getState: () => RawState | null; getIntent: () => ProjectIntent | null; }. Export function startQueryServer(deps: QueryServerDeps): void — wires deps.transport.onMessage((chunk) => { parse + validateQuery; if invalid -> send result{ok:false, error:"invalid_query", stateFreshness: deps.watchdog.tick()}; else dispatch on msg.op: "focus.export" -> send result{ok:true, stateFreshness, payload: focusView(deps.getState()), assumptions:[...]}; "project.summary" -> ...; "project.region" -> ...; "midi.inspect" -> ...; "device.inspect" -> ...; "diff" -> ...; default -> send result{ok:false, error:"not_implemented", availableFrom: "M2", stateFreshness} }). The stateFreshness field is REQUIRED on every result (schemas/cli-query/result.schema.json gate from Plan 01). The assumptions[] array is attached to every result carrying a derived field (UX-06). The actual op-handler bodies (focusView, projectSummary, etc.) are THIN — they read from deps.getState()/getIntent() which Task 1's normalizer + intent-store populate. For M1, if getState() returns null (bridge not yet connected), return stateFreshness from the watchdog (likely "disconnected") + payload null + assumptions[{claim:"bridge not connected", confidence:1.0, source:"selection"}].
 
     Create daemon/src/query/query-server.test.ts: inject a fake transport (capture sent messages) + a fake watchdog (return "live" + "stale" + "disconnected" on demand) + a fixture RawState. Test: send {op:"focus.export"} -> response has ok:true, stateFreshness matches the watchdog, payload is the focus view, assumptions is non-empty. Test: send {op:"project.summary"} -> ok:true. Test: send {op:"unknown"} -> ok:false, error:"not_implemented", availableFrom present. Test: send a malformed query (missing op) -> ok:false, error:"invalid_query". Test: watchdog returns "stale" -> response stateFreshness:"stale" (SC#3 surfacing). Test: getState() returns null -> response ok:true but payload null + stateFreshness from watchdog + assumptions carrying the "bridge not connected" claim.
   </action>
@@ -267,23 +218,20 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
 |----------|-------------|
 | bridge → daemon ingest (port 7878) | Raw bridge payloads normalize through the second-stage Ajv validator (project-state.schema.json) before reaching the state layer. Pitfall 2 defense: a slot-index trackSid cannot pass the regex gate. |
 | CLI → daemon query (UDS ~/.bw-brain/daemon.sock) | Inbound cli-query messages validate against cli-query/query.schema.json; outbound results carry stateFreshness (SC#3) + assumptions[] (UX-06). Socket file mode 0600 is the auth (same-user only). |
-| daemon → durable disk (<project>/.bw-brain/) | Every write is atomic (temp+rename). The daemon is the sole writer. MEM-02 boundary unit test asserts no ephemeral-write op exists in the cli-query schema. |
+| daemon → durable disk (<project>/.bw-brain/) | Every write is atomic via the 02-03a atomicWriteJson primitive. The MEM-02 boundary unit test asserts no ephemeral-write op exists in the cli-query schema. |
 
 ## STRIDE Threat Register
 
 | Threat ID | Category | Component | Disposition | Mitigation Plan |
 |-----------|----------|-----------|-------------|-----------------|
-| T-2-03-T | Tampering | state-cache.json (crash mid-write) | mitigate | atomicWriteJson (temp+rename, POSIX-atomic) — Pitfall 4 defense; held-out N-parallel property test proves no half-written file. |
-| T-2-03-S | Spoofing | UDS socket (other local user connects) | mitigate | chmod(socketPath, 0o600) immediately after listen + constructor refuses-to-start if chmod fails — Pitfall 5 UDS-form; uds.test.ts asserts the mode. |
-| T-2-03-E | Elevation (sid corruption) | reconcile on reorder | mitigate | Fingerprint (name+type+neighbors+contentHash) — never trusts a slot index; held-out 20-track-reorder property test proves >=18/20 sids survive. |
-| T-2-03-T2 | Tampering (stale trusted as live) | CLI results during bridge silence | mitigate | StaleWatchdog surfaces stateFreshness on every result; assertFresh() throws when not live (M2 edit gate). |
-| T-2-03-I | Tampering (ephemeral -> durable) | cli-query op surface | mitigate | boundary.ts unit test asserts the cli-query op enum has NO ephemeral-write op (MEM-02 / SC#5 architectural gate). |
-| T-2-03-D | DoS (fingerprint flood) | reconcile under massive reorder | accept | M1 threat model is single-user dev box; the held-out 20-track test bounds the realistic case. Tuning the fuzzy fallback is a post-M1 observation per RESEARCH.md Open Question 3. |
+| T-2-03b-S | Spoofing | UDS socket (other local user connects) | mitigate | chmod(socketPath, 0o600) immediately after listen + constructor refuses-to-start if chmod fails — Pitfall 5 UDS-form; uds.test.ts asserts the mode. |
+| T-2-03b-T | Tampering (stale trusted as live) | CLI results during bridge silence | mitigate | StaleWatchdog surfaces stateFreshness on every result; assertFresh() throws when not live (M2 edit gate). |
+| T-2-03b-I | Tampering (ephemeral -> durable) | cli-query op surface | mitigate | boundary.ts unit test asserts the cli-query op enum has NO ephemeral-write op (MEM-02 / SC#5 architectural gate). |
+| T-2-03b-D | DoS (fingerprint flood) | reconcile under massive reorder | accept | M1 threat model is single-user dev box; 02-03a's held-out 20-track test bounds the realistic case. Tuning the fuzzy fallback is a post-M1 observation per RESEARCH.md Open Question 3. |
 </threat_model>
 
 <verification>
-- `cd daemon && npx vitest run src/state src/store src/ingest src/transport/uds.test.ts src/query` green (all Task 1+2+3 tests).
-- The 3 SC#3 held-out property tests pass: 20-track reorder reconcile (>=18/20), N-parallel atomic write (final file parses + equals one input), watchdog transitions (live/stale/disconnected).
+- `cd daemon && npx vitest run src/state src/store src/ingest src/transport/uds.test.ts src/query` green (all Task 1+2 tests).
 - `cd daemon && npx tsc --noEmit` green (NodeNext strict).
 - boundary.ts checkMemoryBoundary(querySchema) returns [] (MEM-02 gate holds).
 - uds.test.ts asserts socket file mode 0o600 (Pitfall 5 UDS-form).
@@ -293,30 +241,25 @@ Output: 12 new daemon source files + their tests, including the 3 SC#3-critical 
 - Raw bridge snapshots normalize into schema-valid RawState (STATE-01) — invalid payloads (incl. slot-index sids) drop, never throw.
 - Analyzer framework ships with IntentAnalyzer ONLY (STATE-02/D-08); the registry drops below-threshold output; sections/motifs/roles/energy/automation stay empty.
 - Intent loads read-only from <project>/.bw-brain/intent.json with NO inference (STATE-03/D-09).
-- Stable IDs survive a 20-track reorder on reconnect (STATE-04/SC#3 — held-out property test).
-- state-cache.json is atomic under concurrent writes (SC#3 — held-out property test); the watchdog surfaces stateFreshness live|stale|disconnected on every CLI result.
+- The watchdog surfaces stateFreshness live|stale|disconnected on every CLI result (SC#3 — built on 02-03a's proven state-cache primitive).
 - UDS listener at ~/.bw-brain/daemon.sock has mode 0600 (D-07/Pitfall 5).
 - MEM-02 boundary holds: no cli-query op writes ephemeral data to durable (SC#5 — unit test).
 </success_criteria>
 
 <output>
-Create `.planning/phases/02-read-only-context-foundation-m1/02-03-SUMMARY.md` when done.
+Create `.planning/phases/02-read-only-context-foundation-m1/02-03b-SUMMARY.md` when done.
 </output>
 
-## Artifacts this phase produces (Plan 03)
+## Artifacts this phase produces (Plan 03b)
 
-**New modules (daemon-side state layer):**
-- `daemon/src/state/fingerprint.ts` — `fingerprint(input: FingerprintInput): string`, `mintSid(type, input)`, `FingerprintInput` interface
-- `daemon/src/state/reconcile.ts` — `reconcile(observed, persisted, now): ReconcileResult`, `StableIdMap`, `ReconcileResult` interfaces
+**New modules (daemon-side stateful layer + UDS query channel):**
 - `daemon/src/state/stale-watchdog.ts` — `StaleWatchdog` class, `Freshness` type, `STALE_THRESHOLD_MS`, `RECONNECT_GRACE_MS` constants
 - `daemon/src/state/analyzer-registry.ts` — `Analyzer`, `DerivedField`, `AnalyzeContext`, `Assumption` interfaces; `AnalyzerRegistry` class; `M1_ANALYZERS` const (length 1: IntentAnalyzer); `IntentAnalyzer`
 - `daemon/src/state/intent-store.ts` — `loadIntent(path): Promise<ProjectIntent | null>`
 - `daemon/src/ingest/normalizer.ts` — `normalize(payload): RawState | null`
-- `daemon/src/store/atomic-write.ts` — `atomicWriteJson(path, data): Promise<void>`
-- `daemon/src/store/state-cache.ts` — `loadOrInit(path)`, `save(path, state)`
 - `daemon/src/store/boundary.ts` — `checkMemoryBoundary(querySchema): string[]` + main() guard
 - `daemon/src/transport/uds.ts` — `UnixDomainSocketServerTransport` class implementing `Transport`
 - `daemon/src/query/query-server.ts` — `QueryServerDeps` interface, `startQueryServer(deps)`
 
-**New tests (12 files):**
-- fingerprint.test.ts, reconcile.test.ts (SC#3 20-track-reorder held-out), stale-watchdog.test.ts, analyzer-registry.test.ts, intent-store.test.ts, atomic-write.test.ts (SC#3 N-parallel held-out), state-cache.test.ts, boundary.test.ts (MEM-02 gate), normalizer.test.ts, uds.test.ts (Pitfall 5 0600 gate), query-server.test.ts
+**New tests (8 files):**
+- stale-watchdog.test.ts (SC#3 transition suite), analyzer-registry.test.ts (D-08 framework + below-threshold refuse), intent-store.test.ts (D-09 no-inference), atomic-write/state-cache tests live in 02-03a, boundary.test.ts (MEM-02 / SC#5 gate), normalizer.test.ts (Pitfall 2 regex gate), uds.test.ts (Pitfall 5 0600 gate), query-server.test.ts (op dispatch + stateFreshness surfacing)

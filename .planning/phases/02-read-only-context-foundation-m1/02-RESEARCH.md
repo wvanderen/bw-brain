@@ -1317,26 +1317,30 @@ See §Architecture Patterns Pattern 5 for the full `Analyzer` / `DerivedField` /
 
 **If this table is empty:** — not applicable; the above 10 are the assumed claims. A1, A5, A7 carry the most planning risk and are mirrored in Open Questions.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`CursorRemoteControlsPage` VST/AU exposure (A1)** — does walking the 8-remotes-per-page surface for a loaded VST (e.g. Vital, Surge, a free synth) actually return the plugin's parameters? Capabilities doc §4 lists the surface but the §4 behavioral probe is TODO-in-app.
    - What we know: surface exists; 8 remotes/page; AGENTS.md capabilities table says "8 macro-style remote parameters per page" with `each remote parameter` writable.
    - What's unclear: whether VST/AU plugins AUTOMATICALLY populate the page or whether the user must manually map macros first.
    - Recommendation: add a Phase 2 human-verify checkpoint (load a free VST, run `bw-device inspect`, observe). Fallback if empty: `cursorDevice.getParameter(int index)` direct walk (slower but covers all params regardless of page mapping).
+   - **— RESOLVED: 02-02 Task 3** (BLOCKING human-verify checkpoint: loads a real VST, runs `bw-device inspect`, records the A1 finding as CONFIRMED or NEGATED with fallback in `docs/bitwig-capabilities.md` §4).
 
 2. **Persistent TUI state-pane API (A7)** — the seed doc shows four TUI panes (state/diff/arrangement/device); the verified OpenClaw docs cover skills + slash commands but NOT a custom-pane renderer.
    - What we know: `pi --help` shows the runtime; OpenClaw has plugins (heavier than skills); Ink-style TUI is implied by the project shape.
    - What's unclear: whether M1 should ship a real persistent pane (plugin-shaped effort) or text-rendered state from `/analyze` (M1-recommended).
    - Recommendation: M1 = text-rendered state in `/analyze` output + a reserved section slot. Persistent pane deferred to M2 (with `/vary`+diff-pane) where the diff visualization is the real value. UX-05's "renders selected track/clip/device + section label" is satisfiable as text-render in M1.
+   - **— RESOLVED: 02-05 describe.ts (section em-dash reserved) + SKILL.md** (M1 ships the state pane as a text-render block inside `/analyze` output: T/C/D + transport + `section: —` reserved per D-11; SKILL.md body reproduces this shape. Persistent TUI pane API explicitly deferred to M2 per A7 recommendation.)
 
 3. **Reconcile policy under massive project reorder (A5)** — the fingerprint fuzzy-fallback covers renames + content drift. What if the user reorders 20 tracks at once (drag-strip)?
    - What we know: neighbors are part of the fingerprint; a 20-track reorder changes most neighbor pairs.
    - What's unclear: whether the name+content signal alone is enough, or whether we need a longer neighbor window.
    - Recommendation: ship the documented reconcile + a held-out fixture test simulating a 20-track reorder; tune the fuzzy fallback after observing real behavior.
+   - **— RESOLVED: 02-03a Task 1 reconcile.test.ts** (held-out 20-track-reorder property test asserts >=18/20 sids survive the reorder via the fuzzy fallback; tuning the fallback is a post-M1 observation per the test's bounds).
 
 4. **Java `host.println()` reachability for bridge diagnostics** — the bridge logs via `host.println()` (Bitwig's in-app console). For debugging the daemon-side, do we need bridge logs to reach the daemon?
    - What we know: Phase 1 spike used `host.println` for in-app visibility; no disk log is produced.
    - Recommendation: NOT needed for M1 — the bridge is dumb by design; daemon-side logging (console + structured) is sufficient. Bridge errors surface as malformed/missing events the daemon already drops cleanly.
+   - **— RESOLVED: no-op for M1** (no plan introduces a bridge→daemon log channel; daemon-side logging is sufficient per the original recommendation. The bridge stays dumb by design — D-03 push/pull envelopes carry state, not diagnostics.)
 
 ## Environment Availability
 
