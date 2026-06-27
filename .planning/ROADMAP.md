@@ -13,7 +13,7 @@ bw-brain is a local-first intelligence layer for Bitwig, built as a dumb Java `.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Schema & IPC Spike** - Prove Bitwig TCP access, freeze the JSON-Lines contract, document the verified API surface before any production bridge work
+- [x] **Phase 1: Schema & IPC Spike** - Prove Bitwig TCP access, freeze the JSON-Lines contract, document the verified API surface before any production bridge work (completed 2026-06-26)
 - [ ] **Phase 2: Read-Only Context Foundation (M1)** - Bridge mirror + daemon normalization + read CLI + memory bootstrap + Pi /analyze — the assistant reliably describes selected context
 - [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply
 - [ ] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only)
@@ -63,9 +63,23 @@ Plans:
   4. Pi `/analyze` produces a critique + 2–4 next actions grounded in live selection/section/intent, every suggestion carries an `assumptions[]` field, and the state pane renders selected track/clip/device + section label.
   5. Durable project memory (`.bw-brain/`) and ephemeral session memory stay cleanly separated — experiment threads never write to the durable store (hard architectural boundary).
 
-**Plans**: TBD
+**Plans**: 5 plans across 3 waves
 **UI hint**: yes
 **Research needed**: bridge capability probe (Pitfall 1 — highest-risk item in the project); exact `CursorClip`/`CursorTrack`/`CursorDevice` observer surface; controller-thread scheduling semantics.
+Plans:
+**Wave 1** *(parallel — zero file overlap)*
+
+- [ ] 02-01-PLAN.md — Wire contracts foundation: 4 new JSON Schemas (project-state, intent, cli-query/{query,result}) + extend event/request enums + gen-types multi-dir + reader OBSERVATIONAL_EVENT_TYPES (Pitfall 1) (autonomous, Wave 1)
+- [ ] 02-02-PLAN.md — Java `.bwextension` bridge (Maven + ServiceLoader + full observer set + get.* pull handlers + live VST/AU + reload-reconcile human-verify) (autonomous: false — Task 3 blocking checkpoint, Wave 1)
+
+**Wave 2** *(blocked on Wave 1 — zero file overlap between 02-03 and 02-04)*
+
+- [ ] 02-03-PLAN.md — Daemon state layer + query server + memory boundary: STATE-04 fingerprint/reconcile/watchdog (SC#3 held-out tests) + STATE-01 normalizer + STATE-02 analyzer framework (IntentAnalyzer only) + STATE-03 intent store + MEM-01/02 + D-07 UDS listener (autonomous, Wave 2)
+- [ ] 02-04-PLAN.md — Multicall CLI thin client: `bw-brain` binary + 8 subcommands (5 live + 3 stubs) + UDS query-client + bw-diff pure logic (SC#1 round-trip) + dump.ts deleted (autonomous, Wave 2)
+
+**Wave 3** *(blocked on Waves 1+2 — full live stack required)*
+
+- [ ] 02-05-PLAN.md — Pi `/analyze` pack (SKILL.md wrapping the CLI) + describe() literal grounded description engine + SC#1 ~20-clip accuracy harness (>0.9 token-overlap) + live Pi smoke (D-12) + spike/ deletion (D-05/D-06) (autonomous: false — Task 3 blocking checkpoint, Wave 3)
 
 ### Phase 3: Reversible MIDI Patching (M2)
 
@@ -129,8 +143,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Schema & IPC Spike | 2/3 | In Progress|  |
-| 2. Read-Only Context Foundation (M1) | 0/TBD | Not started | - |
+| 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
+| 2. Read-Only Context Foundation (M1) | 0/5 | Not started | - |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | Not started | - |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
