@@ -28,7 +28,16 @@ import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
-const SCHEMA_DIR = join(REPO_ROOT, "schemas", "protocol");
+// Phase 2 (Plan 02-01): scan THREE schema roots instead of one. The $id-based
+// deref logic below (lines 53-109) ALREADY handles cross-dir $refs because it
+// suffix-matches against the byId registry — no deref change needed, only the
+// input-directory loop. Order is protocol → schemas → cli-query (deterministic
+// so re-runs produce stable output ordering).
+const SCHEMA_DIRS = [
+  join(REPO_ROOT, "schemas", "protocol"),
+  join(REPO_ROOT, "schemas"),
+  join(REPO_ROOT, "schemas", "cli-query"),
+];
 const OUT_DIR = join(REPO_ROOT, "daemon", "src", "gen");
 
 // json-schema-to-typescript lives in daemon/node_modules (it's a daemon devDep).
@@ -109,25 +118,48 @@ function derefNode(node, byId, seen) {
 }
 
 async function main() {
-  const files = (await readdir(SCHEMA_DIR)).filter((f) =>
-    f.endsWith(".schema.json"),
-  );
+  // Scan all SCHEMA_DIRS, accumulating *.schema.json files from each. Duplicate
+  // basenames across dirs would collide in daemon/src/gen/ — none exist today
+  // (protocol/, schemas/, schemas/cli-query/ carry disjoint filenames), but we
+  // guard with a per-basename seen-set so a future collision surfaces as an
+  // explicit error rather than a silent overwrite.
+  const files = [];
+  const seenBasenames = new Set();
+  for (const dir of SCHEMA_DIRS) {
+    let entries = [];
+    try {
+      entries = await readdir(dir);
+    } catch (err) {
+      // A schema root may not exist yet on a fresh checkout (e.g. cli-query/
+      // before Plan 02-01). Skip rather than crash — the existing protocol/
+      // root is the only hard requirement.
+      if (err.code === "ENOENT") continue;
+      throw err;
+    }
+    for (const f of entries.filter((name) => name.endsWith(".schema.json"))) {
+      if (seenBasenames.has(f)) {
+        throw new Error(`Schema basename collision across dirs: ${f}`);
+      }
+      seenBasenames.add(f);
+      files.push({ dir, name: f });
+    }
+  }
   if (files.length === 0) {
-    console.error(`No *.schema.json found in ${SCHEMA_DIR}`);
+    console.error(`No *.schema.json found in ${SCHEMA_DIRS.join(", ")}`);
     process.exit(1);
   }
 
   // Pass 1: load everything, build $id → schema.
   const byId = new Map();
   const loaded = [];
-  for (const f of files) {
-    const text = await readFile(join(SCHEMA_DIR, f), "utf8");
+  for (const { dir, name } of files) {
+    const text = await readFile(join(dir, name), "utf8");
     const schema = JSON.parse(text);
     if (!schema.$id) {
-      throw new Error(`${f}: missing $id (required by SC#3)`);
+      throw new Error(`${name}: missing $id (required by SC#3)`);
     }
     byId.set(schema.$id, schema);
-    loaded.push({ fname: f, schema });
+    loaded.push({ fname: name, schema });
   }
 
   // Pass 2: dereference + compile each.
@@ -144,7 +176,7 @@ async function main() {
     const { $id: _drop, ...top } = dereffed;
     const ts = await compile(top, fname, {
       bannerComment: BANNER,
-      cwd: SCHEMA_DIR,
+      cwd: join(REPO_ROOT, "schemas"),
       style: { singleQuote: false },
       additionalProperties: false,
     });

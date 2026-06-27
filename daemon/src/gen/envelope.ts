@@ -35,7 +35,12 @@ export type Envelope = {
 } & (
   | {
       version: string;
-      type: "selection.changed";
+      type:
+        | "selection.changed"
+        | "track.name_changed"
+        | "clip.name_changed"
+        | "device.name_changed"
+        | "transport.changed";
       /**
        * Unix-seconds, sender-originated. Required on every event.
        */
@@ -51,7 +56,7 @@ export type Envelope = {
     }
   | {
       version: string;
-      type: "get.selected_clip";
+      type: "get.selected_clip" | "get.selected_device_chain" | "get.project_summary";
       /**
        * Request/response correlation id. REQUIRED on every request.
        */

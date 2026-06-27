@@ -63,9 +63,23 @@ const validateEnvelope = ajv.getSchema(envelopeSchema.$id)!;
 // Observational events: the bridge fires them with no ack expected. A newer
 // selection supersedes an older one, so dropping a stale event on overflow is
 // safe (bw-brain is observational). Edits/requests: user intent, MUST be ack'd —
-// never silently dropped. The set below is the Phase-1 frozen observational type
-// (selection.changed); Phase 2 extends this as more event types freeze.
-const OBSERVATIONAL_EVENT_TYPES: ReadonlySet<string> = new Set(["selection.changed"]);
+// never silently dropped.
+//
+// PITFALL 1 (RESEARCH.md lines 793-798): this set MUST equal event.schema.json's
+// `type` enum EXACTLY. If a new event type is added to the schema but not here,
+// the backpressure classifier mis-classifies it as never-drop, which under a
+// bridge flood can pause edits (the exact failure Pitfall 1 names). The equality
+// is unit-tested in schemas.test.ts ("Pitfall 1: OBSERVATIONAL_EVENT_TYPES ===
+// event.schema.json type enum") so the build fails on drift. Phase 2 froze the
+// 5-event set (selection.changed + track/clip/device.name_changed +
+// transport.changed); Plan 02 emits all 5 from the bridge.
+export const OBSERVATIONAL_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "selection.changed",
+  "track.name_changed",
+  "clip.name_changed",
+  "device.name_changed",
+  "transport.changed",
+]);
 
 function isObservationalEvent(msg: unknown): boolean {
   if (typeof msg !== "object" || msg === null) return false;

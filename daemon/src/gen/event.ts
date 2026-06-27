@@ -9,7 +9,7 @@
  */
 export interface Event {
   version: string;
-  type: "selection.changed";
+  type: "selection.changed" | "track.name_changed" | "clip.name_changed" | "device.name_changed" | "transport.changed";
   /**
    * Unix-seconds, sender-originated. Required on every event.
    */
