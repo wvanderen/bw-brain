@@ -1,9 +1,9 @@
 ---
-status: partial
+status: diagnosed
 phase: 02-read-only-context-foundation-m1
 source: [02-VERIFICATION.md]
 started: 2026-06-27T22:13:27.000Z
-updated: 2026-06-28T02:17:16.000Z
+updated: 2026-06-28T15:21:57.000Z
 ---
 
 ## Current Test
@@ -52,7 +52,13 @@ blocked: 3
   reason: "User reported: fail - error on load: This has been deprecated since API version 2: Use getChannel(IndexInBank) instead. Extension fails to load entirely — no events round-trip. User notes same deprecation error was hit in phase 1 (possible recurrence/regression)."
   severity: blocker
   test: 1
-  root_cause: ""     # Filled by diagnosis
-  artifacts: []      # Filled by diagnosis
-  missing: []        # Filled by diagnosis
-  debug_session: ""  # Filled by diagnosis
+  root_cause: "trackBank.getTrack(i) at bridge/src/main/java/com/bwbrain/bridge/Observers.java:139 calls TrackBank.getTrack(int), @Deprecated since Bitwig Control Surface API v2. Bitwig 6.0.6 host enforces deprecation-as-error at runtime: the call during init() -> Observers.register() -> wireTrackBank() throws, aborting init() and failing the extension load. Compiles fine (@Deprecated is only a javac warning) which is why autonomous build/javap verification passed but the real host rejects it. Knowledge-loss regression: Phase 1 spike already documented 'TrackBank.getTrack/getChannel are BOTH deprecated in API 21' and deliberately avoided TrackBank; Phase 2 bridge re-introduced getTrack(i) with a contradictory inline comment."
+  artifacts:
+    - ".planning/debug/extension-load-deprecated-getchannel.md"
+  missing:
+    - "Code fix: Observers.java:139 trackBank.getTrack(i) -> trackBank.getItemAt(i) (terminal non-deprecated Bank<Track> accessor; do NOT use getChannel(int) — also deprecated). One-line change."
+    - "Comment fix: Observers.java line 19 + lines 136-137 (misleading 'getTrack non-deprecated' claim)."
+    - "Doc fix: docs/bitwig-capabilities.md §4 (Bank Paging) add deprecation + getItemAt replacement; §5 correct 'no clean single replacement' (getItemAt IS the clean replacement)."
+    - "Process gate: CI check that greps bridge Java sources against deprecated-list.html so deprecated call sites fail verification, not live UAT."
+    - "Reference: expose local Bitwig javadoc as reusable skill/reference per user suggestion."
+  debug_session: ".planning/debug/extension-load-deprecated-getchannel.md"
