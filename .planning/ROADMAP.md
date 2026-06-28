@@ -63,7 +63,7 @@ Plans:
   4. Pi `/analyze` produces a critique + 2–4 next actions grounded in live selection/section/intent, every suggestion carries an `assumptions[]` field, and the state pane renders selected track/clip/device + section label.
   5. Durable project memory (`.bw-brain/`) and ephemeral session memory stay cleanly separated — experiment threads never write to the durable store (hard architectural boundary).
 
-**Plans**: 7 plans (6/6 complete + 1 gap-closure planned)
+**Plans**: 7/7 plans complete
 **UI hint**: yes
 **Research needed**: bridge capability probe (Pitfall 1 — highest-risk item in the project); exact `CursorClip`/`CursorTrack`/`CursorDevice` observer surface; controller-thread scheduling semantics.
 Plans:
@@ -84,7 +84,7 @@ Plans:
 
 **Gap Closure** *(post-execution UAT blocker — diagnosis in .planning/debug/extension-load-deprecated-getchannel.md)*
 
-- [ ] 02-06-PLAN.md — [GAP CLOSURE] Fix the deprecated `TrackBank` int-indexer call at Observers.java:139 (-> `Bank.getItemAt(int)`) that aborts `init()` and fails the extension load in Bitwig 6.0.6; correct the knowledge-loss comments (lines ~19, ~136-137) + docs/bitwig-capabilities.md §4/§5; add `scripts/check-deprecated-bridge.mjs` process gate so the regression class is caught at verification time, not live UAT; rebuild + live reload human-verify (autonomous: false — Task 2 blocking checkpoint, Wave 1; unblocks UAT Tests 2/3/4)
+- [x] 02-06-PLAN.md — [GAP CLOSURE] Fix the deprecated `TrackBank` int-indexer call at Observers.java:139 (-> `Bank.getItemAt(int)`) that aborts `init()` and fails the extension load in Bitwig 6.0.6; correct the knowledge-loss comments (lines ~19, ~136-137) + docs/bitwig-capabilities.md §4/§5; add `scripts/check-deprecated-bridge.mjs` process gate so the regression class is caught at verification time, not live UAT; rebuild + live reload human-verify (autonomous: false — Task 2 blocking checkpoint, Wave 1; unblocks UAT Tests 2/3/4)
 
 ### Phase 3: Reversible MIDI Patching (M2)
 
@@ -149,7 +149,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
-| 2. Read-Only Context Foundation (M1) | 6/6 | Complete   | 2026-06-27 |
+| 2. Read-Only Context Foundation (M1) | 7/7 | Complete   | 2026-06-27 |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | Not started | - |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
