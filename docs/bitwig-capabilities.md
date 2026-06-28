@@ -171,6 +171,27 @@ issues a labelled edit so the user can revert.
 `TrackBank` / `DeviceBank` / `CursorRemoteControlsPage` are windowed N
 (configurable page size — DrivenByMoss `ModelSetup.setNumTracks(N)` etc.).
 
+**Deprecation note `[VERIFIED: in-app Javadoc 6.0.6 deprecated-list.html]`:**
+`TrackBank.getTrack(int)` and `TrackBank.getChannel(int)` are **BOTH
+`@Deprecated` since Bitwig Control Surface API v2** (deprecated-list.html
+lines 1321–1334; the runtime error text "Use getChannel(IndexInBank) instead"
+is a byte-exact match to `getTrack(int)`'s replacement note — but
+`getChannel(int)` is itself deprecated, so following the error message
+literally lands on a second deprecated method). The terminal
+non-deprecated accessor is **`Bank.getItemAt(int)`** (inherited by
+`TrackBank` via `ChannelBank<Track>` → `Bank<Track>`); it returns `Track`
+and supports `.name()` / `.position()` unchanged. **Bitwig 6.0.6 enforces
+deprecation-as-error at runtime** — a `@Deprecated`-since-v2 call site
+compiles as a javac warning only (Maven build succeeds) but throws inside
+`init()` when the host instruments it, aborting extension load. The
+Phase-2 UAT blocker (Plan 02-06) was exactly this regression:
+`trackBank.getTrack(i)` at `Observers.java:139` failed the live host
+despite a clean compile + `javap` "method exists" check. See
+`.planning/debug/extension-load-deprecated-getchannel.md` for the
+diagnosis evidence and `scripts/check-deprecated-bridge.mjs` for the
+mechanical gate that now flags any deprecated call site at verification
+time (closing the javap-vs-deprecation gap).
+
 **Design questions (RESEARCH.md Probe 4):** scroll vs page? Does the cursor
 track follow bank scrolls? 8-remote-parameters-per-page confirmed?
 
@@ -328,8 +349,11 @@ template.) A plain jar without this file is silently ignored.
 
 **Selection-observation finding (informs §5 + §4):** **VERIFIED** — there is NO
 bank-level `addSelectionObserver` in the public control-surface API, and
-`TrackBank.getTrack(int)` / `getChannel(int)` are BOTH deprecated in API 21 (no
-clean single replacement). The working surface is a **`CursorTrack`** (created
+`TrackBank.getTrack(int)` / `getChannel(int)` are BOTH `@Deprecated` since
+Bitwig Control Surface API v2; the terminal non-deprecated replacement is
+`Bank.getItemAt(int)` (inherited by `TrackBank` via `ChannelBank<Track>`;
+returns `Track`; `.name()` works unchanged). See §4 for the full deprecation
+chain + runtime enforcement note. The working surface is a **`CursorTrack`** (created
 via the non-deprecated `createCursorTrack(int,int)`) which follows the GUI
 selection; `cursorTrack.position()` (an `IntegerValue`) fires
 `addValueObserver` on selection change. Per-channel selection also exists via

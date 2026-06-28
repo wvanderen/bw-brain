@@ -62,7 +62,7 @@ public final class BridgeExtension extends ControllerExtension {
         // which IS-A CursorDevice).
         final CursorTrack cursorTrack = host.createCursorTrack(0, 0);
         final PinnableCursorClip cursorClip = cursorTrack.createLauncherCursorClip(16, 128);
-        final CursorDevice cursorDevice = cursorTrack.createCursorDevice();
+        final CursorDevice cursorDevice = cursorTrack.createCursorDevice(); // deprecated-allow: 0-arg overload (non-deprecated); javadoc deprecates only the 4-arg (String,String,int,CursorDeviceFollowMode) form
         final Transport transport = host.createTransport();
         final TrackBank trackBank = host.createTrackBank(BANK_SIZE, 0, 0);
 

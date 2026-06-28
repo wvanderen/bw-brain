@@ -16,7 +16,13 @@
 //                                                       change is the clip-selection proxy]
 //   - CursorDevice.name().addValueObserver(cb)         [Device.name() -> StringValue]
 //   - Transport.isPlaying().addValueObserver(cb)       [BooleanValue; NOT playState() — confirmed]
-//   - TrackBank.getTrack(i).name().addValueObserver(cb)[DeviceChain.name() via Track->Channel]
+//   - TrackBank.getItemAt(i).name().addValueObserver(cb) [DeviceChain.name() via Track->Channel;
+//                                                       inherited from Bank<Track>. getItemAt(int)
+//                                                       is the terminal non-deprecated accessor —
+//                                                       the int-arg AND 0-arg TrackBank indexers
+//                                                       (getTrack/getChannel) are BOTH @Deprecated
+//                                                       since API v2 (capabilities doc §4); Bitwig
+//                                                       6.0.6 enforces deprecation-as-error at runtime]
 //
 // Each observer carries its own skipFirstFire guard: Bitwig value observers fire
 // once on registration with the boot state (spike lines 73-77); skip that initial
@@ -133,10 +139,16 @@ public final class Observers {
     }
 
     private void wireTrackBank(final TrackBank trackBank) {
-        // Windowed TrackBank[N=8] (D-01). In-window getTrack(int) is non-deprecated
-        // (capabilities doc §4); the deprecated form is the cursor-following 0-arg.
+        // Windowed TrackBank[N=8] (D-01). The terminal non-deprecated accessor is
+        // Bank.getItemAt(int) (inherited by TrackBank via ChannelBank<Track>); it
+        // returns Track and supports .name() unchanged. The int-arg AND 0-arg
+        // TrackBank indexers (getTrack(int) AND getChannel(int)) are BOTH
+        // @Deprecated since Bitwig Control Surface API v2 — Bitwig 6.0.6 enforces
+        // deprecation-as-error at runtime (compiles as a javac warning only), so
+        // any deprecated call site aborts init() and fails the extension load.
+        // See docs/bitwig-capabilities.md §4 for the deprecation chain + evidence.
         for (int i = 0; i < bankSize; i++) {
-            final Track t = trackBank.getTrack(i);
+            final Track t = trackBank.getItemAt(i);
             final int slot = i;
             final AtomicBoolean skip = new AtomicBoolean(true);
             t.name().addValueObserver((StringValueChangedCallback) (String name) -> {
