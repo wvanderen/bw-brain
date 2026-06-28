@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "02-extension-load-deprecated-getchannel — Bitwig 6.0.6 extension fails to load: deprecation error 'Use getChannel(IndexInBank) instead' at load time; blocks 3 of 4 Phase-2 UAT tests."
 created: 2026-06-28T02:30:00.000Z
-updated: 2026-06-28T02:46:00.000Z
+updated: 2026-06-28T16:55:00.000Z
+resolved_at: 2026-06-28T16:55:00.000Z
+resolved_by: "Plan 02-06 (commit 3a9a271 — Observers.java:151 trackBank.getItemAt(i); user-verified live in Bitwig 6.0.6)"
 ---
 
 ## Current Focus
