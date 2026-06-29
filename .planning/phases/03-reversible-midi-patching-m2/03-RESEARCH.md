@@ -1462,19 +1462,21 @@ These CANNOT be automated — they require human ears, live Bitwig, or subjectiv
 
 **If this table is empty:** N/A — 6 assumptions listed; A3 (NoteStep grid-lock) is the only MEDIUM-risk one and is covered by manual checkpoint M4.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **NoteStep grid-locking (A3 / M4)**
+All items resolved by Plan 05 Task 2 (the end-of-phase manual UAT checkpoints M1–M5 + held-out fixture validation). Each prefix records the resolution path; the original text is preserved below for traceability.
+
+1. RESOLVED: manual probe M4 at end-of-phase (non-blocking) → Plan 05 Task 2. **NoteStep grid-locking (A3 / M4)**
    - What we know: `docs/bitwig-capabilities.md` §2 VERIFIED `NoteStep` exposes `start`/`pitch`/`velocity`/`duration` setters; the launcher cursor clip is `createLauncherCursorClip(16, 128)`.
    - What's unclear: does `NoteStep.start` accept free-beat values or snap to the 16-column grid? The grid-walk read pattern (`getStep(x,y,0)`) implies grid-locked addressing.
    - Recommendation: manual probe M4 at end-of-phase. If grid-locked, the planner adds a quantize-mitigation task (size gridWidth to shortest note, or quantize patch op `start` to the grid). NON-blocking for planning — the daemon-side spine (resolve/preview/revert) is grid-agnostic; only the bridge write path cares.
 
-2. **Bitwig undo coalescing window (M1)**
+2. RESOLVED: manual probe M1 (non-blocking) → Plan 05 Task 2. **Bitwig undo coalescing window (M1)**
    - What we know: `docs/bitwig-capabilities.md` §1 VERIFIED no labelled-undo API; coalescing behavior is undocumented.
    - What's unclear: does `Application.undo()` reverse one NoteStep mutation or coalesce a tight loop of 5 adds into one step?
    - Recommendation: manual probe M1 (non-blocking). Refines the user-facing "Cmd-Z step count" caveat ONLY. The daemon-authoritative revert (D-03) is the spine regardless.
 
-3. **Exact motif thresholds per genre (D-13)**
+3. RESOLVED: ship the guesses + validate via held-out fixtures + M3/M5 → Plan 05 Task 2. **Exact motif thresholds per genre (D-13)**
    - What we know: generic.json ships `vary:0.85`, `counterline:0.80`; techno.json tightens to 0.88/0.82.
    - What's unclear: are these the RIGHT numbers musically? They are starting guesses, not measured.
    - Recommendation: ship the guesses; validate via held-out fixtures + manual M3/M5. Tunable via profile JSON (no code change). The D-08 refuse-and-show-near-miss path means a wrong threshold produces over/under-refusing, NOT data loss.
