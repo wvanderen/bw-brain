@@ -97,6 +97,28 @@ export class TcpServerTransport implements Transport {
     }
   }
 
+  /**
+   * Read-only boolean: are any bridge sockets currently connected?
+   *
+   * ADDITIVE accessor (02-07 Task 2 step 1 — Blocker 1 fix): tcp.ts:47
+   * declares `sockets` `private readonly` with no public accessor. The
+   * daemon's boot (02-07 boot.ts step e) needs to observe the true->false
+   * transition to fire watchdog.onBridgeDisconnect() on socket-loss; without
+   * this accessor the private field is mechanically unreachable (the
+   * alternative — a per-socket-close callback — would require a larger edit
+   * to a 02-03b-frozen module).
+   *
+   * Purely additive: returns a boolean ONLY (no Set or socket exposure);
+   * weakens no invariant (loopback guard in the constructor + send-throws-
+   * on-empty above both stay byte-for-byte); adds no behavior (a method
+   * that reads .size cannot mutate state). Threat surface: read-only
+   * boolean, crosses no trust boundary (the envelope-validation gate in
+   * reader.ts remains the boundary).
+   */
+  hasConnectedSockets(): boolean {
+    return this.sockets.size > 0;
+  }
+
   close(): void {
     for (const socket of this.sockets) {
       socket.destroy();

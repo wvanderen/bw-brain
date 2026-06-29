@@ -61,6 +61,21 @@ export interface QueryServerDeps {
   getState: () => RawState | null;
   /** Returns the user-authored ProjectIntent, or null if absent (D-09). */
   getIntent: () => ProjectIntent | null;
+  /**
+   * OPTIONAL on-demand device-chain pull (02-07 Task 2 — Major 2 fix). When
+   * present + state is live + a cursor device/track selection exists, the
+   * device.inspect arm AWAITS this pull and surfaces the fresh `pages`
+   * payload (PullHandlers.java:73-89 buildDeviceChainResponse). Absent ->
+   * device.inspect serves the folded cache (state.devices). The pull is
+   * bounded by the correlator's 3s timeout (boot.ts wires the callback).
+   */
+  pullDeviceChain?: () => Promise<unknown>;
+  /**
+   * OPTIONAL on-demand selected-clip pull (02-07 Task 2 — Major 2 fix). Same
+   * shape as pullDeviceChain but for midi.inspect + get.selected_clip
+   * (PullHandlers.java:60-71).
+   */
+  pullSelectedClip?: () => Promise<unknown>;
 }
 
 /** A schema-valid ok:true result. */
@@ -186,7 +201,20 @@ export function startQueryServer(deps: QueryServerDeps): void {
       return;
     }
 
-    // Live op: build the payload + assumptions.
+    // device.inspect / midi.inspect MAY issue an on-demand pull (02-07 Task 2
+    // — Major 2 fix). The LineBuffer callback is sync-invoked but each inbound
+    // query is independent, so async-fire-and-forget is safe: the pull promise
+    // resolves later + transport.send fires from the async continuation.
+    if (op === "device.inspect") {
+      void handleDeviceInspect(deps, state, intent, freshness);
+      return;
+    }
+    if (op === "midi.inspect") {
+      void handleMidiInspect(deps, state, intent, freshness);
+      return;
+    }
+
+    // Live op (synchronous arms only): build the payload + assumptions.
     let payload: object;
     switch (op) {
       case "focus.export":
@@ -198,14 +226,8 @@ export function startQueryServer(deps: QueryServerDeps): void {
       case "project.region":
         payload = projectRegion(state);
         break;
-      case "midi.inspect":
-        payload = midiInspect(state);
-        break;
-      case "device.inspect":
-        payload = deviceInspect(state);
-        break;
       default:
-        // Unreachable (LIVE_OPS gate above) — defensive not_implemented.
+        // Unreachable (LIVE_OPS gate above + device/midi handled above) — defensive.
         deps.transport.send(makeErr(freshness, "not_implemented", "M2"));
         return;
     }
@@ -256,4 +278,143 @@ function makeOkNoState(freshness: "live" | "stale" | "disconnected"): OkResult {
     stateFreshness: freshness,
     assumptions: NO_STATE_ASSUMPTIONS,
   };
+}
+
+/**
+ * Wrap transport.send in try/catch so an async continuation (the on-demand
+ * pull arms below) cannot throw into the void if the socket closed during
+ * the pull (e.g. SIGINT mid-pull). Logs + swallows; the query is already
+ * best-effort by that point.
+ */
+function safeSend(transport: Transport, result: OkResult): void {
+  try {
+    transport.send(result);
+  } catch (e) {
+    console.error("[query-server] transport.send failed from async pull continuation:", (e as Error).message);
+  }
+}
+
+/**
+ * device.inspect handler (02-07 Task 2 — Major 2 fix). Issues an on-demand
+ * `get.selected_device_chain` pull via deps.pullDeviceChain WHEN:
+ *   (i)  the pull dep is wired, AND
+ *   (ii) state is live (the caller already checked state !== null), AND
+ *   (iii) a cursor selection exists (deviceSid OR trackSid).
+ *
+ * On success: surfaces the fresh `pages` array (PullHandlers.java:73-89
+ * buildDeviceChainResponse returns `{ pages: [...] }`) under the `devices`
+ * key the cli-query contract expects. On failure (pull rejected/timed out —
+ * bounded by the correlator's 3s timeout): falls back to the folded cache
+ * `state.devices` AND pushes a degradation Assumption so the CLI surfaces
+ * it honestly. When the preconditions don't hold, serves the folded cache
+ * synchronously (still via the async wrapper for shape uniformity).
+ */
+async function handleDeviceInspect(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const hasCursor = !!state.selection.deviceSid || !!state.selection.trackSid;
+  if (deps.pullDeviceChain && hasCursor) {
+    try {
+      const fresh = await deps.pullDeviceChain();
+      const pages = (fresh as { pages?: unknown }).pages;
+      const payload = { devices: pages ?? state.devices ?? [] };
+      safeSend(deps.transport, {
+        version: VERSION,
+        type: "result",
+        ok: true,
+        stateFreshness: freshness,
+        payload,
+        assumptions: liveAssumptions(state, intent),
+      });
+      return;
+    } catch (e) {
+      const payload = deviceInspect(state);
+      const assumptions: Assumption[] = [
+        ...liveAssumptions(state, intent),
+        {
+          claim: `device-chain pull failed; serving last folded cache (${(e as Error).message})`,
+          confidence: 0.4,
+          source: "selection",
+        },
+      ];
+      safeSend(deps.transport, {
+        version: VERSION,
+        type: "result",
+        ok: true,
+        stateFreshness: freshness,
+        payload,
+        assumptions,
+      });
+      return;
+    }
+  }
+  // No pull dep OR no cursor selection -> serve the folded cache.
+  safeSend(deps.transport, {
+    version: VERSION,
+    type: "result",
+    ok: true,
+    stateFreshness: freshness,
+    payload: deviceInspect(state),
+    assumptions: liveAssumptions(state, intent),
+  });
+}
+
+/**
+ * midi.inspect handler (02-07 Task 2 — Major 2 fix). Same shape as
+ * {@link handleDeviceInspect} but for `get.selected_clip`
+ * (PullHandlers.java:60-71 -> `{ notes: [...] }`) + selection.clipSid.
+ */
+async function handleMidiInspect(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const hasCursor = !!state.selection.clipSid;
+  if (deps.pullSelectedClip && hasCursor) {
+    try {
+      const fresh = await deps.pullSelectedClip();
+      const notes = (fresh as { notes?: unknown }).notes;
+      const payload = { clips: notes ?? state.clips ?? [] };
+      safeSend(deps.transport, {
+        version: VERSION,
+        type: "result",
+        ok: true,
+        stateFreshness: freshness,
+        payload,
+        assumptions: liveAssumptions(state, intent),
+      });
+      return;
+    } catch (e) {
+      const payload = midiInspect(state);
+      const assumptions: Assumption[] = [
+        ...liveAssumptions(state, intent),
+        {
+          claim: `selected-clip pull failed; serving last folded cache (${(e as Error).message})`,
+          confidence: 0.4,
+          source: "selection",
+        },
+      ];
+      safeSend(deps.transport, {
+        version: VERSION,
+        type: "result",
+        ok: true,
+        stateFreshness: freshness,
+        payload,
+        assumptions,
+      });
+      return;
+    }
+  }
+  safeSend(deps.transport, {
+    version: VERSION,
+    type: "result",
+    ok: true,
+    stateFreshness: freshness,
+    payload: midiInspect(state),
+    assumptions: liveAssumptions(state, intent),
+  });
 }
