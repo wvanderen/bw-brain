@@ -92,8 +92,16 @@ describe("RequestCorrelator (get.* request/response by id with timeout)", () => 
     const t = new FakeTransport();
     const c = new RequestCorrelator(t as unknown as Transport);
     const p = c.send("get.project_summary");
+    // Attach a noop handler up-front so the timer-flushed rejection does
+    // not surface as an unhandled rejection before `expect().rejects` runs.
+    const caught: Promise<Error> = p.then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
     await vi.advanceTimersByTimeAsync(DEFAULT_CORRELATOR_TIMEOUT_MS + 1);
-    await expect(p).rejects.toThrow(/get\.project_summary timed out after 3000ms/);
+    const err = await caught;
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toMatch(/get\.project_summary timed out after 3000ms/);
     expect(c.outstanding()).toBe(0);
   });
 
@@ -109,27 +117,49 @@ describe("RequestCorrelator (get.* request/response by id with timeout)", () => 
   it("close() rejects all pending promises with 'correlator closed' + outstanding()===0 after", async () => {
     const t = new FakeTransport();
     const c = new RequestCorrelator(t as unknown as Transport);
-    const p1 = c.send("get.project_summary");
-    const p2 = c.send("get.selected_clip");
+    // Attach catch handlers up-front so close()'s rejections are not
+    // surfaced as unhandled before the awaits below. Type as Promise<Error>
+    // so the awaited value carries `.message`.
+    const p1: Promise<Error> = c.send("get.project_summary").then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
+    const p2: Promise<Error> = c.send("get.selected_clip").then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
     expect(c.outstanding()).toBe(2);
     c.close();
-    await expect(p1).rejects.toThrow(/correlator closed/);
-    await expect(p2).rejects.toThrow(/correlator closed/);
+    const e1 = await p1;
+    const e2 = await p2;
+    expect(e1).toBeInstanceOf(Error);
+    expect(e2).toBeInstanceOf(Error);
+    expect(e1.message).toMatch(/correlator closed/);
+    expect(e2.message).toMatch(/correlator closed/);
     expect(c.outstanding()).toBe(0);
   });
 
-  it("id is a unique uuid across two send() calls (uniqueness gate)", () => {
+  it("id is a unique uuid across two send() calls (uniqueness gate)", async () => {
     const t = new FakeTransport();
     const c = new RequestCorrelator(t as unknown as Transport);
-    c.send("get.project_summary");
-    c.send("get.selected_clip");
+    // Attach rejection handlers up-front so the cleanup close() does not
+    // surface as an unhandled rejection.
+    const p1: Promise<Error> = c.send("get.project_summary").then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
+    const p2: Promise<Error> = c.send("get.selected_clip").then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
     const id1 = (t.sent[0] as { id: string }).id;
     const id2 = (t.sent[1] as { id: string }).id;
     expect(id1).not.toBe(id2);
     expect(id1).toMatch(/^[0-9a-f-]{36}$/);
     expect(id2).toMatch(/^[0-9a-f-]{36}$/);
-    // Cleanup pending timers.
+    // Cleanup pending timers + settle the rejections.
     c.close();
+    await Promise.all([p1, p2]);
   });
 
   it("Minor 4: transport.send() throws synchronously -> promise REJECTS + outstanding()===0 + no dangling timer after advanceTimersByTime(10_000)", async () => {
