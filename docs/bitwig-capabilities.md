@@ -419,7 +419,7 @@ accessor (the bridge uses `getLoopLength()` as a clip-change proxy — see Plan
 
 ### Sub-check 2 — VST/AU PARAMETER EXPOSURE (Open Question A1 / BRIDGE-02 / CLI-03)
 
-**Observed: PENDING.** This is the ONE behavioral probe that gates CLI-03's
+**Observed: NEGATED (live probe, 2026-06-29).** This is the ONE behavioral probe that gates CLI-03's
 VST/AU claim (RESEARCH.md Pitfall 10). Steps:
 1. Load a free VST instrument (e.g. Vital, Surge, or any installed third-party
    synth) onto the selected track. Select its device.
@@ -443,6 +443,20 @@ Candidate paths to confirm live:
 walk returns the VST's parameters (D-02 delivered as designed — wire the real
 accessor), or (A1 NEGATED) the page is empty for the VST (fall back to direct
 `cursorDevice.getParameter(int)` enumeration; record the fallback here).
+
+**Recorded (2026-06-29, live probe in Bitwig 6.0.6): A1 NEGATED.** With Surge XT
+loaded as the selected track's device and its parameters tweaked live, the bridge
+event stream (`nc -l 7878`) carried `track.name_changed` / `device.name_changed`
+/ `transport.changed` / `selection.changed` events but **no parameter-change
+lines**. This corroborates the autonomous-build `javap` finding: `CursorDevice`
+exposes no `getRemoteControls()` / parameter-page accessor in `extension-api:21`,
+so `PullHandlers.handleSelectedDeviceChain` returns an empty `pages` list and
+`bw-device inspect` shows "no parameters" for VSTs.
+
+**Fallback path (deferred enhancement, out of Phase 02 read-only scope):**
+enumerate parameters directly via `cursorDevice.getParameter(int index)` (RESEARCH.md
+Pitfall 10's documented fallback). Not wired in Phase 02 — the read-only context
+foundation ships with an empty `pages` list for VST device chains by design.
 
 ### Sub-check 3 — SC#3 BRIDGE-RELOAD RECONCILE SMOKE (STATE-04)
 
