@@ -17,11 +17,11 @@ Requirements for initial release across all 4 milestones (M1 read-only context â
 
 ### Foundation â€” State Model & CLI (M1)
 
-- [ ] **STATE-01**: Daemon ingests bridge snapshots and normalizes them into a raw project-state model (project, transport, selection, tracks, clips, devices, automation) validated against `schemas/project-state.schema.json`
+- [x] **STATE-01**: Daemon ingests bridge snapshots and normalizes them into a raw project-state model (project, transport, selection, tracks, clips, devices, automation) validated against `schemas/project-state.schema.json`
 - [ ] **STATE-02**: Daemon derives composition state (sections, trackRoles, motifs, energyCurve, automationSalience) from raw state, each with confidence scores
 - [ ] **STATE-03**: Daemon maintains an intent-state model (`projectIntent`: summary, constraints, targets) that constrains transforms and suggestions
-- [ ] **STATE-04**: Daemon synthesizes stable IDs for observed Bitwig objects (Bitwig exposes none) via fingerprint mapping, with reconnect/reconcile-on-connect semantics
-- [ ] **CLI-01**: Eight CLI commands (`bw-focus`, `bw-project`, `bw-device`, `bw-midi`, `bw-arrange`, `bw-automation`, `bw-edit`, `bw-diff`) emit compact JSON, fail clearly, and suppress prose unless `--explain` is set
+- [x] **STATE-04**: Daemon synthesizes stable IDs for observed Bitwig objects (Bitwig exposes none) via fingerprint mapping, with reconnect/reconcile-on-connect semantics
+- [x] **CLI-01**: Eight CLI commands (`bw-focus`, `bw-project`, `bw-device`, `bw-midi`, `bw-arrange`, `bw-automation`, `bw-edit`, `bw-diff`) emit compact JSON, fail clearly, and suppress prose unless `--explain` is set
 - [ ] **CLI-02**: `bw-focus export`, `bw-project summary`, `bw-project region` return selected/project/region context as JSON
 - [ ] **CLI-03**: `bw-midi inspect` and `bw-device inspect` return notes/velocity/timing and chain/parameters (including loaded VST/AU plugins) of the selected clip/device as JSON
 
@@ -115,11 +115,11 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 | BRIDGE-03 | M1 | Phase 2 | Pending |
 | PROBE-01 | M1 | Phase 1 | Pending |
 | PROBE-02 | M1 | Phase 1 | Pending |
-| STATE-01 | M1 | Phase 2 | Pending |
+| STATE-01 | M1 | Phase 2 | Complete (02-07 daemon boot wires end-to-end) |
 | STATE-02 | M1 | Phase 2 | Pending |
 | STATE-03 | M1 | Phase 2 | Pending |
-| STATE-04 | M1 | Phase 2 | Pending |
-| CLI-01 | M1 | Phase 2 | Pending |
+| STATE-04 | M1 | Phase 2 | Complete (02-07 boot fires reconcile on every (re)connect) |
+| CLI-01 | M1 | Phase 2 | Complete (02-07 daemon runnable; bw-* CLIs end-to-end) |
 | CLI-02 | M1 | Phase 2 | Pending |
 | CLI-03 | M1 | Phase 2 | Pending |
 | MEM-01 | M1 | Phase 2 | Pending |

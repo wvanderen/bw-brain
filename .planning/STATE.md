@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 02
 current_phase_name: read-only-context-foundation-m1
-status: executing
-stopped_at: Phase 2 planned (6 plans, 3 waves)
-last_updated: "2026-06-29T02:08:40.676Z"
+status: phase_complete
+stopped_at: Phase 02 complete (8/8 plans); 02-07 gap-closure landed (daemon boot + fold-event + correlator)
+last_updated: "2026-06-29T02:39:29.824Z"
 last_activity: 2026-06-29
-last_activity_desc: Phase 02 execution resumed (wave continue)
+last_activity_desc: Completed 02-07-PLAN.md — daemon boot + fold-event + correlator gap closure
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 11
-  completed_plans: 10
-  percent: 20
+  completed_plans: 11
+  percent: 40
 ---
 
 # Project State
@@ -28,35 +28,36 @@ See: .planning/PROJECT.md (updated 2026-06-25)
 
 ## Current Position
 
-Phase: 02 (read-only-context-foundation-m1) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 02
-Last activity: 2026-06-29 — Phase 02 execution resumed (wave continue)
+Phase: 02 (read-only-context-foundation-m1) — COMPLETE (8/8 plans)
+Plan: All plans complete (02-07 was the final gap-closure plan)
+Status: Phase 02 complete — ready for /gsd-verify-work 02 + /gsd-plan-phase 03
+Last activity: 2026-06-29 — Completed 02-07-PLAN.md (daemon boot + fold-event + correlator gap closure)
 
-Progress: [██░░░░░░░░] ~20% — 1/5 phases complete; Phase 2 next
+Progress: [██████████] 100% — 2/5 phases complete; Phase 3 next
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
-- Average duration: 17 min
-- Total execution time: ~0.6 hours
+- Total plans completed: 11 (3 in Phase 1 + 8 in Phase 2)
+- Average duration: ~17 min
+- Total execution time: ~2.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Schema & IPC Spike | 3/3 | ~38 min | 13 min |
-| 2. Read-Only Context Foundation (M1) | 0/TBD | — | — |
+| 2. Read-Only Context Foundation (M1) | 8/8 | ~70+ min | ~9 min/plan |
 | 3. Reversible MIDI Patching (M2) | 0/TBD | — | — |
 | 4. Arrangement Intelligence (M3) | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 
 **Recent Trend:**
 
-- Last 5 plans: 1-01 (19 min), 1-02 (15 min), 1-03 (4 min autonomous + manual checkpoints)
-- Trend: steady; daemon-side framing pipe landed cleanly on the Plan-01 contract; live round-trip confirmed
+- Last 5 plans: 02-03b (assembly primitives), 02-04 (CLI contract), 02-05 (Pi /analyze), 02-06 (deprecation fix), 02-07 (daemon boot gap closure)
+- Trend: Phase 2 lands cleanly; the daemon is now runnable end-to-end (npm start); Phase-2 UAT 2/3/4 semantically unblocked
+- Phase 02 P07: 19 min | 2 tasks | 10 files
 
 *Updated after each plan completion*
 
@@ -79,6 +80,10 @@ Recent decisions affecting current work:
 - [Phase 1 / Plan 02] Under NodeNext, Ajv 2020-12 must be imported as named { Ajv2020 } from ajv/dist/2020.js (ajv 8.20 ships no exports map; .js ext required). addFormats dropped — no frozen schema uses the format keyword (premise false), and its CJS default-export interop is not callable as a static NodeNext import.
 - [Phase 1 / Plan 03] Only Task 1 is autonomous; Tasks 2 (in-app capability probes → docs/bitwig-capabilities.md Observed: fields) and 3 (transport proof + live SC#1 round-trip) are blocking human-verify checkpoints. Observed Bitwig behavior is the spike's OUTPUT (D-02) — never fabricated. Skeleton + throwaway artifacts (spike/bitwig-extension.js + spike/raw-tcp-probe.java + capabilities-doc skeleton) committed as b14a52d; the manual work is documented precisely in 01-03-SUMMARY.md → "Manual Steps Remaining."
 - [Phase 1 / Plan 03] Decoupled tracks (RESEARCH.md §The JS-vs-Java Spike Tension): Track A (capability probes via JS — D-07 iteration speed) is in spike/bitwig-extension.js; Track B (transport proof via raw java.net OR the OSC-as-proof fallback) is in spike/raw-tcp-probe.java. SC#1 is never hostage to whether JsApi exposes networking — Track B can use DrivenByMoss's proven OSC server as a stand-in if JDK 21 is not installed.
+- [Phase 02-07]: Stale-socket probe-and-unlink (not refuse-and-exit): a crashed daemon's stale socket is the COMMON case; the probe (net.createConnection with 300ms timeout) distinguishes live (connect -> refuse + exit 1) from stale (ECONNREFUSED -> unlink + proceed). Matches the Unix daemon convention (dbus/ssh-agent) + RESEARCH.md Pattern 3 'cleaned on daemon exit.'
+- [Phase 02-07]: Disconnect detection via 2.5s interval poll + 1-line tcp.ts additive hasConnectedSockets() accessor (Blocker 1 fix): tcp.ts:47 declared 'sockets' private readonly with no accessor + no per-socket-close callback. The additive boolean method is the minimal honest fix (vs a per-socket-close callback that would require a larger edit to a 02-03b-frozen module). Purely additive: returns a boolean only; weakens no invariant.
+- [Phase 02-07]: M1 LIMITATION (Minor 3 fix): the bridge's get.project_summary returns ONLY {tracks:[{slot,name}]} — no project metadata. The daemon supplies defaults (name='', tempo=120, timeSignature='4/4'). Pulling project metadata is a Phase-3+ concern (no get.project_meta handler in PullHandlers.java today). Documented in boot.ts + SUMMARY.
+- [Phase 02-07]: Handshake wired but non-blocking: the dispatcher's hello branch calls negotiateVersion + replies hello.response WHEN a hello arrives, but the reconnect trigger is NOT 'hello arrived' — it is 'TCP accept + get.project_summary response.' The current bridge (BridgeExtension.startConnector) does NOT emit hello (verified). The hello path is forward-compatible + exercised by the smoke test's fake bridge.
 
 ### Pending Todos
 
@@ -99,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-27T14:48:58.536Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-read-only-context-foundation-m1/02-CONTEXT.md
+Last session: 2026-06-29T02:38:46.555Z
+Stopped at: Completed 02-07-PLAN.md (daemon boot + fold-event + correlator gap closure)
+Resume file: None
