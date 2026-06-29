@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 02
-current_phase_name: read-only-context-foundation-m1
-status: phase_complete
-stopped_at: Phase 02 complete (8/8 plans); 02-07 gap-closure landed (daemon boot + fold-event + correlator)
-last_updated: "2026-06-29T02:39:29.824Z"
+current_phase: 3
+current_phase_name: M2
+status: verifying
+stopped_at: Completed 02-07-PLAN.md (daemon boot + fold-event + correlator gap closure)
+last_updated: "2026-06-29T16:31:22.702Z"
 last_activity: 2026-06-29
-last_activity_desc: Completed 02-07-PLAN.md — daemon boot + fold-event + correlator gap closure
+last_activity_desc: Phase 02 complete, transitioned to Phase 3
 progress:
   total_phases: 5
   completed_phases: 2
@@ -21,25 +21,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-25)
+See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 02 — read-only-context-foundation-m1
+**Current focus:** Phase 3 — reversible-midi-patching (M2)
 
 ## Current Position
 
-Phase: 02 (read-only-context-foundation-m1) — COMPLETE (8/8 plans)
-Plan: All plans complete (02-07 was the final gap-closure plan)
-Status: Phase 02 complete — ready for /gsd-verify-work 02 + /gsd-plan-phase 03
-Last activity: 2026-06-29 — Completed 02-07-PLAN.md (daemon boot + fold-event + correlator gap closure)
+Phase: 3 — Reversible MIDI Patching (M2)
+Plan: Not started
+Status: Phase 02 verified + complete (UAT 4/4 passed); ready to plan Phase 3
+Last activity: 2026-06-29 — Phase 02 UAT complete (4/4), marked complete, transitioned to Phase 3
 
-Progress: [██████████] 100% — 2/5 phases complete; Phase 3 next
+Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 next
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 11 (3 in Phase 1 + 8 in Phase 2)
+- Total plans completed: 19 (3 in Phase 1 + 8 in Phase 2)
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100% — 2/5 phases complete; Phase 3
 | 3. Reversible MIDI Patching (M2) | 0/TBD | — | — |
 | 4. Arrangement Intelligence (M3) | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
+| 02 | 8 | - | - |
 
 **Recent Trend:**
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - [Phase 02-07]: Disconnect detection via 2.5s interval poll + 1-line tcp.ts additive hasConnectedSockets() accessor (Blocker 1 fix): tcp.ts:47 declared 'sockets' private readonly with no accessor + no per-socket-close callback. The additive boolean method is the minimal honest fix (vs a per-socket-close callback that would require a larger edit to a 02-03b-frozen module). Purely additive: returns a boolean only; weakens no invariant.
 - [Phase 02-07]: M1 LIMITATION (Minor 3 fix): the bridge's get.project_summary returns ONLY {tracks:[{slot,name}]} — no project metadata. The daemon supplies defaults (name='', tempo=120, timeSignature='4/4'). Pulling project metadata is a Phase-3+ concern (no get.project_meta handler in PullHandlers.java today). Documented in boot.ts + SUMMARY.
 - [Phase 02-07]: Handshake wired but non-blocking: the dispatcher's hello branch calls negotiateVersion + replies hello.response WHEN a hello arrives, but the reconnect trigger is NOT 'hello arrived' — it is 'TCP accept + get.project_summary response.' The current bridge (BridgeExtension.startConnector) does NOT emit hello (verified). The hello path is forward-compatible + exercised by the smoke test's fake bridge.
+- [Phase 02 UAT]: A1 NEGATED (2026-06-29) — VST/AU parameters do NOT surface via CursorRemoteControlsPage; `CursorDevice` exposes no `getRemoteControls()` in extension-api:21 (verified live with Surge XT + javap). `bw-device inspect` returns empty pages by design. The `cursorDevice.getParameter(int)` direct-enumeration fallback is documented in docs/bitwig-capabilities.md §4 + deferred to Phase 5 (device workflows). All 3 human_verification checkpoints PASSED live (Tests 2/3/4); 5/5 bridge event types now verified end-to-end over loopback TCP (clip.name_changed captured in the /analyze session).
 
 ### Pending Todos
 
@@ -92,7 +94,8 @@ None yet.
 ### Blockers/Concerns
 
 - *(Phase 1 blockers all resolved — spike goal achieved.)* Bitwig loopback TCP access: CONFIRMED live (Java `.bwextension`, captured `selection.changed` round-trip). JDK 21: installed via Homebrew. In-app scripting guide / Javadoc 6.0.6: consulted; capability surface recorded in `docs/bitwig-capabilities.md`. JS-vs-Java tension: resolved — JS `host` has no networking, Java `.bwextension` is the mandatory transport.
-- [Phase 2 — to watch]: no native stable-IDs in Bitwig → Phase 2 must implement STATE-04 fingerprint-mapping. Behavioral probes (undo-coalescing, live NoteStep round-trip, automation envelope) deferred to pre-Phase-3; non-blocking for Phase 2 planning but run them before Phase 3.
+- *(Phase 2 — resolved 2026-06-29 UAT):* STATE-04 fingerprint-mapping implemented + verified live (reload-reconcile smoke passed). The deferred behavioral probes (BRIDGE-02 5th event clip.name_changed, SC#3 reload-reconcile, Pi /analyze runtime) all PASSED in the end-of-phase UAT — 5/5 bridge events now live, /analyze produces grounded output + assumptions[] + stateFreshness surfacing.
+- [Phase 3 — to watch]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5.
 
 ## Deferred Items
 
@@ -104,6 +107,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-29T02:38:46.555Z
-Stopped at: Completed 02-07-PLAN.md (daemon boot + fold-event + correlator gap closure)
+Last session: 2026-06-29
+Stopped at: Phase 02 verified (UAT 4/4) + marked complete; ready to plan Phase 3
 Resume file: None
