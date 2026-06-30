@@ -49,6 +49,9 @@ import { loadIntent } from "../state/intent-store.js";
 import { createDispatcher } from "./dispatcher.js";
 import { startQueryServer } from "../query/query-server.js";
 import { DEFAULT_SOCKET } from "../cli/query-client.js";
+import { CandidateStore } from "../patch/candidate-store.js";
+import { PatchHistory } from "../patch/patch-history.js";
+import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 
 /** The daemon's protocol version. Matches bridge LineJson.VERSION (LineJson.java:25). */
@@ -262,6 +265,21 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   //     The pull callbacks close over the outer `correlator` slot (the `let`
   //     from step d). When step e swaps the correlator on disconnect, these
   //     callbacks pick up the new instance lazily.
+  //
+  //     Phase 3 Plan 03-02: also wire the ephemeral candidate store (D-05),
+  //     the durable patch-history journal (D-03), and the daemon→bridge
+  //     apply.patch round-trip callback. The candidate store is in-memory only
+  //     (lost on restart — a producer must re-preview after a daemon restart);
+  //     the journal persists at `<socketDir>/patch-history.jsonl`.
+  const candidateStore = new CandidateStore();
+  const patchHistory = new PatchHistory(join(dirname(socketPath), "patch-history.jsonl"));
+  const applyPatchOverBridge = (undoLabel: string, operations: PrimitiveOp[]): Promise<{ applied: number; failed: number }> =>
+    correlator
+      .send("apply.patch", { undoLabel, operations })
+      .then((resp) => {
+        const r = resp as { applied?: number; failed?: number };
+        return { applied: r.applied ?? 0, failed: r.failed ?? 0 };
+      });
   startQueryServer({
     transport: uds,
     watchdog,
@@ -269,6 +287,9 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     getIntent: () => intent,
     pullDeviceChain: () => correlator.send("get.selected_device_chain"),
     pullSelectedClip: () => correlator.send("get.selected_clip"),
+    candidateStore,
+    patchHistory,
+    applyPatchOverBridge,
   });
 
   // --- j. Signal handlers + shutdown. ----------------------------------

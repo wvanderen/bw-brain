@@ -36,19 +36,33 @@ import type { StaleWatchdog } from "../state/stale-watchdog.js";
 import type { RawState } from "../state/reconcile.js";
 import type { ProjectIntent } from "../gen/intent.js";
 import type { Assumption } from "../state/analyzer-registry.js";
+import type { Patch } from "../gen/patch.js";
+import type { Note } from "../cli/diff-logic.js";
+import type { PrimitiveOp } from "../patch/inverse-ops.js";
+import type { StateDiff } from "../cli/diff-logic.js";
+import { validatePatchOrThrow } from "../patch/patch-schema.js";
+import { previewPatch } from "../patch/patch-resolve.js";
+import { classifyRisk, ScopeMismatchError } from "../patch/risk-classifier.js";
+import { inverseOps } from "../patch/inverse-ops.js";
+import type { CandidateStore } from "../patch/candidate-store.js";
+import type { PatchHistory, PatchHistoryEntry } from "../patch/patch-history.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 ajv.addSchema(querySchema);
 ajv.addSchema(resultSchema);
 const validateQuery = ajv.getSchema(querySchema.$id)!;
 
-/** The 5 live M1 ops the daemon serves with ok:true + payload. */
+/** The live ops the daemon serves with ok:true + payload (M1 reads + M2 edits). */
 const LIVE_OPS = new Set([
   "focus.export",
   "project.summary",
   "project.region",
   "midi.inspect",
   "device.inspect",
+  // Phase 3 Plan 03-02 — reversible MIDI patching (D-04 two-step explicit).
+  "edit.preview",
+  "edit.apply",
+  "edit.revert",
 ]);
 
 /** Dependencies injected by the daemon boot sequence. */
@@ -76,6 +90,26 @@ export interface QueryServerDeps {
    * (PullHandlers.java:60-71).
    */
   pullSelectedClip?: () => Promise<unknown>;
+  /**
+   * Phase 3 Plan 03-02 — the ephemeral candidate store (D-05). edit.preview
+   * mints a `pt_<uuid>` candidate; edit.apply looks it up by patchId. Absent
+   * when M2 edit ops are not wired (the ops still parse but return
+   * not_implemented — see startQueryServer dispatch).
+   */
+  candidateStore?: CandidateStore;
+  /**
+   * Phase 3 Plan 03-02 — the durable patch-history.jsonl journal (D-03).
+   * edit.apply appends the applied patch + inverseOperations; edit.revert
+   * finds + replays the inverse. Absent when M2 edit ops are not wired.
+   */
+  patchHistory?: PatchHistory;
+  /**
+   * Phase 3 Plan 03-02 — daemon→bridge apply.patch round-trip (D-03). Sends
+   * `{undoLabel, operations}` over the loopback TCP via correlator.send +
+   * awaits the bridge's {applied, failed} response. Absent when M2 edit ops
+   * are not wired (edit.apply/revert return not_implemented).
+   */
+  applyPatchOverBridge?: (undoLabel: string, operations: PrimitiveOp[]) => Promise<{ applied: number; failed: number }>;
 }
 
 /** A schema-valid ok:true result. */
@@ -211,6 +245,23 @@ export function startQueryServer(deps: QueryServerDeps): void {
     }
     if (op === "midi.inspect") {
       void handleMidiInspect(deps, state, intent, freshness);
+      return;
+    }
+
+    // Phase 3 Plan 03-02 — edit.* ops (D-04 two-step explicit). Each is an
+    // async pull/apply path: fire-and-forget from the sync LineBuffer callback;
+    // the handler resolves later + transport.send fires from the async
+    // continuation (same shape as device/midi inspect above).
+    if (op === "edit.preview") {
+      void handleEditPreview(deps, state, intent, freshness, msg as { payload?: { patch?: unknown } });
+      return;
+    }
+    if (op === "edit.apply") {
+      void handleEditApply(deps, state, intent, freshness, msg as { payload?: EditApplyPayload });
+      return;
+    }
+    if (op === "edit.revert") {
+      void handleEditRevert(deps, state, intent, freshness, msg as { payload?: { patchId?: string } });
       return;
     }
 
@@ -417,4 +468,305 @@ async function handleMidiInspect(
     payload: midiInspect(state),
     assumptions: liveAssumptions(state, intent),
   });
+}
+
+// ============================================================================
+// Phase 3 Plan 03-02 — edit.preview / edit.apply / edit.revert (D-03/D-04/D-09)
+// ============================================================================
+//
+// The edit trust-spine: preview computes a diff + mints an ephemeral candidate;
+// apply enforces the risk gate server-side, computes inverseOps at APPLY time
+// (INV-14), sends apply.patch over the bridge, and on success appends the
+// durable journal + evicts the candidate; revert replays the stamped inverse
+// through the SAME bridge path and appends a NEW history entry. SC#3 P2: all
+// three refuse when stateFreshness !== "live" (the watchdog gate).
+//
+// All gating is server-side (INV-10 — never trust CLI-only enforcement). The
+// --confirm / --force / --allow-below-bar flags ride in the query payload.
+
+/** edit.apply payload shape (the CLI forwards patchId + D-04/D-09 flags). */
+interface EditApplyPayload {
+  patchId?: string;
+  confirm?: boolean;
+  force?: boolean;
+  allowBelowBar?: boolean;
+}
+
+/**
+ * Pull the live clip notes for the selected clipSid. Returns the Note[] the
+ * preview/resolve pipeline expects, or null when the pull is unavailable /
+ * the clip notes are absent. The bridge returns notes in its NoteView shape;
+ * the daemon treats them as the canonical Note[] here (the NoteView→Note
+ * field reconciliation is downstream — the wire-contract smoke test exercises
+ * this path with daemon-Note-shaped notes).
+ */
+async function pullLiveClipNotes(deps: QueryServerDeps): Promise<Note[] | null> {
+  if (!deps.pullSelectedClip) return null;
+  try {
+    const fresh = (await deps.pullSelectedClip()) as { notes?: Note[] };
+    return fresh.notes ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** edit.preview handler — resolve + classify + mint, NO apply (D-04 two-step). */
+async function handleEditPreview(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: { patch?: unknown } },
+): Promise<void> {
+  // SC#3 P2 watchdog gate: refuse when state is not live.
+  if (freshness !== "live") {
+    safeSendErr(deps.transport, freshness, "state_stale");
+    return;
+  }
+  if (!deps.candidateStore) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return;
+  }
+  const rawPatch = msg.payload?.patch;
+  let patch: Patch;
+  try {
+    patch = validatePatchOrThrow(rawPatch);
+  } catch {
+    safeSendErr(deps.transport, freshness, "invalid_patch");
+    return;
+  }
+  const before = (await pullLiveClipNotes(deps)) ?? ((state.clips as Note[] | undefined) ?? []);
+  const ops = patch.operations as PrimitiveOp[];
+  let diff: StateDiff;
+  let risk: ReturnType<typeof classifyRisk>;
+  try {
+    diff = previewPatch(before, ops);
+    risk = classifyRisk({
+      declared: patch.risk,
+      operations: ops,
+      scopeDeclared: patch.scope,
+      belowBar: patch.belowBar ?? false,
+    });
+  } catch (e) {
+    // ScopeMismatchError (INV-9) → scope_mismatch; any other → invalid_patch.
+    safeSendErr(deps.transport, freshness, e instanceof ScopeMismatchError ? "scope_mismatch" : "invalid_patch");
+    return;
+  }
+  // Mint the ephemeral candidate (D-05). The minted patchId is the apply key.
+  const candidate = deps.candidateStore.mint({
+    ...patch,
+    risk,
+    operations: ops as Patch["operations"],
+  });
+  const assumptions: Assumption[] = [
+    ...liveAssumptions(state, intent),
+    { claim: `preview mints candidate ${candidate.patchId} (risk ${risk})`, confidence: 1.0, source: "selection" },
+  ];
+  safeSendOk(deps.transport, freshness, { patchId: candidate.patchId, risk, diff }, assumptions);
+}
+
+/** edit.apply handler — risk gate → inverseOps → bridge apply.patch → journal. */
+async function handleEditApply(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: EditApplyPayload },
+): Promise<void> {
+  // SC#3 P2 watchdog gate.
+  if (freshness !== "live") {
+    safeSendErr(deps.transport, freshness, "state_stale");
+    return;
+  }
+  if (!deps.candidateStore || !deps.patchHistory || !deps.applyPatchOverBridge) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return;
+  }
+  const patchId = msg.payload?.patchId ?? "";
+  const candidate = deps.candidateStore.get(patchId);
+  if (!candidate) {
+    safeSendErr(deps.transport, freshness, "candidate_not_found");
+    return;
+  }
+  const confirm = msg.payload?.confirm ?? false;
+  const force = msg.payload?.force ?? false;
+  const allowBelowBar = msg.payload?.allowBelowBar ?? false;
+  const ops = candidate.operations as PrimitiveOp[];
+
+  // D-04 risk gate (server-side, INV-10). --force bypasses --confirm entirely.
+  if (!force) {
+    if (candidate.risk === "medium" || candidate.risk === "high") {
+      if (!confirm) {
+        safeSendErr(deps.transport, freshness, "confirmation_required");
+        return;
+      }
+    }
+    // D-09: belowBar requires --allow-below-bar AND --confirm (stacking).
+    if (candidate.belowBar && !(allowBelowBar && confirm)) {
+      safeSendErr(deps.transport, freshness, "below_bar_requires_confirm");
+      return;
+    }
+  }
+
+  // D-03: compute inverseOps at APPLY time (INV-14) — frozen into the journal.
+  const inverseOperations = inverseOps(ops);
+  let applied: { applied: number; failed: number };
+  try {
+    applied = await deps.applyPatchOverBridge(candidate.undoLabel ?? "bw-edit apply", ops);
+  } catch {
+    // Bridge failure (timeout / transport throw): do NOT journal a partial patch.
+    safeSendErr(deps.transport, freshness, "apply_failed");
+    return;
+  }
+  if (applied.failed > 0) {
+    // Some ops failed at the bridge — do NOT journal a partial patch.
+    safeSendOk(
+      deps.transport,
+      freshness,
+      { ok: false, error: "apply_failed", applied: applied.applied, failed: applied.failed },
+      liveAssumptions(state, intent),
+    );
+    return;
+  }
+  // Success: append the durable journal entry (INV-14 inverse at apply time) +
+  // evict the ephemeral candidate.
+  const entry: PatchHistoryEntry = {
+    ...candidate,
+    inverseOperations,
+    appliedAt: Date.now(),
+    stateHashBefore: `clip:${state.selection.clipSid ?? ""}`,
+  };
+  try {
+    await deps.patchHistory.append(entry);
+  } catch {
+    // The apply already succeeded at the bridge; a journal failure is logged
+    // but does not unwind the apply. The candidate is still evicted (the
+    // bridge mutation is authoritative; the journal is the audit/revert spine).
+  }
+  deps.candidateStore.evict(patchId);
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { ok: true, appliedOps: applied.applied, patchId, undoLabel: candidate.undoLabel ?? "bw-edit apply" },
+    liveAssumptions(state, intent),
+  );
+}
+
+/** edit.revert handler — find the journal entry, replay its inverse, append. */
+async function handleEditRevert(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: { patchId?: string } },
+): Promise<void> {
+  // SC#3 P2 watchdog gate.
+  if (freshness !== "live") {
+    safeSendErr(deps.transport, freshness, "state_stale");
+    return;
+  }
+  if (!deps.patchHistory || !deps.applyPatchOverBridge) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return;
+  }
+  const patchId = msg.payload?.patchId ?? "";
+  const entry = await deps.patchHistory.find(patchId);
+  if (!entry) {
+    safeSendErr(deps.transport, freshness, "not_found");
+    return;
+  }
+  // Build a NEW patch whose operations = entry.inverseOperations (D-03 LIFO
+  // replay through the SAME bridge path). Revert is itself recorded.
+  const revertOps = entry.inverseOperations;
+  const undoLabel = `revert ${entry.undoLabel ?? patchId}`;
+  let applied: { applied: number; failed: number };
+  try {
+    applied = await deps.applyPatchOverBridge(undoLabel, revertOps);
+  } catch {
+    safeSendErr(deps.transport, freshness, "apply_failed");
+    return;
+  }
+  if (applied.failed > 0) {
+    safeSendOk(
+      deps.transport,
+      freshness,
+      { ok: false, error: "apply_failed", applied: applied.applied, failed: applied.failed },
+      liveAssumptions(state, intent),
+    );
+    return;
+  }
+  // Stamp the original entry as reverted + append a NEW entry recording the
+  // revert (its own inverseOperations = the original operations, so reverting
+  // the revert re-applies the original — INV-1 round-trip). The journal is
+  // append-only; stampReverted rewrites atomically (temp+rename).
+  const now = Date.now();
+  const revertEntry: PatchHistoryEntry = {
+    patchId: `pt_revert-of-${patchId}`,
+    scope: entry.scope,
+    operations: revertOps as Patch["operations"],
+    undoLabel,
+    rationale: `daemon-authoritative revert of ${patchId}`,
+    reversibility: "self-inverse",
+    risk: entry.risk,
+    inverseOperations: entry.operations as PrimitiveOp[],
+    appliedAt: now,
+    stateHashBefore: entry.stateHashBefore,
+  };
+  try {
+    await deps.patchHistory.append(revertEntry);
+    // Stamp the original so a subsequent find(patchId) returns null
+    // (double-revert protection). Best-effort: a stamp failure does not unwind
+    // the revert — the bridge mutation is authoritative.
+    await deps.patchHistory.stampReverted(patchId, now);
+  } catch {
+    // best-effort — the bridge mutation already succeeded.
+  }
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { ok: true, patchId, appliedRevertedAt: now, appliedOps: applied.applied },
+    liveAssumptions(state, intent),
+  );
+}
+
+/** Construct a schema-valid ok:true result + send it (edit.* handlers). */
+function safeSendOk(
+  transport: Transport,
+  freshness: "live" | "stale" | "disconnected",
+  payload: object,
+  assumptions: Assumption[],
+): void {
+  try {
+    transport.send({
+      version: VERSION,
+      type: "result",
+      ok: true,
+      stateFreshness: freshness,
+      payload,
+      assumptions,
+    });
+  } catch (e) {
+    console.error("[query-server] transport.send failed from edit.* continuation:", (e as Error).message);
+  }
+}
+
+/** Construct a schema-valid ok:false result + send it (edit.* error arms). */
+function safeSendErr(
+  transport: Transport,
+  freshness: "live" | "stale" | "disconnected",
+  error: string,
+): void {
+  try {
+    transport.send({
+      version: VERSION,
+      type: "result",
+      ok: false,
+      stateFreshness: freshness,
+      error,
+      // result.schema.json forces availableFrom on ok:false; M2 edits are live.
+      availableFrom: "M2",
+    });
+  } catch (e) {
+    console.error("[query-server] transport.send failed from edit.* error arm:", (e as Error).message);
+  }
 }

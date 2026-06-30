@@ -117,6 +117,34 @@ describe("INV-14 history carries inverse (D-03 — inverseOps at apply time)", (
     // find returns null because the only entry is marked reverted.
     expect(await hist.find("pt_revertme1revertme1revertme")).toBeNull();
   });
+
+  it("stampReverted marks the original entry; subsequent find returns null (double-revert protection)", async () => {
+    const hist = new PatchHistory(journalPath);
+    const ops: PrimitiveOp[] = [{ op: "add_note", note: note(60, 0) }];
+    await hist.append(entryFromOps("pt_stampmestampmestampmestamp", ops, 1_000));
+    // Before stamping, find returns the entry.
+    expect(await hist.find("pt_stampmestampmestampmestamp")).not.toBeNull();
+    // Stamp it reverted.
+    await hist.stampReverted("pt_stampmestampmestampmestamp", 9_000);
+    // After stamping, find returns null (double-revert is a no-op).
+    expect(await hist.find("pt_stampmestampmestampmestamp")).toBeNull();
+    // The entry still exists in the journal (append-only: it's rewritten with
+    // appliedRevertedAt set, not deleted) — verified by reading raw entries.
+    const all: PatchHistoryEntry[] = [];
+    for await (const e of hist.entries()) all.push(e);
+    expect(all).toHaveLength(1);
+    expect(all[0]!.appliedRevertedAt).toBe(9_000);
+  });
+
+  it("stampReverted on an unknown patchId is a no-op (does not rewrite the journal)", async () => {
+    const hist = new PatchHistory(journalPath);
+    await hist.append(entryFromOps("pt_presentpresentpresentpresen", [{ op: "add_note", note: note(60, 0) }], 1));
+    await hist.stampReverted("pt_absent-absent-absent-absent-", 9_000);
+    const all: PatchHistoryEntry[] = [];
+    for await (const e of hist.entries()) all.push(e);
+    expect(all).toHaveLength(1);
+    expect(all[0]!.appliedRevertedAt).toBeUndefined();
+  });
 });
 
 describe("Pitfall 8 corruption-skip (entries() never throws on malformed lines)", () => {

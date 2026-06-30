@@ -249,15 +249,18 @@ describe("CLI contract --explain pretty-prints (CLI-01)", () => {
   });
 });
 
-describe("CLI contract — 3 stubs (CLI-01, D-05)", () => {
-  it("bw-edit → not_implemented JSON, availableFrom M2, exit 0", async () => {
+describe("CLI contract — 2 stubs (CLI-01, D-05; bw-edit went live in M2 Plan 03-02)", () => {
+  it("bw-edit with no subcommand prints help (live multicall — was a stub pre-M2)", async () => {
+    // bw-edit replaced its M1 stub with live preview/apply/revert subcommands
+    // (Plan 03-02 Task 2). With no subcommand, commander prints help to stderr
+    // + exits 1 (its standard "missing command" behavior). The dedicated
+    // edit.test.ts covers the live subcommand contract.
     const r = await runCli(join(COMMANDS, "edit.ts"), [], {});
-    expect(r.code).toBe(0);
-    const out = JSON.parse(r.stdout);
-    expect(out.ok).toBe(false);
-    expect(out.error).toBe("not_implemented");
-    expect(out.command).toBe("bw-edit");
-    expect(out.availableFrom).toBe("M2");
+    expect(r.code).toBe(1); // commander's missing-subcommand exit code
+    // Help output mentions the live subcommands (not a not_implemented stub).
+    const helpText = r.stdout + r.stderr;
+    expect(helpText).toContain("preview");
+    expect(helpText).toContain("apply");
   });
 
   it("bw-arrange → not_implemented JSON, availableFrom M3, exit 0", async () => {

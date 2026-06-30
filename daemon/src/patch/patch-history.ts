@@ -142,6 +142,35 @@ export class PatchHistory {
   }
 
   /**
+   * Stamp the first non-reverted entry matching `patchId` with
+   * `appliedRevertedAt = timestamp`. The journal is append-only, so this
+   * re-reads every entry, mutates the match, and rewrites the file atomically
+   * (temp in dirname + rename — the atomic-write discipline). A no-op when no
+   * matching non-reverted entry exists. Called by the revert path after a
+   * successful inverse replay so a subsequent `find(patchId)` returns null
+   * (double-revert protection).
+   */
+  async stampReverted(patchId: string, timestamp: number): Promise<void> {
+    const collected: PatchHistoryEntry[] = [];
+    let touched = false;
+    for await (const e of this.entries()) {
+      if (!touched && e.patchId === patchId && e.appliedRevertedAt === undefined) {
+        collected.push({ ...e, appliedRevertedAt: timestamp });
+        touched = true;
+      } else {
+        collected.push(e);
+      }
+    }
+    if (!touched) return; // nothing to stamp
+    const jsonl = collected.map((e) => JSON.stringify(e)).join("\n") + "\n";
+    const dir = dirname(this.path);
+    const tmp = join(dir, `.${basename(this.path)}.${randomBytes(6).toString("hex")}.tmp`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(tmp, jsonl, "utf8");
+    await rename(tmp, this.path); // atomic on POSIX, same filesystem
+  }
+
+  /**
    * Compact the journal via atomic temp+rename (atomic-write.ts:45 discipline).
    *
    * Re-reads all valid entries, rewrites them as JSONL (one `JSON.stringify`
