@@ -47,6 +47,14 @@ import { classifyRisk, ScopeMismatchError } from "../patch/risk-classifier.js";
 import { inverseOps } from "../patch/inverse-ops.js";
 import type { CandidateStore } from "../patch/candidate-store.js";
 import type { PatchHistory, PatchHistoryEntry } from "../patch/patch-history.js";
+// Phase 3 Plan 03-04 — midi.* creative/cleanup dispatch (MIDI-02..05).
+import type { Profile } from "../gen/profile.js";
+import { loadProfile } from "../profiles/profile-loader.js";
+import { detectHarmonicCenter } from "../transforms/harmonic-detect.js";
+import { vary } from "../transforms/vary.js";
+import { counterline } from "../transforms/counterline.js";
+import { voiceLeadingFix } from "../transforms/voice-leading-fix.js";
+import { humanize } from "../transforms/humanize.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 ajv.addSchema(querySchema);
@@ -64,6 +72,12 @@ const LIVE_OPS = new Set([
   "edit.preview",
   "edit.apply",
   "edit.revert",
+  // Phase 3 Plan 03-04 — creative/cleanup MIDI transforms (D-05/D-07/D-12).
+  // Each mints candidate patchId(s) the producer applies via `bw-edit apply`.
+  "midi.vary",
+  "midi.counterline",
+  "midi.voice_leading_fix",
+  "midi.humanize",
 ]);
 
 /** Dependencies injected by the daemon boot sequence. */
@@ -263,6 +277,27 @@ export function startQueryServer(deps: QueryServerDeps): void {
     }
     if (op === "edit.revert") {
       void handleEditRevert(deps, state, intent, freshness, msg as { payload?: { patchId?: string } });
+      return;
+    }
+
+    // Phase 3 Plan 03-04 — midi.* transform dispatch (MIDI-02..05). Each is an
+    // async pull/transform/mint path: fire-and-forget from the sync LineBuffer
+    // callback; the handler resolves later + transport.send fires from the
+    // async continuation (same shape as edit.* above).
+    if (op === "midi.vary") {
+      void handleMidiVary(deps, state, intent, freshness);
+      return;
+    }
+    if (op === "midi.counterline") {
+      void handleMidiCounterline(deps, state, intent, freshness);
+      return;
+    }
+    if (op === "midi.voice_leading_fix") {
+      void handleMidiVoiceLeadingFix(deps, state, intent, freshness);
+      return;
+    }
+    if (op === "midi.humanize") {
+      void handleMidiHumanize(deps, state, intent, freshness);
       return;
     }
 
@@ -774,4 +809,307 @@ function safeSendErr(
   } catch (e) {
     console.error("[query-server] transport.send failed from edit.* error arm:", (e as Error).message);
   }
+}
+
+// ============================================================================
+// Phase 3 Plan 03-04 — midi.vary / midi.counterline / midi.voice_leading_fix /
+// midi.humanize dispatch (MIDI-02..05, D-05/D-07/D-12).
+// ============================================================================
+//
+// The creative/cleanup transform dispatch. Each handler pulls the live clip,
+// loads the genre profile (D-14), resolves the harmonic center (D-12 — authored
+// wins; opt-in inference with assumptions[] disclosure otherwise), runs the
+// PURE transform, and mints candidate patchId(s) via the candidate store. The
+// producer applies the minted patchId via Plan 02's `bw-edit apply`.
+//
+// BLOCKER-01 / INV-10 (audit-trail integrity): handleMidiVary RE-VALIDATES each
+// candidate's risk via classifyRisk({declared, operations, scopeDeclared,
+// belowBar: status==="refused"}) BEFORE candidateStore.mint — mirroring
+// handleEditPreview. The vary birth-place already stamps refused→risk:"high"
+// (Task 1); this daemon-side classifyRisk is the defense-in-depth re-validation
+// so patch-history.jsonl can NEVER record a below-bar candidate as medium.
+//
+// SC#3 P2 watchdog gate: all four refuse when stateFreshness !== "live".
+
+/** Shared preamble result for midi.* handlers (gating + clip + profile + harmonic). */
+interface MidiDispatchCtx {
+  before: Note[];
+  profile: Profile;
+  profileName: string;
+  region: { start: number; end: number } | undefined;
+  scopeDeclared: { clipSid: string; region?: { start: number; end: number } };
+  harmonic: { key: string; mode: "major" | "minor" } | undefined;
+  assumptions: Assumption[];
+}
+
+/**
+ * Resolve the D-12 harmonic center. Authored intent wins (no inference
+ * assumption); otherwise run detectHarmonicCenter and disclose the inference
+ * (or the refusal) via assumptions[] (Pitfall 6 — no silent guess).
+ *
+ * Pure over its inputs (the detection itself is pure).
+ */
+function resolveHarmonic(
+  before: Note[],
+  intent: ProjectIntent | null,
+  assumptions: Assumption[],
+): { key: string; mode: "major" | "minor" } | undefined {
+  const authored = intent?.projectIntent.harmonicCenter;
+  if (authored) {
+    return { key: authored.key, mode: authored.mode };
+  }
+  const detected = detectHarmonicCenter(before);
+  if (detected) {
+    assumptions.push({
+      claim: `harmonicCenter: inferred ${detected.key} ${detected.mode}, confidence ${detected.confidence.toFixed(2)}`,
+      confidence: detected.confidence,
+      source: "default",
+    });
+    return { key: detected.key, mode: detected.mode };
+  }
+  assumptions.push({
+    claim: "harmonicCenter: could not infer",
+    confidence: 0.3,
+    source: "default",
+  });
+  return undefined;
+}
+
+/**
+ * The shared midi.* preamble: watchdog gate, candidateStore gate, pull live
+ * clip notes, load profile, resolve harmonic. Returns the dispatch context, or
+ * null when an error result has already been sent (the caller returns).
+ */
+async function prepareMidiDispatch(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<MidiDispatchCtx | null> {
+  if (freshness !== "live") {
+    safeSendErr(deps.transport, freshness, "state_stale");
+    return null;
+  }
+  if (!deps.candidateStore) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return null;
+  }
+  const clipSid = state.selection.clipSid ?? "";
+  // Narrow the loose selection.region (optional start?/end?) to a complete
+  // {start,end} region ONLY when both bounds are present; a partial region is
+  // treated as whole-clip (the default D-11 target).
+  const rawRegion = state.selection.region;
+  const region = rawRegion && typeof rawRegion.start === "number" && typeof rawRegion.end === "number"
+    ? { start: rawRegion.start, end: rawRegion.end }
+    : undefined;
+  const before = (await pullLiveClipNotes(deps)) ?? ((state.clips as Note[] | undefined) ?? []);
+  const profileName = intent?.projectIntent.profile;
+  let profile: Profile;
+  try {
+    profile = loadProfile(profileName);
+  } catch {
+    // UnknownProfileError (T-3-14) — surface as invalid_query.
+    safeSendErr(deps.transport, freshness, "invalid_query");
+    return null;
+  }
+  const assumptions: Assumption[] = [...liveAssumptions(state, intent)];
+  const harmonic = resolveHarmonic(before, intent, assumptions);
+  return {
+    before,
+    profile,
+    profileName: profileName ?? "generic",
+    region,
+    scopeDeclared: { clipSid, region },
+    harmonic,
+    assumptions,
+  };
+}
+
+/**
+ * midi.vary handler — run vary(), classify + mint 3 candidate patchIds.
+ *
+ * BLOCKER-01 / INV-10: each candidate is RE-VALIDATED via classifyRisk({belowBar:
+ * status==="refused"}) BEFORE mint. A refused candidate is stored + journaled
+ * with risk:"high" AND belowBar:true (the audit-trail floor — vary stamps the
+ * birth-side risk:"high"; this is the daemon-side defense-in-depth).
+ */
+async function handleMidiVary(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const ctx = await prepareMidiDispatch(deps, state, intent, freshness);
+  if (!ctx) return; // error already sent
+  const { before, profile, profileName, scopeDeclared, harmonic, assumptions } = ctx;
+
+  const candidates = vary(before, ctx.region, profile, harmonic);
+  const envelope = candidates.map((candidate) => {
+    let risk: ReturnType<typeof classifyRisk>;
+    try {
+      risk = classifyRisk({
+        declared: candidate.risk,
+        operations: candidate.operations,
+        scopeDeclared,
+        // INV-10 / BLOCKER-01 — belowBar: candidate.status === "refused" forces
+        // risk high so a refused candidate is journaled with its true risk class
+        // (defense-in-depth over vary's birth-side risk:"high" stamp).
+        belowBar: candidate.status === "refused",
+      });
+    } catch (e) {
+      // ScopeMismatchError on a creative candidate is a bug (vary filters to
+      // region internally) — surface as scope_mismatch + skip this candidate.
+      console.error("[query-server] midi.vary classifyRisk scope_mismatch:", (e as Error).message);
+      risk = candidate.risk;
+    }
+    const minted = deps.candidateStore!.mint({
+      scope: scopeDeclared,
+      operations: candidate.operations as Patch["operations"],
+      rationale: `vary ${candidate.label}: ${candidate.description}`,
+      reversibility: "self-inverse",
+      transformIntent: { name: "vary", variant: candidate.label, profile: profileName },
+      risk,
+      motifSimilarity: candidate.motifSimilarity,
+      // belowBar: candidate.status === "refused" — the minted patch carries the
+      // belowBar flag so patch-history.jsonl records it as a below-bar override.
+      belowBar: candidate.status === "refused",
+      assumptions,
+    });
+    const entry: { label: string; description: string; patchId: string; risk: string; motifSimilarity: number; status?: string } = {
+      label: candidate.label,
+      description: candidate.description,
+      patchId: minted.patchId,
+      risk,
+      motifSimilarity: candidate.motifSimilarity,
+    };
+    if (candidate.status) entry.status = candidate.status;
+    return entry;
+  });
+
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { candidates: envelope },
+    assumptions,
+  );
+}
+
+/**
+ * midi.counterline handler — run counterline(), classify + mint ONE candidate.
+ * Creative tier (can refuse when no harmonic center or below threshold); a
+ * refused candidate is minted with belowBar:true + risk:high (INV-10).
+ */
+async function handleMidiCounterline(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const ctx = await prepareMidiDispatch(deps, state, intent, freshness);
+  if (!ctx) return;
+  const { before, profile, profileName, scopeDeclared, harmonic, assumptions } = ctx;
+
+  const result = counterline(before, ctx.region, profile, harmonic);
+  const belowBar = result.status === "refused";
+  const risk = classifyRisk({
+    declared: result.risk,
+    operations: result.operations,
+    scopeDeclared,
+    belowBar,
+  });
+  const minted = deps.candidateStore!.mint({
+    scope: scopeDeclared,
+    operations: result.operations as Patch["operations"],
+    rationale: `counterline: companion voice (${result.operations.length} add_note ops)`,
+    reversibility: "self-inverse",
+    transformIntent: { name: "counterline", profile: profileName },
+    risk,
+    motifSimilarity: result.motifSimilarity,
+    belowBar,
+    assumptions,
+  });
+  const payload: { patchId: string; risk: string; operations: number; motifSimilarity: number; status?: string } = {
+    patchId: minted.patchId,
+    risk,
+    operations: result.operations.length,
+    motifSimilarity: result.motifSimilarity,
+  };
+  if (result.status) payload.status = result.status;
+  safeSendOk(deps.transport, freshness, payload, assumptions);
+}
+
+/**
+ * midi.voice_leading_fix handler — cleanup tier (INV-8 never refuses on motif
+ * grounds). Mint ONE low-risk candidate. Empty ops when the clip is clean (a
+ * no-op candidate the producer applies harmlessly).
+ *
+ * D-10: cleanup transforms self-declare risk "low" and the daemon respects it —
+ * their ops are identity-stable remove+add pairs / update_note_field content
+ * mutations, NOT structural changes. The classifyRisk op-count floor (designed
+ * for creative-tier add/remove blast radius) would over-penalize a cleanup that
+ * legitimately touches many notes. BLOCKER-01's classifyRisk mandate is scoped
+ * to the creative tier (handleMidiVary/handleMidiCounterline) where belowBar
+ * re-validation is load-bearing for audit-trail integrity.
+ */
+async function handleMidiVoiceLeadingFix(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const ctx = await prepareMidiDispatch(deps, state, intent, freshness);
+  if (!ctx) return;
+  const { before, profileName, scopeDeclared, assumptions } = ctx;
+
+  const result = voiceLeadingFix(before);
+  const risk = result.risk; // D-10 cleanup tier — self-declared "low" is authoritative
+  const minted = deps.candidateStore!.mint({
+    scope: scopeDeclared,
+    operations: result.operations as Patch["operations"],
+    rationale: `voice-leading-fix: parallel-fifth/octave resolution (${result.operations.length} ops)`,
+    reversibility: "self-inverse",
+    transformIntent: { name: "voice-leading-fix", profile: profileName },
+    risk,
+    assumptions,
+  });
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { patchId: minted.patchId, risk, operations: result.operations.length },
+    assumptions,
+  );
+}
+
+/**
+ * midi.humanize handler — cleanup tier (INV-8 never refuses). Mint ONE low-risk
+ * candidate carrying update_note_field ops (identity-stable, Pitfall 2). D-10
+ * cleanup-tier risk stance (see {@link handleMidiVoiceLeadingFix}).
+ */
+async function handleMidiHumanize(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+): Promise<void> {
+  const ctx = await prepareMidiDispatch(deps, state, intent, freshness);
+  if (!ctx) return;
+  const { before, profile, profileName, scopeDeclared, assumptions } = ctx;
+
+  const result = humanize(before, profile);
+  const risk = result.risk; // D-10 cleanup tier — self-declared "low" is authoritative
+  const minted = deps.candidateStore!.mint({
+    scope: scopeDeclared,
+    operations: result.operations as Patch["operations"],
+    rationale: `humanize: velocity + timing jitter (${result.operations.length} update_note_field ops)`,
+    reversibility: "self-inverse",
+    transformIntent: { name: "humanize", profile: profileName },
+    risk,
+    assumptions,
+  });
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { patchId: minted.patchId, risk, operations: result.operations.length },
+    assumptions,
+  );
 }
