@@ -15,10 +15,12 @@
 
 import { describe, it, expect } from "vitest";
 import { startQueryServer, type QueryServerDeps } from "./query-server.js";
+import { CandidateStore } from "../patch/candidate-store.js";
 import type { StaleWatchdog } from "../state/stale-watchdog.js";
 import type { RawState } from "../state/reconcile.js";
 import type { ProjectIntent } from "../gen/intent.js";
 import type { Transport } from "../transport/transport.js";
+import type { Note } from "../cli/diff-logic.js";
 
 /** Fake transport: captures the registered handler + every sent message. */
 interface CapturingTransport extends Transport {
@@ -234,5 +236,166 @@ describe("query-server (D-07 cli-query op dispatch + SC#3 surfacing)", () => {
     expect(res.ok).toBe(true);
     expect(res.error).toBeUndefined();
     expect(res.availableFrom).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// Phase 3 Plan 03-04 Task 2 — midi.vary / counterline / voice_leading_fix /
+// humanize dispatch (D-05/D-07/D-12). These tests pin the BLOCKER-01 INV-10
+// integration: handleMidiVary RE-VALIDATES risk via classifyRisk({belowBar:
+// status==="refused"}) BEFORE candidateStore.mint, so a refused candidate is
+// stored + journaled with risk:"high" AND belowBar:true (audit-trail integrity).
+// The CLI contract (midi.test.ts) cannot introspect the candidate store; these
+// dispatch tests can (Rule 2 — the INV-10 integration assertion is required
+// critical functionality for the trust spine).
+// ============================================================================
+
+/** A clip fixture carrying a clear C-major motif as the selected clip's notes. */
+function fixtureClipWithNotes(notes: Note[]): RawState {
+  return {
+    ...fixtureRaw(),
+    clips: notes,
+  };
+}
+
+function cMajorMotifNotes(): Note[] {
+  return [
+    { key: "n:60:0.0000", pitch: 60, start: 0.0, length: 0.5, velocity: 100 },
+    { key: "n:64:0.5000", pitch: 64, start: 0.5, length: 0.5, velocity: 100 },
+    { key: "n:67:1.0000", pitch: 67, start: 1.0, length: 0.5, velocity: 100 },
+    { key: "n:72:1.5000", pitch: 72, start: 1.5, length: 0.5, velocity: 100 },
+    { key: "n:67:2.0000", pitch: 67, start: 2.0, length: 0.5, velocity: 100 },
+    { key: "n:64:2.5000", pitch: 64, start: 2.5, length: 0.5, velocity: 100 },
+    { key: "n:60:3.0000", pitch: 60, start: 3.0, length: 0.5, velocity: 100 },
+    { key: "n:62:3.5000", pitch: 62, start: 3.5, length: 0.5, velocity: 100 },
+  ];
+}
+
+/** Build deps that wire a REAL CandidateStore so midi.* dispatch can mint + we can introspect. */
+function makeMidiDeps(opts: {
+  state?: RawState | null;
+  intent?: ProjectIntent | null;
+  candidateStore?: CandidateStore;
+}): { deps: QueryServerDeps; transport: CapturingTransport; store: CandidateStore } {
+  const transport = makeCapturingTransport();
+  const store = opts.candidateStore ?? new CandidateStore();
+  const deps: QueryServerDeps = {
+    transport,
+    watchdog: makeFakeWatchdog("live"),
+    getState: () => opts.state === undefined ? fixtureClipWithNotes(cMajorMotifNotes()) : opts.state,
+    getIntent: () => opts.intent === undefined ? fixtureIntent() : opts.intent,
+    candidateStore: store,
+  };
+  startQueryServer(deps);
+  return { deps, transport, store };
+}
+
+/** Drive an ASYNC op through the server (await microtask drain for fire-and-forget handlers). */
+async function driveAsync(deps: QueryServerDeps, queryLine: string): Promise<Record<string, unknown>> {
+  const transport = deps.transport as CapturingTransport;
+  transport.sent.length = 0;
+  transport.handler(queryLine);
+  // midi.* handlers are async (they pull live clip notes); drain microtasks so
+  // the async continuation's transport.send lands before we assert.
+  await new Promise((r) => setImmediate(r));
+  expect(transport.sent).toHaveLength(1);
+  return transport.sent[0] as Record<string, unknown>;
+}
+
+describe("midi.vary dispatch (MIDI-02, BLOCKER-01 INV-10 integration)", () => {
+  it("returns 3 candidates each with a minted patchId + risk + motifSimilarity", async () => {
+    const { deps } = makeMidiDeps({});
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.vary" }) + "\n");
+    expect(res.ok).toBe(true);
+    const candidates = (res.payload as { candidates: Array<{ patchId: string; risk: string; motifSimilarity: number }> }).candidates;
+    expect(candidates).toHaveLength(3);
+    for (const c of candidates) {
+      expect(c.patchId).toMatch(/^pt_/);
+      expect(["low", "medium", "high"]).toContain(c.risk);
+      expect(Number.isFinite(c.motifSimilarity)).toBe(true);
+    }
+  });
+
+  it("INV-10 integration: a refused candidate is STORED with risk:'high' AND belowBar:true (D-09 audit-trail floor)", async () => {
+    // Force a refused candidate by feeding an EMPTY clip (no motif → below bar).
+    const { deps, store } = makeMidiDeps({ state: fixtureClipWithNotes([]) });
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.vary" }) + "\n");
+    expect(res.ok).toBe(true);
+    const candidates = res.payload as { candidates: Array<{ patchId: string; risk: string; status?: string; motifSimilarity: number }> };
+    // At least one refused candidate is returned + stored.
+    const refused = candidates.candidates.find((c) => c.status === "refused");
+    expect(refused).toBeDefined();
+    expect(refused!.risk).toBe("high"); // the daemon re-validated via classifyRisk({belowBar:true})
+    // The STORED patch (candidate store) carries belowBar:true + risk:high — the
+    // audit-trail floor. patch-history.jsonl can NEVER record this as medium.
+    const stored = store.get(refused!.patchId);
+    expect(stored).toBeDefined();
+    expect(stored!.risk).toBe("high");
+    expect(stored!.belowBar).toBe(true);
+  });
+
+  it("an accepted candidate is stored with belowBar absent/false (the default path)", async () => {
+    const { deps, store } = makeMidiDeps({});
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.vary" }) + "\n");
+    const candidates = res.payload as { candidates: Array<{ patchId: string; status?: string }> };
+    const accepted = candidates.candidates.find((c) => c.status === undefined);
+    expect(accepted).toBeDefined();
+    const stored = store.get(accepted!.patchId);
+    expect(stored).toBeDefined();
+    expect(stored!.belowBar ?? false).toBe(false);
+  });
+
+  it("D-12 inferred-harmony disclosure: blank intent.harmonicCenter -> assumptions[] carries 'harmonicCenter: inferred'", async () => {
+    // intent with NO harmonicCenter → the daemon infers + discloses (Pitfall 6).
+    const intent: ProjectIntent = { version: "1.0", projectIntent: { summary: "techno" } };
+    const { deps } = makeMidiDeps({ intent });
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.vary" }) + "\n");
+    const claims = (res.assumptions as Array<{ claim: string }>).map((a) => a.claim);
+    expect(claims.some((c) => c.includes("harmonicCenter: inferred") || c.includes("harmonicCenter: could not infer"))).toBe(true);
+  });
+
+  it("D-12 authored harmonic: intent.harmonicCenter present -> no inference assumption", async () => {
+    const intent: ProjectIntent = {
+      version: "1.0",
+      projectIntent: { summary: "techno", harmonicCenter: { key: "A", mode: "minor" } },
+    };
+    const { deps } = makeMidiDeps({ intent });
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.vary" }) + "\n");
+    const claims = (res.assumptions as Array<{ claim: string }>).map((a) => a.claim);
+    expect(claims.some((c) => c.includes("harmonicCenter: inferred"))).toBe(false);
+  });
+});
+
+describe("midi.counterline / voice_leading_fix / humanize dispatch (MIDI-03/04/05)", () => {
+  it("midi.counterline -> one candidate patchId (creative tier)", async () => {
+    const intent: ProjectIntent = {
+      version: "1.0",
+      projectIntent: { summary: "x", harmonicCenter: { key: "C", mode: "major" } },
+    };
+    const { deps, store } = makeMidiDeps({ intent });
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.counterline" }) + "\n");
+    expect(res.ok).toBe(true);
+    const payload = res.payload as { patchId: string; risk: string };
+    expect(payload.patchId).toMatch(/^pt_/);
+    // The candidate is minted into the store (the producer applies via bw-edit).
+    expect(store.get(payload.patchId)).toBeDefined();
+  });
+
+  it("midi.voice_leading_fix -> one low-risk candidate (cleanup tier)", async () => {
+    const { deps } = makeMidiDeps({});
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.voice_leading_fix" }) + "\n");
+    expect(res.ok).toBe(true);
+    const payload = res.payload as { patchId: string; risk: string };
+    expect(payload.patchId).toMatch(/^pt_/);
+    expect(payload.risk).toBe("low");
+  });
+
+  it("midi.humanize -> one low-risk candidate (cleanup tier)", async () => {
+    const { deps } = makeMidiDeps({});
+    const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "midi.humanize" }) + "\n");
+    expect(res.ok).toBe(true);
+    const payload = res.payload as { patchId: string; risk: string };
+    expect(payload.patchId).toMatch(/^pt_/);
+    expect(payload.risk).toBe("low");
   });
 });
