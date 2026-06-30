@@ -1,22 +1,26 @@
 // daemon/src/state/analyzer-registry.test.ts
 //
 // STATE-02 framework-only analyzer registry (D-08) + the below-threshold refuse
-// filter. M1 ships EXACTLY ONE analyzer (IntentAnalyzer); sections/motifs/roles
-// /energy/automation all stay empty until their phase (D-08 defense).
+// filter. M1 ships EXACTLY ONE analyzer (IntentAnalyzer); M2 (Plan 03-03)
+// extends to TWO by registering MotifSignatureAnalyzer (MIDI-01, D-08 — the
+// motif analyzer is the FIRST addition to the framework). sections/roles/
+// energy/automation still stay empty until their phase (D-08 defense).
 //
-// Source: RESEARCH.md Pattern 5 lines 673-721 (Analyzer interface + M1 ships
-// IntentAnalyzer only) + 02-PATTERNS.md Assignment 8 lines 333-348.
+// Source: RESEARCH.md Pattern 5 lines 673-721 (Analyzer interface) +
+// 02-PATTERNS.md Assignment 8 lines 333-348 + 03-03-PLAN Task 1.
 
 import { describe, it, expect } from "vitest";
 import {
   AnalyzerRegistry,
   M1_ANALYZERS,
+  M2_ANALYZERS,
   IntentAnalyzer,
   CONFIDENCE_THRESHOLD,
   type Analyzer,
   type DerivedField,
   type AnalyzeContext,
 } from "./analyzer-registry.js";
+import { MotifSignatureAnalyzer } from "../transforms/motif-signature.js";
 import type { RawState } from "./reconcile.js";
 import type { ProjectIntent } from "../gen/intent.js";
 
@@ -48,12 +52,27 @@ describe("M1_ANALYZERS (D-08 framework-only)", () => {
   it("the one analyzer is IntentAnalyzer", () => {
     expect(M1_ANALYZERS[0].id).toBe("intent");
   });
+});
 
-  it("M1 has NO sections/motifs/roles/energy/automation analyzers (D-08)", () => {
-    const ids = M1_ANALYZERS.map((a) => a.id);
+describe("M2_ANALYZERS (Plan 03-03 — MotifSignatureAnalyzer added, MIDI-01)", () => {
+  it("registers EXACTLY TWO analyzers (intent + motifs)", () => {
+    expect(M2_ANALYZERS).toHaveLength(2);
+  });
+
+  it("contains IntentAnalyzer (id 'intent') + MotifSignatureAnalyzer (id 'motifs')", () => {
+    const ids = M2_ANALYZERS.map((a) => a.id);
+    expect(ids).toContain("intent");
+    expect(ids).toContain("motifs");
+  });
+
+  it("M2 extends M1 (superset — M1's analyzer is still present in M2)", () => {
+    expect(M2_ANALYZERS).toEqual(expect.arrayContaining([...M1_ANALYZERS]));
+  });
+
+  it("M2 still has NO sections/roles/energy/automation analyzers (D-08 — only motifs added in M2)", () => {
+    const ids = M2_ANALYZERS.map((a) => a.id);
     expect(ids).not.toContain("sections");
     expect(ids).not.toContain("trackRoles");
-    expect(ids).not.toContain("motifs");
     expect(ids).not.toContain("energyCurve");
     expect(ids).not.toContain("automationSalience");
   });
