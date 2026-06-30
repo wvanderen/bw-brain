@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Schema & IPC Spike** - Prove Bitwig TCP access, freeze the JSON-Lines contract, document the verified API surface before any production bridge work (completed 2026-06-26)
 - [x] **Phase 2: Read-Only Context Foundation (M1)** - Bridge mirror + daemon normalization + read CLI + memory bootstrap + Pi /analyze — the assistant reliably describes selected context (completed 2026-06-27)
-- [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply
+- [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply (all 5 plans executed; BLOCKING end-of-phase UAT M1–M5 pending human — status: verifying)
 - [ ] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only)
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
 
@@ -103,7 +103,7 @@ Plans:
   4. `bw-midi vary` produces A/B/C motif-preserving variants; counterline, voice-leading-fix, and humanization all default to preserve-motif-identity mode, and below-threshold transforms refuse rather than emit "casino MIDI."
   5. Pi `/vary` + `/apply` drive the edit pipeline with a diff pane rendering patch diffs; the genre-profile interface (ARCH-01) is in place with electronic/techno as the first profile, and the generic reasoning core runs without a profile (profiles enhance, never gate).
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans complete
 **UI hint**: yes
 **Research needed**: Bitwig undo-grouping behavior (does the host auto-coalesce consecutive edits on a ~1s window?); motif signature algorithm (chroma/rhythm features adapted from librosa concepts to MIDI).
 Plans:
@@ -123,7 +123,7 @@ Plans:
 
 **Wave 4** *(blocked on Waves 2+3 — Pi skills shell to the CLI)*
 
-- [ ] 03-05-PLAN.md — Pi /vary /apply /diff skills (UX-02) + end-of-phase manual UAT M1..M5 (autonomous: false — Task 2 blocking checkpoint, Wave 4)
+- [~] 03-05-PLAN.md — Pi /vary /apply /diff skills (UX-02) + end-of-phase manual UAT M1..M5 (autonomous: false — Task 2 blocking checkpoint, Wave 4) — Task 1 done + committed; Task 2 (M1–M5 manual UAT) BLOCKING pending human (CHECKPOINT REACHED)
 
 ### Phase 4: Arrangement Intelligence (M3)
 
@@ -171,6 +171,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
-| 3. Reversible MIDI Patching (M2) | 4/5 | In Progress|  |
+| 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

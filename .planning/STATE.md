@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 03
 current_phase_name: reversible-midi-patching-m2
-status: executing
+status: verifying
 stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-06-30T22:39:20.850Z"
+last_updated: "2026-06-30T22:51:24.063Z"
 last_activity: 2026-06-29
 last_activity_desc: Phase 03 execution started
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 16
-  completed_plans: 15
-  percent: 40
+  completed_plans: 16
+  percent: 60
 ---
 
 # Project State
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 ## Current Position
 
-Phase: 03 (reversible-midi-patching-m2) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-06-29 — Phase 03 execution started
+Phase: 03 (reversible-midi-patching-m2) — VERIFYING (all 5 plans executed; M1–M5 UAT pending human)
+Plan: 5 of 5 (executed)
+Status: ready_for_verification — Plan 03-05 Task 1 done; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint (CHECKPOINT REACHED)
+Last activity: 2026-06-30 — Plan 03-05 Task 1 (Pi /vary /apply /diff skills) shipped; Task 2 UAT gate pending human
 
-Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 next
+Progress: [██████░░░░] 60% — 2/5 phases complete; Phase 3 plans all executed, blocking end-of-phase UAT (M1–M5) pending human
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 
 | Phase 03 P02 | 113 min | 3 tasks | 12 files |
 | Phase 03 P03 | 88 | 2 tasks | 10 files |
 | Phase 03 P04 | 95 | 2 tasks | 12 files |
+| Phase 03 P05 | 6 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase ?]: BLOCKER-01 INV-10 audit-trail integrity (T-3-18a) closed: vary stamps refused→risk:high at birth + handleMidiVary RE-VALIDATES via classifyRisk({belowBar}) BEFORE mint — patch-history.jsonl can never record a below-bar candidate as medium (Plan 03-04)
 - [Phase ?]: Cleanup transforms (voice-leading-fix/humanize) use D-10 self-declared low risk WITHOUT classifyRisk op-count flooring — floor over-penalizes identity-stable update_note_field content mutations; classifyRisk mandate scoped to creative tier (Plan 03-04)
 - [Phase ?]: midi.* dispatch DRY preamble (prepareMidiDispatch): watchdog + candidateStore gates + pullLiveClipNotes + loadProfile + resolveHarmonic shared across the 4 handlers (Plan 03-04)
+- [Phase 03]: Phase 03-05: Pi /vary /apply /diff skills (UX-02) shipped — 3 SKILL.md shelling to bw-* CLI only (D-15 no inline diffs, D-04/D-09 flag handling, on-demand diff pane) + 3 structural contract tests. BLOCKER-02 vitest-include defense: daemon/vitest.config.ts include extended with ../pi-pack/skills/**/*.test.ts — without it npm test -- skill exits 0 vacuously (vitest 4.x CLI filter does not override include). Proven: Test Files 3 passed (3) under NO_COLOR=1.
+- [Phase 03]: Phase 03-05: plan status is pending-uat (NOT complete). Task 1 (Pi skills + contract tests) done + committed; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint — live Bitwig + human ears (casino-MIDI refusal audibility, techno-enhances-not-gates, NoteStep grid-lock, undo coalescing, /vary UX legibility). UX-02 implemented but not verified; requirements-completed stays [] until M2/M3/M4/M5 pass. Phase 3 not yet complete.
 
 ### Pending Todos
 
@@ -110,6 +113,7 @@ None yet.
 - *(Phase 1 blockers all resolved — spike goal achieved.)* Bitwig loopback TCP access: CONFIRMED live (Java `.bwextension`, captured `selection.changed` round-trip). JDK 21: installed via Homebrew. In-app scripting guide / Javadoc 6.0.6: consulted; capability surface recorded in `docs/bitwig-capabilities.md`. JS-vs-Java tension: resolved — JS `host` has no networking, Java `.bwextension` is the mandatory transport.
 - *(Phase 2 — resolved 2026-06-29 UAT):* STATE-04 fingerprint-mapping implemented + verified live (reload-reconcile smoke passed). The deferred behavioral probes (BRIDGE-02 5th event clip.name_changed, SC#3 reload-reconcile, Pi /analyze runtime) all PASSED in the end-of-phase UAT — 5/5 bridge events now live, /analyze produces grounded output + assumptions[] + stateFreshness surfacing.
 - [Phase 3 — to watch]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5.
+- Phase 03 UAT pending: M1–M5 manual checkpoints (Plan 03-05 Task 2) require live Bitwig 6.0.6 + human ears + Pi. M2/M3/M4/M5 BLOCKING; M1 non-blocking. docs/bitwig-capabilities.md §1/§2 PENDING slots marked. Until these pass, Phase 3 is NOT complete (status: ready_for_verification / pending-uat). If M4 finds NoteStep.start grid-locked, flag to planner — bridge write path changes.
 
 ## Deferred Items
 
@@ -121,6 +125,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-30T22:39:14.137Z
+Last session: 2026-06-30T22:51:24.056Z
 Stopped at: Completed 03-03-PLAN.md
 Resume file: None
