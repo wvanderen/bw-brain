@@ -72,13 +72,20 @@ const DEVICE_CHAIN_PAGES = {
  * Start a fake bridge: connects to the daemon's TCP port + answers
  * get.project_summary + get.selected_device_chain requests by id. Also
  * provides a sendEvent() helper to push event lines to the daemon.
+ *
+ * Phase 3 Plan 03-02 Task 3: when `applyPatchSink` is provided, the fake
+ * bridge ALSO handles apply.patch by dispatching the primitive ops against
+ * the sink (an in-memory mock clip) + replying {applied, failed}. This proves
+ * the daemon↔bridge wire contract end-to-end without live Bitwig.
  */
-function startFakeBridge(env: Env): {
+function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?: unknown[] } = {}): {
   socket: net.Socket;
   close: () => void;
   sendEvent: (type: string, payload: Record<string, unknown>) => void;
   connected: Promise<void>;
+  applyPatchCalls: { undoLabel: string; operations: unknown[] }[];
 } {
+  const applyPatchCalls: { undoLabel: string; operations: unknown[] }[] = [];
   const socket = net.createConnection({ port: env.tcpPort });
   socket.setEncoding("utf8");
 
@@ -94,7 +101,7 @@ function startFakeBridge(env: Env): {
   });
 
   const handleDaemonLine = (line: string): void => {
-    let msg: { type?: string; id?: string };
+    let msg: { type?: string; id?: string; payload?: Record<string, unknown> };
     try {
       msg = JSON.parse(line);
     } catch {
@@ -126,7 +133,7 @@ function startFakeBridge(env: Env): {
       );
       return;
     }
-    // Reply to get.selected_clip with an empty notes array.
+    // Reply to get.selected_clip with notes (default empty; overridden by opts.clipNotes).
     if (msg.type === "get.selected_clip" && msg.id) {
       socket.write(
         JSON.stringify({
@@ -134,7 +141,39 @@ function startFakeBridge(env: Env): {
           type: "response",
           id: msg.id,
           ok: true,
-          payload: { notes: [] },
+          payload: { notes: opts.clipNotes ?? [] },
+        }) + "\n",
+      );
+      return;
+    }
+    // Phase 3 Plan 03-02: handle apply.patch by dispatching primitive ops against
+    // the in-memory mock clip (opts.applyPatchSink) + replying {applied, failed}.
+    if (msg.type === "apply.patch" && msg.id) {
+      applyPatchCalls.push({
+        undoLabel: (msg.payload?.undoLabel as string) ?? "",
+        operations: (msg.payload?.operations as unknown[]) ?? [],
+      });
+      let applied = 0;
+      let failed = 0;
+      const sink = opts.applyPatchSink;
+      if (sink) {
+        const ops = (msg.payload?.operations as Array<Record<string, unknown>>) ?? [];
+        for (const op of ops) {
+          try {
+            sink.apply(op);
+            applied++;
+          } catch {
+            failed++;
+          }
+        }
+      }
+      socket.write(
+        JSON.stringify({
+          version: "1.0",
+          type: "response",
+          id: msg.id,
+          ok: true,
+          payload: { applied, failed },
         }) + "\n",
       );
       return;
@@ -150,6 +189,7 @@ function startFakeBridge(env: Env): {
   return {
     socket,
     connected,
+    applyPatchCalls,
     sendEvent: (type: string, payload: Record<string, unknown>): void => {
       socket.write(
         JSON.stringify({ version: "1.0", type, timestamp: Math.floor(Date.now() / 1000), payload }) + "\n",
@@ -159,6 +199,42 @@ function startFakeBridge(env: Env): {
       socket.destroy();
     },
   };
+}
+
+/**
+ * In-memory mock clip for the apply.patch smoke. Keys by `n:${pitch}:${startQ}`
+ * (the daemon Note identity) + stores {velocity, length}. The 3-case primitive
+ * dispatch mirrors PullHandlers.java:applyOps at the TS level (the wire contract
+ * is what's under test, not the Java NoteStep setters — those are JUnit-covered).
+ */
+class MockClip {
+  private readonly notes = new Map<string, { velocity: number; length: number }>();
+
+  /** Apply a primitive op (add/remove/update). Throws on invalid op (-> failed). */
+  apply(op: Record<string, unknown>): void {
+    const opType = op["op"] as string;
+    if (opType === "add_note") {
+      const n = op["note"] as Record<string, number>;
+      this.notes.set(`n:${n.pitch}:${n.start}`, { velocity: n.velocity, length: n.length });
+    } else if (opType === "remove_note") {
+      const n = op["note"] as Record<string, number>;
+      this.notes.delete(`n:${n.pitch}:${n.start}`);
+    } else if (opType === "update_note_field") {
+      const after = op["after"] as Record<string, number>;
+      this.notes.set(`n:${after.pitch}:${after.start}`, { velocity: after.velocity, length: after.length });
+    } else {
+      throw new Error(`unknown op: ${opType}`);
+    }
+  }
+
+  /** True when a note with this identity is present. */
+  has(pitch: number, start: number): boolean {
+    return this.notes.has(`n:${pitch}:${start}`);
+  }
+
+  size(): number {
+    return this.notes.size;
+  }
 }
 
 /** Send one query to the daemon UDS + resolve the parsed result line. */
@@ -468,6 +544,138 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         } finally {
           await handle.shutdown();
         }
+      }
+    } finally {
+      await dropEnv(env);
+    }
+  });
+
+  // =========================================================================
+  // Phase 3 Plan 03-02 Task 3 — daemon↔fake-bridge apply/revert round-trip.
+  // Proves the EDIT-02/04/05 wire contract end-to-end: preview mints a
+  // candidate, apply sends apply.patch over TCP (fake bridge mutates the mock
+  // clip), history is appended with INV-14 inverseOps, revert replays the
+  // inverse. NO live Bitwig required (RESEARCH.md §Validation "CLI Smoke").
+  // =========================================================================
+  it("assertion 6 (Plan 03-02): preview -> apply.patch over TCP -> history appended (INV-14) -> revert -> inverse applied", async () => {
+    const env = await makeEnv(PORT_PRIMARY);
+    // A separate history path so this test asserts the journal gain in isolation.
+    const historyPath = path.join(env.dir, "patch-history.jsonl");
+    // Seed an initial note in the mock clip so the patch's add_note is a net add
+    // (and remove_note of the seed is testable). The note uses the daemon Note
+    // shape (the fake bridge returns these as get.selected_clip notes).
+    const seedNote = { key: "n:60:0.0000", pitch: 60, start: 0, length: 0.25, velocity: 90 };
+    const mockClip = new MockClip();
+    mockClip.apply({ op: "add_note", note: seedNote });
+    try {
+      const handle = await boot({
+        socketPath: env.socketPath,
+        tcpPort: env.tcpPort,
+        stateCachePath: env.stateCachePath,
+        intentPath: env.intentPath,
+      });
+      // Override the daemon's default history path by constructing a PatchHistory
+      // pointed at historyPath — but the daemon wires its own. Instead, read the
+      // daemon's journal at the socket-dir default after apply. The boot wires
+      // patch-history.jsonl alongside the socket (boot.ts: join(dirname(socketPath), ...)).
+        const daemonJournalPath = path.join(env.dir, "patch-history.jsonl");
+      const fakeBridge = startFakeBridge(env, {
+        applyPatchSink: mockClip,
+        clipNotes: [seedNote],
+      });
+      try {
+        await fakeBridge.connected;
+        await waitForSocket(env);
+        await waitForSnapshot(env);
+        // Fold a selection event so the watchdog reports freshness "live" (the
+        // edit.* ops refuse when stateFreshness !== "live" — SC#3 P2 gate).
+        fakeBridge.sendEvent("selection.changed", { slot: 0 });
+        await new Promise((r) => setTimeout(r, 300));
+
+        // --- preview: a patch that adds a note at pitch 64 / start 0. ---
+        const patchPayload = {
+          patch: {
+            scope: { clipSid: "clip_0123456789abcdef" },
+            operations: [
+              { op: "add_note", note: { key: "n:64:0.0000", pitch: 64, start: 0, length: 0.25, velocity: 100 } },
+            ],
+            rationale: "smoke: add a note at C#4",
+            reversibility: "self-inverse",
+            risk: "low",
+            undoLabel: "smoke-add",
+          },
+        };
+        const preview = (await udsQuery(env, "edit.preview", patchPayload)) as {
+          ok?: boolean;
+          error?: string;
+          payload?: { patchId?: string; risk?: string; diff?: { notesAdded?: unknown[] } };
+        };
+        expect(preview.ok).toBe(true);
+        expect(preview.payload?.patchId).toMatch(/^pt_/);
+        expect(preview.payload?.risk).toBeDefined();
+        const patchId = preview.payload!.patchId!;
+        // The preview diff reflects the add (notesAdded non-empty).
+        expect(preview.payload!.diff?.notesAdded).toBeDefined();
+
+        // --- apply: low-risk, no --confirm needed (D-04: low is one-step). ---
+        const apply = (await udsQuery(env, "edit.apply", { patchId })) as {
+          ok?: boolean;
+          error?: string;
+          payload?: { ok?: boolean; appliedOps?: number; undoLabel?: string };
+        };
+        expect(apply.ok).toBe(true);
+        expect(apply.payload?.ok).toBe(true);
+        expect(apply.payload?.appliedOps).toBeGreaterThan(0);
+        // The fake bridge received exactly one apply.patch call carrying the add_note op.
+        expect(fakeBridge.applyPatchCalls.length).toBe(1);
+        expect(fakeBridge.applyPatchCalls[0]!.undoLabel).toBe("smoke-add");
+        // The mock clip now has 2 notes (seed + applied add).
+        expect(mockClip.size()).toBe(2);
+        expect(mockClip.has(64, 0)).toBe(true);
+
+        // --- INV-14 integration: the daemon journal gained exactly one entry
+        //     whose inverseOperations deep-equals inverseOps(operations). ---
+        await new Promise((r) => setTimeout(r, 200)); // let the async append land
+        const fs = await import("node:fs/promises");
+        let journalText: string;
+        try {
+          journalText = await fs.readFile(daemonJournalPath, "utf8");
+        } catch {
+          // The daemon may have written to its default history path; fall back
+          // to the env-dir relative path the boot wires (dirname(socketPath)).
+          journalText = await fs.readFile(historyPath, "utf8");
+        }
+        const lines = journalText.split("\n").filter((l) => l.length > 0);
+        expect(lines.length).toBe(1);
+        const entry = JSON.parse(lines[0]!);
+        expect(entry.patchId).toBe(patchId);
+        expect(entry.appliedAt).toBeDefined();
+        // INV-14: the inverseOperations are the reverse-inverted ops (a single
+        // add_note inverts to a remove_note of the same note).
+        expect(Array.isArray(entry.inverseOperations)).toBe(true);
+        expect(entry.inverseOperations.length).toBe(1);
+        expect(entry.inverseOperations[0].op).toBe("remove_note");
+
+        // --- revert: replays the inverse (remove_note) through the same path. ---
+        const revert = (await udsQuery(env, "edit.revert", { patchId })) as {
+          ok?: boolean;
+          payload?: { ok?: boolean; appliedRevertedAt?: number };
+        };
+        expect(revert.ok).toBe(true);
+        expect(revert.payload?.ok).toBe(true);
+        expect(revert.payload?.appliedRevertedAt).toBeDefined();
+        // The fake bridge received a SECOND apply.patch (the revert's inverse).
+        expect(fakeBridge.applyPatchCalls.length).toBe(2);
+        // The revert op is a remove_note (the inverse of the applied add_note).
+        expect(fakeBridge.applyPatchCalls[1]!.operations[0]).toMatchObject({ op: "remove_note" });
+        // The mock clip is back to 1 note (the added note was removed).
+        expect(mockClip.size()).toBe(1);
+        expect(mockClip.has(64, 0)).toBe(false);
+        // The seed note survives (revert only touched the applied add).
+        expect(mockClip.has(60, 0)).toBe(true);
+      } finally {
+        fakeBridge.close();
+        await handle.shutdown();
       }
     } finally {
       await dropEnv(env);

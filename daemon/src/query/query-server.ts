@@ -28,6 +28,7 @@
 // load (AGENTS.md 64-65 standalone-compiled pattern; mirrors reader.ts).
 
 import { Ajv2020 } from "ajv/dist/2020.js";
+import { randomUUID } from "node:crypto";
 import querySchema from "../../../schemas/cli-query/query.schema.json" with { type: "json" };
 import resultSchema from "../../../schemas/cli-query/result.schema.json" with { type: "json" };
 import { LineBuffer } from "../protocol/line-buffer.js";
@@ -528,9 +529,13 @@ async function handleEditPreview(
     return;
   }
   const rawPatch = msg.payload?.patch;
+  // The producer authors a patch DRAFT without a patchId (the daemon mints it
+  // via candidateStore.mint — D-05). The schema requires patchId, so stamp a
+  // placeholder before validation; mint() overwrites it with the real id.
+  const draftWithId = { ...(rawPatch as object), patchId: `pt_${randomUUID()}` };
   let patch: Patch;
   try {
-    patch = validatePatchOrThrow(rawPatch);
+    patch = validatePatchOrThrow(draftWithId);
   } catch {
     safeSendErr(deps.transport, freshness, "invalid_patch");
     return;

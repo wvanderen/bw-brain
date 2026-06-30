@@ -147,6 +147,10 @@ public final class PullHandlers {
                 case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip));
                 case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id));
                 case "get.project_summary" -> outbox.offer(handleProjectSummary(id, observers));
+                // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
+                // (D-01 / Pitfall 7). The handler NEVER branches on the
+                // semantic-intent metadata field — it stays three-case forever.
+                case "apply.patch" -> outbox.offer(handleApplyPatch(id, req, cursorClip));
                 default -> outbox.offer(LineJson.responseError(id, "unknown_request"));
             }
         } catch (final Exception e) {
@@ -197,5 +201,121 @@ public final class PullHandlers {
             tracks.add(new TrackView(slot, names.getOrDefault(slot, "")));
         }
         return buildProjectSummaryResponse(id, tracks);
+    }
+
+    // ------------------------------------------------------------------------
+    // Phase 3 Plan 03-02 Task 3 — apply.patch primitive dispatch (D-01 / Pitfall 7)
+    // ------------------------------------------------------------------------
+
+    /**
+     * Functional interface for the NoteStep write surface. The pure {@link #applyOps}
+     * helper calls this for every primitive op; the production {@link #handleApplyPatch}
+     * wires it to {@code cursorClip.getStep(x,y,0).setVelocity().setDuration()}, and
+     * the JUnit test injects a recording implementation (no Mockito in this project).
+     */
+    interface NoteStepWriter {
+        /**
+         * Write velocity + duration at grid column {@code x}, pitch row {@code y}.
+         * Throwing (e.g. {@link IndexOutOfBoundsException}) signals a grid-out-of-range
+         * cell — the per-op try/catch in {@link #applyOps} increments {@code failed}.
+         */
+        void write(int x, int y, double velocity, double duration);
+    }
+
+    /**
+     * Pure primitive-op dispatch — the 3-CASE-FOREVER spine (D-01 / Pitfall 7).
+     *
+     * <p>Switches ONLY on the primitive op discriminant ({@code add_note} /
+     * {@code remove_note} / {@code update_note_field}); NEVER reads the semantic-
+     * intent metadata field (Pitfall 7 — the bridge handler is three-case forever;
+     * new transforms emit the SAME primitives). Each op maps to a single
+     * {@link NoteStepWriter#write} call via the beatsPerColumn -> grid column
+     * mapping; an out-of-range cell (writer throws) increments {@code failed}
+     * without crashing the handler.</p>
+     *
+     * <p>Package-private so {@link PullHandlersApplyPatchTest} can exercise the
+     * dispatch with a recording writer (no live Bitwig).</p>
+     *
+     * @param id             the echoed request id.
+     * @param ops            the operations JSON array ({payload.operations}).
+     * @param beatsPerColumn loopBeats / GRID_W (start-beats -> grid column).
+     * @param writer         the NoteStep write surface (production = cursorClip; test = recording).
+     * @return the JSON-Lines response ({applied, failed} payload).
+     */
+    static String applyOps(final String id, final JsonNode ops, final double beatsPerColumn,
+                           final NoteStepWriter writer) {
+        if (ops == null || !ops.isArray() || ops.isEmpty()) {
+            return LineJson.responseError(id, "invalid_patch");
+        }
+        int applied = 0;
+        int failed = 0;
+        for (final JsonNode opNode : ops) {
+            final String opType = opNode.path("op").asText("");
+            try {
+                switch (opType) {
+                    case "add_note" -> {
+                        final JsonNode n = opNode.path("note");
+                        final int x = (int) Math.round(n.path("start").asDouble() / beatsPerColumn);
+                        final int y = n.path("pitch").asInt();
+                        writer.write(x, y, n.path("velocity").asDouble(), n.path("length").asDouble());
+                        applied++;
+                    }
+                    case "remove_note" -> {
+                        final JsonNode n = opNode.path("note");
+                        final int x = (int) Math.round(n.path("start").asDouble() / beatsPerColumn);
+                        final int y = n.path("pitch").asInt();
+                        // velocity 0 = no note (mirrors the read heuristic at line 173).
+                        writer.write(x, y, 0.0, 0.0);
+                        applied++;
+                    }
+                    case "update_note_field" -> {
+                        // Identity-stable (Pitfall 2): before.key === after.key;
+                        // pitch+start unchanged, only velocity/length mutate.
+                        // Dispatch on the `after` note (the new content).
+                        final JsonNode after = opNode.path("after");
+                        final int x = (int) Math.round(after.path("start").asDouble() / beatsPerColumn);
+                        final int y = after.path("pitch").asInt();
+                        writer.write(x, y, after.path("velocity").asDouble(), after.path("length").asDouble());
+                        applied++;
+                    }
+                    default -> failed++; // unknown op — daemon pre-validates; defensive
+                }
+            } catch (final Exception e) {
+                failed++; // grid out of range, etc. — do not crash the handler
+            }
+        }
+        return LineJson.response(id, failed == 0, Map.of("applied", applied, "failed", failed));
+    }
+
+    /**
+     * Bridge-facing apply.patch handler: read the loop length, compute
+     * beatsPerColumn, and delegate to {@link #applyOps} with a writer backed by
+     * {@code cursorClip.getStep(x,y,0)} NoteStep setters (capabilities §2 VERIFIED:
+     * NoteStep exposes setVelocity / setDuration / etc.).
+     *
+     * <p>Falls back to 1.0 beat/column when the loop length is 0/unknown
+     * (BridgeExtension.java:64 default is 16x128 launcher clip).</p>
+     */
+    private static String handleApplyPatch(final String id, final JsonNode req,
+                                            final PinnableCursorClip cursorClip) {
+        final JsonNode ops = req.path("payload").path("operations");
+        final double loopBeats;
+        try {
+            loopBeats = cursorClip.getLoopLength().get();
+        } catch (final Exception e) {
+            // Loop length unavailable — fall back to 1 beat/column.
+            return applyOps(id, ops, 1.0, cursorClipWriter(cursorClip));
+        }
+        final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;
+        return applyOps(id, ops, beatsPerColumn, cursorClipWriter(cursorClip));
+    }
+
+    /** Build a NoteStepWriter backed by the live cursor clip's NoteStep setters. */
+    private static NoteStepWriter cursorClipWriter(final PinnableCursorClip cursorClip) {
+        return (x, y, velocity, duration) -> {
+            final NoteStep step = cursorClip.getStep(x, y, 0);
+            step.setVelocity(velocity);
+            step.setDuration(duration);
+        };
     }
 }
