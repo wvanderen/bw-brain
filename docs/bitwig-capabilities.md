@@ -81,6 +81,16 @@ structural-only; the `undoLabel` field in the frozen `edit.schema.json` is
 (coalescing window, per-note vs per-batch undo step count) still need the live
 multi-step probe (add N notes → undo once → count survivors); pending in-app run.
 
+> **M1 manual gate (Plan 03-05 Task 2, NON-BLOCKING):** the live coalescing
+> probe runs here — on a throwaway launcher clip: `bw-edit apply` 1 note →
+> `bw-edit revert` (daemon-authoritative, expected 1 step); separately add 5
+> notes in a tight loop natively → `Application.undo()` once → count survivors.
+> **Record the observed native step-count below when run** (refines the
+> user-facing revert caveat only; the daemon-authoritative journal is the spine
+> regardless, D-03):
+>
+> - _Observed native undo step-count (M1):_ **PENDING — record after the live probe.**
+
 **Mitigation:** **CONFIRMED design path** — because there is no native labelled
 undo and the coalescing behavior is not contractual, the daemon-authoritative
 revert model (`patch-history.jsonl` + inverse operations, EDIT-05) is the
@@ -125,6 +135,17 @@ arranger clip; then probe arbitrary-beat positioning vs the configured grid.
 primitive + its full field set. The behavioral round-trip (values persist?
 launcher vs arranger? grid-locked vs free-beat?) needs the live probe with a
 selected clip — pending in-app run. Does not block Phase 2 transport.
+
+> **M4 manual gate (Plan 03-05 Task 2, BLOCKING — ARCHITECTURE-IMPACTING if
+> grid-locked):** apply a patch with a note at `start=0.237` beats (off-grid)
+> via `bw-edit apply` → inspect in Bitwig → did it land at 0.237 or snap to the
+> nearest grid column? **Record the finding + mitigation below when run.** If
+> grid-locked, flag to the planner — the bridge write path (size
+> `createLauncherCursorClip` gridWidth to shortest note, OR quantize patch-op
+> `start` to the grid) changes here:
+>
+> - _Observed NoteStep.start positioning (M4):_ **PENDING — record after the live probe (grid-locked vs free-beat).**
+> - _Mitigation if grid-locked (M4):_ **PENDING.**
 
 **Mitigation:** DRAFT (pending observation) — if arranger-clip editing turns
 out to be unsupported (likely per ROADMAP Phase 4), Phase 3 patch operations
