@@ -21,10 +21,24 @@ import genericProfile from "./generic.json" with { type: "json" };
 import technoProfile from "./techno.json" with { type: "json" };
 import type { Profile } from "../gen/profile.js";
 
-/** The set of profiles shipped inside the daemon package (D-14). */
+// Re-export the gen Profile type so callers import it from the loader (single
+// public surface for profile data + the loader).
+export type { Profile };
+
+/**
+ * The set of profiles shipped inside the daemon package (D-14).
+ *
+ * Raw JSON profiles may be PARTIAL: a profile that `extends` a parent omits
+ * inherited fields (techno omits voiceLeadingFix/humanize — inherited from
+ * generic). The loader deep-merges over the parent, so a RESOLVED profile is
+ * always complete. `generic` is authored complete; `techno` is partial and
+ * only ever returned after merging over generic. The cast-through-unknown on
+ * techno documents this (the data invariant — generic complete, techno
+ * extends generic — guarantees the merged result satisfies `Profile`).
+ */
 const PROFILES: Record<string, Profile> = {
   generic: genericProfile as Profile,
-  techno: technoProfile as Profile,
+  techno: technoProfile as unknown as Profile,
 };
 
 /**
@@ -101,7 +115,14 @@ export function loadProfile(named?: string): Profile {
  * Pure.
  */
 function mergeProfiles(parent: Profile, child: Profile): Profile {
-  return {
+  // Object-valued fields merge per-key (child wins); arrays/scalars replaced
+  // wholesale by the child when present, else inherited from the parent. The
+  // spreads over optional fields (velocityHumanize/timingHumanize/roleSalience)
+  // produce a structurally-complete object at runtime whenever parent OR child
+  // supplies the field; the `as Profile` cast documents that the data invariant
+  // (generic authored complete, techno extends generic) guarantees the result
+  // satisfies `Profile`. Pure.
+  const merged = {
     ...parent,
     ...child,
     thresholds: { ...parent.thresholds, ...child.thresholds },
@@ -112,4 +133,5 @@ function mergeProfiles(parent: Profile, child: Profile): Profile {
     preferredScales: child.preferredScales ?? parent.preferredScales,
     strongBeatGrid: child.strongBeatGrid ?? parent.strongBeatGrid,
   };
+  return merged as Profile;
 }
