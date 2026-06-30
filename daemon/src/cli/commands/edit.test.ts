@@ -40,6 +40,11 @@ let tmpDir = "";
  * is testable without the full daemon boot. Per query: echo back enough to
  * prove the CLI forwarded the right payload, + return canned envelopes that
  * exercise the flag-gating error surface.
+ *
+ * The mock has NO candidate store, so risk/belowBar are inferred from the
+ * patchId naming convention (the real daemon looks these up from the candidate
+ * store; the CLI forwards only the patchId). This keeps the CLI contract test
+ * self-contained — the daemon-side gating LOGIC is exercised by the smoke test.
  */
 interface InboundQuery {
   op?: string;
@@ -115,13 +120,16 @@ function dispatch(q: InboundQuery): CliResult {
     if (patchId === "pt_unknown000000000000000000000") {
       return errEnvelope("candidate_not_found");
     }
+    // The mock infers risk/belowBar from the patchId naming convention (no
+    // candidate store); the real daemon looks these up from the candidate.
+    const isMedRisk = patchId.startsWith("pt_medrisk");
+    const isBelowBar = patchId.startsWith("pt_belowbar");
     // belowBar requires --allow-below-bar AND --confirm (D-09 stacking).
-    if (p.patch?.belowBar && !(p.allowBelowBar && p.confirm)) {
+    if (isBelowBar && !(p.allowBelowBar && p.confirm)) {
       return errEnvelope("below_bar_requires_confirm");
     }
     // medium/high risk requires --confirm (D-04); --force bypasses.
-    const risk = p.patch?.risk ?? "low";
-    if ((risk === "medium" || risk === "high") && !p.confirm && !p.force) {
+    if (isMedRisk && !p.confirm && !p.force) {
       return errEnvelope("confirmation_required");
     }
     return applyOk(patchId);

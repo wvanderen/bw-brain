@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 03
 current_phase_name: reversible-midi-patching-m2
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-06-30T14:27:10.884Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-06-30T16:28:58.170Z"
 last_activity: 2026-06-29
 last_activity_desc: Phase 03 execution started
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 16
-  completed_plans: 12
+  completed_plans: 13
   percent: 40
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 03 (reversible-midi-patching-m2) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-06-29 — Phase 03 execution started
 
@@ -62,6 +62,7 @@ Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 
 
 *Updated after each plan completion*
 | Phase 03 P01 | 95 | 2 tasks | 29 files |
+| Phase 03 P02 | 113 min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 02 UAT]: A1 NEGATED (2026-06-29) — VST/AU parameters do NOT surface via CursorRemoteControlsPage; `CursorDevice` exposes no `getRemoteControls()` in extension-api:21 (verified live with Surge XT + javap). `bw-device inspect` returns empty pages by design. The `cursorDevice.getParameter(int)` direct-enumeration fallback is documented in docs/bitwig-capabilities.md §4 + deferred to Phase 5 (device workflows). All 3 human_verification checkpoints PASSED live (Tests 2/3/4); 5/5 bridge event types now verified end-to-end over loopback TCP (clip.name_changed captured in the /analyze session).
 - [Phase ?]: Phase 03-01: Pitfall 2 (before.key===after.key for update_note_field) enforced at TS+runtime+arb layer, NOT JSON Schema — pure 2020-12 cannot express cross-property equality and the $data extension would break the Java bridge's Jackson parser. Runtime guard pinned by INV-1/INV-2 fast-check.
 - [Phase ?]: Phase 03-01: note identity = n:${pitch}:${startQuantized} (1/64-beat grid); pitch change = remove_note+add_note, never update_note_field (Pitfall 2 — a different pitch IS a different identity).
+- [Phase 03]: Phase 03-02: D-03 inverseOps-at-apply-time (INV-14) — the patch-history.jsonl journal freezes the inverse when the daemon holds authoritative before-state; revert replays the frozen inverse (never re-derives from drifted state). SC#2 mechanical guarantee. — Phase 03-02: D-03 inverseOps-at-apply-time (INV-14) — the patch-history.jsonl journal freezes the inverse when the daemon holds authoritative before-state; revert replays the frozen inverse (never re-derives from drifted state). SC#2 mechanical guarantee.
+- [Phase 03]: Phase 03-02: bw-edit preview/apply/revert live; candidate-store (D-05 ephemeral LRU 64) + patch-history.jsonl (D-03) + bridge handleApplyPatch (3-case forever, D-01/Pitfall 7) shipped. EDIT-02/04/05/06 wire contract proven by daemon<->fake-bridge smoke (no live Bitwig). — Phase 03-02: bw-edit preview/apply/revert live; candidate-store (D-05 ephemeral LRU 64) + patch-history.jsonl (D-03) + bridge handleApplyPatch (3-case forever, D-01/Pitfall 7) shipped. EDIT-02/04/05/06 wire contract proven by daemon<->fake-bridge smoke (no live Bitwig).
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-30T14:26:49.285Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-reversible-midi-patching-m2/03-CONTEXT.md
+Last session: 2026-06-30T16:28:58.164Z
+Stopped at: Completed 03-02-PLAN.md
+Resume file: None

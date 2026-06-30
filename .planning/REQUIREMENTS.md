@@ -35,7 +35,7 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 - [x] **EDIT-01**: Patch object schema (`scope → operations → rationale → reversibility → risk`) is defined at `schemas/patch.schema.json` and validated at every boundary (daemon entry/exit, CLI emit, bridge apply)
 - [x] **EDIT-02**: `bw-edit preview` renders a diff of what a patch would change without applying it
 - [x] **EDIT-03**: `bw-diff` surfaces notes added/removed/changed, automation targets touched, and scope (track/clip/region) between two states
-- [ ] **EDIT-04**: `bw-edit apply` applies a patch only after preview unless `--force` is used; every applied patch is recorded with a daemon-authoritative undo entry
+- [x] **EDIT-04**: `bw-edit apply` applies a patch only after preview unless `--force` is used; every applied patch is recorded with a daemon-authoritative undo entry
 - [x] **EDIT-05**: Undo is daemon-authoritative: `patch-history.jsonl` + `bw-edit revert` replay inverse operations (Bitwig native undo is caveated, not relied upon)
 - [x] **EDIT-06**: Risk class gating classifies edits low/medium/high; only low-risk edits are one-step, medium/high require explicit confirmation
 
