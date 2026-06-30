@@ -15,6 +15,10 @@
 
 import type { ProjectState } from "../gen/project-state.js";
 import type { ProjectIntent } from "../gen/intent.js";
+// M2 (Plan 03-03): motif-signature is the FIRST analyzer addition (MIDI-01).
+// motif-signature.ts imports TYPE-ONLY from this module, so runtime import
+// direction is one-way (registry -> motif-signature) — no cycle.
+import { MotifSignatureAnalyzer } from "../transforms/motif-signature.js";
 
 /** The Plan-01-generated raw-state contract (re-aliased from 02-03a's reconcile.ts). */
 export type RawState = ProjectState;
@@ -152,7 +156,15 @@ export const IntentAnalyzer: Analyzer = {
 
 /**
  * M1's complete analyzer set: EXACTLY ONE analyzer (IntentAnalyzer). D-08
- * defense — sections/trackRoles/motifs/energyCurve/automationSalience all
- * stay empty until their phase (P3/P4/P5).
+ * defense — sections/trackRoles/energyCurve/automationSalience all stay empty
+ * until their phase (P4/P5); motifs lands in M2 below.
  */
 export const M1_ANALYZERS: readonly Analyzer[] = [IntentAnalyzer];
+
+/**
+ * M2's complete analyzer set: EXACTLY TWO analyzers (IntentAnalyzer +
+ * MotifSignatureAnalyzer). D-08 defense — sections/trackRoles/energyCurve/
+ * automationSalience still stay empty until their phase (P4/P5). The motif
+ * analyzer (MIDI-01) is the FIRST addition to the framework.
+ */
+export const M2_ANALYZERS: readonly Analyzer[] = [...M1_ANALYZERS, MotifSignatureAnalyzer];
