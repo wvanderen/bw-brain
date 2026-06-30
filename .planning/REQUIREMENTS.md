@@ -41,7 +41,7 @@ Requirements for initial release across all 4 milestones (M1 read-only context â
 
 ### MIDI Transforms (M2)
 
-- [ ] **MIDI-01**: Motif signature (pitch-class + rhythm quantization) and preserve-motif-identity mode are implemented; every creative transform runs in preserve-motif mode by default
+- [x] **MIDI-01**: Motif signature (pitch-class + rhythm quantization) and preserve-motif-identity mode are implemented; every creative transform runs in preserve-motif mode by default
 - [ ] **MIDI-02**: `bw-midi vary` produces motif-preserving A/B/C variant patch candidates
 - [ ] **MIDI-03**: `bw-midi counterline` generates a companion voice respecting harmonic center and motif identity
 - [ ] **MIDI-04**: `bw-midi voice-leading-fix` produces a low-risk cleanup patch (parallel fifths, leading tones, spacing)
@@ -70,8 +70,8 @@ Requirements for initial release across all 4 milestones (M1 read-only context â
 - [ ] **UX-04**: Pi `/device` skill + device pane render chain summary + macro opportunities (M4)
 - [x] **UX-05**: State pane renders selected track/clip/device + section label (M1)
 - [x] **UX-06**: Every suggestion/transform output includes an `assumptions[]` field stating its assumptions
-- [ ] **ARCH-01**: Genre-pluggable profile interface is designed in M2; electronic/techno ships as the first profile, expanded in M4
-- [ ] **ARCH-02**: Generic reasoning core runs without a profile (defaults to generic electronic); profiles enhance, never gate, the core
+- [x] **ARCH-01**: Genre-pluggable profile interface is designed in M2; electronic/techno ships as the first profile, expanded in M4
+- [x] **ARCH-02**: Generic reasoning core runs without a profile (defaults to generic electronic); profiles enhance, never gate, the core
 
 ## v2 Requirements
 

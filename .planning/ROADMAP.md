@@ -103,7 +103,7 @@ Plans:
   4. `bw-midi vary` produces A/B/C motif-preserving variants; counterline, voice-leading-fix, and humanization all default to preserve-motif-identity mode, and below-threshold transforms refuse rather than emit "casino MIDI."
   5. Pi `/vary` + `/apply` drive the edit pipeline with a diff pane rendering patch diffs; the genre-profile interface (ARCH-01) is in place with electronic/techno as the first profile, and the generic reasoning core runs without a profile (profiles enhance, never gate).
 
-**Plans**: 2/5 plans executed
+**Plans**: 3/5 plans executed
 **UI hint**: yes
 **Research needed**: Bitwig undo-grouping behavior (does the host auto-coalesce consecutive edits on a ~1s window?); motif signature algorithm (chroma/rhythm features adapted from librosa concepts to MIDI).
 Plans:
@@ -115,7 +115,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 — pure primitives lock before I/O + musical knowledge; zero file overlap between 03-02 and 03-03)*
 
 - [x] 03-02-PLAN.md — Trust-spine I/O end-to-end: candidate-store + patch-history + bw-edit preview/apply/revert + daemon edit.* dispatch + bridge handleApplyPatch + smoke (EDIT-02/04/05/06; INV-14) (autonomous, Wave 2)
-- [ ] 03-03-PLAN.md — Musical knowledge: motif-signature (MIDI-01) + harmonic-detect (D-12) + genre profiles (ARCH-01/02) (autonomous, Wave 2)
+- [x] 03-03-PLAN.md — Musical knowledge: motif-signature (MIDI-01) + harmonic-detect (D-12) + genre profiles (ARCH-01/02) (autonomous, Wave 2)
 
 **Wave 3** *(blocked on Waves 1+2 — transforms consume primitives + musical knowledge; dispatch consumes Plan 02's query-server)*
 
@@ -171,6 +171,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
-| 3. Reversible MIDI Patching (M2) | 2/5 | In Progress|  |
+| 3. Reversible MIDI Patching (M2) | 3/5 | In Progress|  |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
