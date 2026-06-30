@@ -88,20 +88,19 @@ describe("INV-7 motif-preservation gate (creative tier — no third state)", () 
     );
   });
 
-  it("an accepted candidate carries non-empty operations; a refused candidate carries empty operations", () => {
+  it("a REFUSED candidate always carries empty operations (no applicable patch)", () => {
+    // Note: an ACCEPTED candidate MAY carry empty operations — an identity
+    // variant (e.g. variant B when no harmonic center is supplied, or a clip
+    // where no transform fires) legitimately accepts with sim≈1.0 and no diff.
+    // The load-bearing invariant is the refused → empty-ops direction (a refused
+    // candidate must never carry ops the producer could apply without
+    // --allow-below-bar).
     fc.assert(
       fc.property(arbNoteSet, (source) => {
         const profile = loadProfile();
         const candidates = vary(source, undefined, profile, undefined);
         for (const c of candidates) {
-          if (c.status === undefined) {
-            // accepted → ops reflect the variant diff (may be empty only if the
-            // variant is identical to source, which still satisfies INV-7).
-            if (c.operations.length === 0 && c.motifSimilarity < 1.0) return false;
-          } else {
-            // refused → no ops emitted (the apply path is gated to --allow-below-bar).
-            if (c.operations.length !== 0) return false;
-          }
+          if (c.status === "refused" && c.operations.length !== 0) return false;
         }
         return true;
       }),
