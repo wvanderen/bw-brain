@@ -17,9 +17,22 @@ export interface CliQuery {
    */
   type: "query";
   /**
-   * The 5 live M1 ops + diff (promoted per D-05). Stubs (bw-arrange/bw-automation/bw-edit) do NOT get ops here — they emit not_implemented results without ever querying the daemon.
+   * The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize. Stubs (bw-arrange/bw-automation) do NOT get ops here — they emit not_implemented results without ever querying the daemon.
    */
-  op: "focus.export" | "project.summary" | "project.region" | "midi.inspect" | "device.inspect" | "diff";
+  op:
+    | "focus.export"
+    | "project.summary"
+    | "project.region"
+    | "midi.inspect"
+    | "device.inspect"
+    | "diff"
+    | "edit.preview"
+    | "edit.apply"
+    | "edit.revert"
+    | "midi.vary"
+    | "midi.counterline"
+    | "midi.voice_leading_fix"
+    | "midi.humanize";
   /**
    * Op-specific arguments. Open at the schema level; op-specific shapes (e.g. project.region {start,end}) are enforced by the daemon handler. Tightened per-op in Phase 3 if patterns stabilize.
    */

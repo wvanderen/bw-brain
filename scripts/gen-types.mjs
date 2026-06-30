@@ -58,10 +58,13 @@ const BANNER = `/**
  * Recursively dereference every $ref by $id lookup. A node that is just
  * { "$ref": "<uri>" } is replaced by the target schema (recursively dereffed);
  * sibling keys (rare in our schemas) are merged onto the inlined target.
+ *
+ * `currentDoc` is the top-level schema currently being dereferenced — used to
+ * resolve bare-fragment refs (`#/$defs/X`) which are local to the same document.
  */
-function derefNode(node, byId, seen) {
+function derefNode(node, byId, seen, currentDoc) {
   if (Array.isArray(node)) {
-    return node.map((n) => derefNode(n, byId, seen));
+    return node.map((n) => derefNode(n, byId, seen, currentDoc));
   }
   if (node === null || typeof node !== "object") {
     return node;
@@ -70,38 +73,88 @@ function derefNode(node, byId, seen) {
     // Resolve the $ref against the JSON Schema base-URI rules: the ref is
     // interpreted relative to the nearest enclosing $id. We pass the absolute
     // resolved URI in `seen` to detect cycles.
-    const abs = node.$ref.includes("://")
-      ? node.$ref
-      : null; // already absolute if it has a scheme; our refs are bare filenames resolved per-file below
-    // Our schemas use bare-filename refs (e.g. "event.schema.json") which
-    // resolve against the referencing file's $id (https://bw-brain.local/.../<name>).
-    // Build the absolute $id the ref resolves to.
-    const targetId = abs ?? node.$ref;
-    // Try direct lookup (works for absolute $id refs), else try resolving as a
-    // filename suffix against every known $id (handles "event.schema.json" →
-    // "https://bw-brain.local/schemas/protocol/event.schema.json").
-    let target = byId.get(targetId);
-    if (!target) {
-      for (const id of byId.keys()) {
-        if (id.endsWith("/" + node.$ref) || id.endsWith(node.$ref)) {
-          target = byId.get(id);
-          break;
+    //
+    // Four $ref shapes are supported:
+    //  1. Bare filename (e.g. "event.schema.json") — resolved against the
+    //     referencing file's $id by suffix-match below.
+    //  2. Absolute $id URI (e.g. "https://bw-brain.local/schemas/intent.schema.json")
+    //     — direct byId lookup.
+    //  3. Absolute $id URI + JSON-pointer fragment (e.g.
+    //     "https://bw-brain.local/schemas/patch.schema.json#/$defs/PrimitiveOp") —
+    //     strip the fragment, look up the target schema by $id, then walk the
+    //     pointer into the target's $defs (or anywhere via slash-split). Phase 3
+    //     edit.schema.json uses shape #3 for the cross-file PrimitiveOp $ref.
+    //  4. Bare JSON-pointer fragment (e.g. "#/$defs/Note") — local to the
+    //     current document; resolved against `currentDoc`. Phase 3
+    //     patch.schema.json uses shape #4 for its internal $defs cross-refs.
+    const fragmentIdx = node.$ref.indexOf("#");
+    const baseRef = fragmentIdx >= 0 ? node.$ref.slice(0, fragmentIdx) : node.$ref;
+    const fragment = fragmentIdx >= 0 ? node.$ref.slice(fragmentIdx + 1) : "";
+    const abs = baseRef.includes("://") ? baseRef : null;
+    const targetId = abs ?? baseRef;
+    let target;
+    let resolvedId;
+    if (targetId === "" && currentDoc) {
+      // Shape #4: bare-fragment ref local to the current document.
+      target = currentDoc;
+      resolvedId = currentDoc.$id;
+    } else {
+      target = byId.get(targetId);
+      if (!target) {
+        for (const id of byId.keys()) {
+          if (id.endsWith("/" + baseRef) || id.endsWith(baseRef)) {
+            target = byId.get(id);
+            break;
+          }
         }
       }
+      if (!target) {
+        throw new Error(`Unresolved $ref: ${node.$ref}`);
+      }
+      resolvedId = target.$id;
     }
-    if (!target) {
-      throw new Error(`Unresolved $ref: ${node.$ref}`);
+    // If a JSON-pointer fragment is present, walk into the target. Fragment
+    // grammar: "/$defs/PrimitiveOp" → ["", "$defs", "PrimitiveOp"]. The leading
+    // empty string (from the slash before "defs") is skipped. URI-encoded
+    // segments are decoded (~1 → /, ~0 → ~) per RFC 6901.
+    if (fragment.startsWith("/")) {
+      const segments = fragment.split("/").slice(1).map((s) =>
+        s.replace(/~1/g, "/").replace(/~0/g, "~")
+      );
+      let walked = target;
+      for (const seg of segments) {
+        if (walked === null || typeof walked !== "object" || !(seg in walked)) {
+          throw new Error(`Unresolved $ref pointer: ${node.$ref} (missing "${seg}")`);
+        }
+        walked = walked[seg];
+      }
+      target = walked;
+      // Synthetic identity for cycle detection: parent document $id + fragment.
+      resolvedId = `${resolvedId}#${fragment}`;
     }
-    if (seen.has(target.$id)) {
+    if (seen.has(resolvedId)) {
       // Circular — leave a $ref pointer so json2ts can emit a circular-safe type.
-      return { $ref: target.$id };
+      return { $ref: resolvedId };
     }
     const nextSeen = new Set(seen);
-    nextSeen.add(target.$id);
+    nextSeen.add(resolvedId);
+    // Thread the current document for nested bare-fragment refs. The doc a
+    // nested ref resolves against is whichever top-level schema the target lives
+    // in: the current doc for bare-fragment refs (shape #4); the byId-looked-up
+    // doc for cross-file refs (shapes #2/#3). When a fragment walked us into a
+    // sub-node, the parent doc is still where the fragment rooted.
+    let nextDoc;
+    if (targetId === "") {
+      nextDoc = currentDoc;
+    } else {
+      // Cross-file (with or without fragment) — the new doc is the byId entry.
+      nextDoc = byId.get(targetId) ?? currentDoc;
+    }
     const dereffedTarget = derefNode(
       JSON.parse(JSON.stringify(target)),
       byId,
       nextSeen,
+      nextDoc,
     );
     // Drop $id/$schema from the inlined copy so json2ts treats it as anonymous
     // (the top-level schema's title names the exported type; nested schemas
@@ -112,7 +165,7 @@ function derefNode(node, byId, seen) {
   }
   const out = {};
   for (const [k, v] of Object.entries(node)) {
-    out[k] = derefNode(v, byId, seen);
+    out[k] = derefNode(v, byId, seen, currentDoc);
   }
   return out;
 }
@@ -169,6 +222,7 @@ async function main() {
       JSON.parse(JSON.stringify(schema)),
       byId,
       new Set([schema.$id]),
+      schema,
     );
     // Strip the $id from the top before compile (json2ts gets confused by $id
     // pointing at a non-existent host); keep $schema + title so the TS type is

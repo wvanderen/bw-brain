@@ -2,10 +2,12 @@
 //
 // MEM-02 / SC#5 architectural gate (RESEARCH.md lines 846, 1489;
 // 02-PATTERNS.md Assignment 11 lines 395-417). The boundary asserts the
-// daemon's durable-write API surface EXCLUDES ephemeral writes: the
-// cli-query/query.schema.json op enum has NO op that writes ephemeral data to
-// .bw-brain/. All M1 ops are read-only; the only durable-write path
-// (apply.patch) lands in M2 via a SEPARATE edit schema, NOT cli-query.
+// daemon's CLI→daemon query channel EXCLUDES ephemeral writes: every op in
+// cli-query/query.schema.json must be a known allowlisted query op. M1 ops are
+// read-only; Phase 3 adds daemon-mediated edit/MIDI ops (edit.preview/apply/
+// revert + midi.vary/counterline/voice_leading_fix/humanize). The durable-write
+// path for `edit.apply` is daemon-mediated via the D-03 spine — the CLI itself
+// never writes to `.bw-brain/`, so MEM-02 holds.
 //
 // Source: check-capabilities-doc.mjs lines 84-143 (structural-validator shape).
 
@@ -19,8 +21,9 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
     expect(errors).toEqual([]);
   });
 
-  it("the real schema's op enum is the expected 6 read-only ops", () => {
-    // Sanity: the enum we're gating is the one we think it is.
+  it("the real schema's op enum is the expected allowlisted set", () => {
+    // Sanity: the enum we're gating is the one we think it is. Phase 3 extends
+    // the M1 read-only 6 with the daemon-mediated edit + MIDI transform ops.
     const ops = querySchema.properties?.op?.enum;
     expect(ops).toEqual([
       "focus.export",
@@ -29,6 +32,13 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
       "midi.inspect",
       "device.inspect",
       "diff",
+      "edit.preview",
+      "edit.apply",
+      "edit.revert",
+      "midi.vary",
+      "midi.counterline",
+      "midi.voice_leading_fix",
+      "midi.humanize",
     ]);
   });
 

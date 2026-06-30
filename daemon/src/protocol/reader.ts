@@ -36,6 +36,12 @@ import requestSchema from "../../../schemas/protocol/request.schema.json" with {
 import responseSchema from "../../../schemas/protocol/response.schema.json" with { type: "json" };
 import editSchema from "../../../schemas/protocol/edit.schema.json" with { type: "json" };
 import handshakeSchema from "../../../schemas/protocol/handshake.schema.json" with { type: "json" };
+// Phase 3 (EDIT-01): edit.schema.json operations.items now $refs
+// patch.schema.json#/$defs/PrimitiveOp — register the patch contract so the
+// cross-file $ref resolves at compile time when the envelope's oneOf compiles
+// edit. Without this the reader fails at boot (Rule 3 fix — the schema
+// tightening introduced a new cross-file dependency).
+import patchSchema from "../../../schemas/patch.schema.json" with { type: "json" };
 import { LineBuffer } from "./line-buffer.js";
 import type { Transport } from "../transport/transport.js";
 
@@ -49,7 +55,9 @@ import type { Transport } from "../transport/transport.js";
 // as a static NodeNext import — see schemas.test.ts for the full rationale.
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 // Register the message-type schemas first so the envelope's oneOf `$ref`s
-// resolve by `$id`. Envelope registered last.
+// resolve by `$id`. Envelope registered last. Phase 3: patchSchema registered
+// FIRST so edit.schema.json's operations.items $ref to PrimitiveOp resolves.
+ajv.addSchema(patchSchema);
 ajv.addSchema(eventSchema);
 ajv.addSchema(requestSchema);
 ajv.addSchema(responseSchema);

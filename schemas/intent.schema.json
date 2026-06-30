@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/intent.schema.json",
   "title": "ProjectIntent",
   "description": "STATE-03 projectIntent contract. The user-authored intent state that keeps the assistant from ruining the song. Source: docs/seed.md §C 'Intent state' + CONTEXT.md D-09.",
-  "$comment": "Phase 2 freezes the intent shape (summary/constraints/targets). D-09: M1 is read-only + user-authored — the daemon does an atomic validated read of ~/.bw-brain/intent.json; NO inference (no defaults, no LLM-generated intent). summary is REQUIRED + minLength 1 (a blank intent file is structurally invalid). additionalProperties:false throughout (trust-spine — the schema is the gate). Editing UX (a future /intent command vs hand-edit) is the agent's discretion; M1 only needs to read it correctly.",
+  "$comment": "Phase 2 freezes the intent shape (summary/constraints/targets). D-09: M1 is read-only + user-authored — the daemon does an atomic validated read of ~/.bw-brain/intent.json; NO inference (no defaults, no LLM-generated intent). summary is REQUIRED + minLength 1 (a blank intent file is structurally invalid). additionalProperties:false throughout (trust-spine — the schema is the gate). Editing UX (a future /intent command vs hand-edit) is the agent's discretion; M1 only needs to read it correctly. Phase 3 (D-12/D-14) extends projectIntent.properties additively with OPTIONAL harmonicCenter + profile fields — existing intent.json without these still validates (backward-compat).",
   "type": "object",
   "required": ["version", "projectIntent"],
   "additionalProperties": false,
@@ -33,6 +33,21 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Goals the assistant should aim for, e.g. 'build tension toward the drop'."
+        },
+        "harmonicCenter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["key", "mode"],
+          "description": "D-12 authored-default harmonic center. When present, transforms use this key/mode directly (no inference). When absent, a transform MAY run one-shot inference with an assumptions[] disclosure + refuse-below-bar (INV-12).",
+          "properties": {
+            "key": { "enum": ["A", "Bb", "B", "C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab"] },
+            "mode": { "enum": ["major", "minor"] }
+          }
+        },
+        "profile": {
+          "type": "string",
+          "enum": ["generic", "techno"],
+          "description": "D-14 genre profile opt-in. Absent → generic core runs literally (ARCH-02). 'techno' opts into the electronic/techno profile shipped inside the daemon package."
         }
       }
     }

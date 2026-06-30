@@ -23,15 +23,18 @@
     "start": "tsx src/runtime/boot.ts",
     "dev": "tsx src/runtime/boot.ts",
     "test": "vitest run",
+    "test:property": "vitest run --grep property",
     "check:capabilities": "node ../scripts/check-capabilities-doc.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "commander": "15.0.0"
+    "commander": "15.0.0",
+    "tonal": "6.4.3"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "fast-check": "4.8.0",
     "json-schema-to-typescript": "15.0.4",
     "tsx": "4.22.4",
     "typescript": "^5.7",

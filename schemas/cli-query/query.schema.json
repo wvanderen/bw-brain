@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/cli-query/query.schema.json",
   "title": "CliQuery",
   "description": "D-07 daemon-local CLI query contract. The query half of the CLI↔daemon channel (separate from the bridge TCP protocol — Pitfall 3 defense). Source: CONTEXT.md D-07 + RESEARCH.md Pattern 3 'Query/response shape'.",
-  "$comment": "Phase 2 freezes the CLI-query op enum as the 5 live + diff ops (D-05): focus.export, project.summary, project.region, midi.inspect, device.inspect, diff. This is its OWN schema set at schemas/cli-query/ — NOT a constrained subset of the bridge protocol (Pitfall 3). The two contracts evolve independently: bridge-protocol changes (Phase 3+ tightening of get.* payload) cannot break CLI consumers. payload is additionalProperties:true (op-specific args like project.region {start,end}); tightened per-op in Phase 3 if needed. type is fixed to 'query' (the discriminator vs result.schema.json's 'result').",
+  "$comment": "Phase 2 freezes the CLI-query op enum as the 5 live + diff ops (D-05): focus.export, project.summary, project.region, midi.inspect, device.inspect, diff. This is its OWN schema set at schemas/cli-query/ — NOT a constrained subset of the bridge protocol (Pitfall 3). The two contracts evolve independently: bridge-protocol changes (Phase 3+ tightening of get.* payload) cannot break CLI consumers. payload is additionalProperties:true (op-specific args like project.region {start,end}); tightened per-op in Phase 3 if patterns stabilize. type is fixed to 'query' (the discriminator vs result.schema.json's 'result'). Phase 3 (EDIT-02/04/05, MIDI-02..05) extends the op enum additively with edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize — backward-compatible.",
   "type": "object",
   "required": ["version", "type", "op"],
   "additionalProperties": false,
@@ -20,8 +20,22 @@
     },
     "op": {
       "type": "string",
-      "enum": ["focus.export", "project.summary", "project.region", "midi.inspect", "device.inspect", "diff"],
-      "description": "The 5 live M1 ops + diff (promoted per D-05). Stubs (bw-arrange/bw-automation/bw-edit) do NOT get ops here — they emit not_implemented results without ever querying the daemon."
+      "enum": [
+        "focus.export",
+        "project.summary",
+        "project.region",
+        "midi.inspect",
+        "device.inspect",
+        "diff",
+        "edit.preview",
+        "edit.apply",
+        "edit.revert",
+        "midi.vary",
+        "midi.counterline",
+        "midi.voice_leading_fix",
+        "midi.humanize"
+      ],
+      "description": "The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize. Stubs (bw-arrange/bw-automation) do NOT get ops here — they emit not_implemented results without ever querying the daemon."
     },
     "payload": {
       "type": "object",

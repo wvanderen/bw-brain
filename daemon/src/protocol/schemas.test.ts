@@ -37,11 +37,19 @@ import projectStateSchema from "../../../schemas/project-state.schema.json" with
 import intentSchema from "../../../schemas/intent.schema.json" with { type: "json" };
 import cliQuerySchema from "../../../schemas/cli-query/query.schema.json" with { type: "json" };
 import cliResultSchema from "../../../schemas/cli-query/result.schema.json" with { type: "json" };
+// Phase 3 (Plan 03-01): the patch contract. edit.schema.json operations.items
+// now $refs patch.schema.json#/$defs/PrimitiveOp — registered here so the
+// cross-file $ref resolves at runtime.
+import patchSchema from "../../../schemas/patch.schema.json" with { type: "json" };
 import { OBSERVATIONAL_EVENT_TYPES } from "./reader.js";
 
 // Ajv2020 = JSON Schema Draft 2020-12 mode (AGENTS.md line 37: use 2020-12 not
 // draft-07). The default `new Ajv()` is draft-07 and would reject our `$schema`.
 const ajv = new Ajv2020({ allErrors: true, strict: false });
+// Phase 3: register the patch contract FIRST — edit.schema.json operations.items
+// $refs patch.schema.json#/$defs/PrimitiveOp, which Ajv must find at compile
+// time. The cross-file $ref resolves by $id when both schemas are in byId.
+ajv.addSchema(patchSchema);
 ajv.addSchema(eventSchema);
 ajv.addSchema(requestSchema);
 ajv.addSchema(responseSchema);
@@ -193,7 +201,15 @@ describe("edit.schema.json (apply.patch — trust-spine)", () => {
       id: "req_92",
       payload: {
         undoLabel: "bw-brain: subtle variation",
-        operations: [{ type: "midi_velocity_scale", target: "clip_19", amount: 0.12 }],
+        operations: [
+          // Phase 3 (EDIT-01) tightened operations.items to $ref the
+          // PrimitiveOp union. The legacy {type:"midi_velocity_scale",...}
+          // Phase-1 stub fixture is replaced with a valid primitive op.
+          {
+            op: "add_note",
+            note: { key: "n:60:0.0000", pitch: 60, start: 0, length: 0.5, velocity: 100 },
+          },
+        ],
       },
     });
     expect(ok, JSON.stringify(validateEdit.errors)).toBe(true);
@@ -205,7 +221,9 @@ describe("edit.schema.json (apply.patch — trust-spine)", () => {
       type: "apply.patch",
       id: "req_92",
       payload: {
-        operations: [{ type: "midi_velocity_scale", target: "clip_19", amount: 0.12 }],
+        operations: [
+          { op: "add_note", note: { key: "n:60:0.0000", pitch: 60, start: 0, length: 0.5, velocity: 100 } },
+        ],
       },
     });
     expect(ok).toBe(false);
@@ -227,6 +245,21 @@ describe("edit.schema.json (apply.patch — trust-spine)", () => {
       type: "apply.patch",
       id: "req_92",
       payload: { undoLabel: "", operations: [{}] },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("REJECTS apply.patch WITH a non-primitive operation (Phase 3 EDIT-01 tightening)", () => {
+    // The legacy {type:"midi_velocity_scale",...} shape is no longer valid —
+    // operations.items $ref's patch.schema.json#/$defs/PrimitiveOp.
+    const ok = validateEdit({
+      version: "1.0",
+      type: "apply.patch",
+      id: "req_92",
+      payload: {
+        undoLabel: "x",
+        operations: [{ type: "midi_velocity_scale", target: "clip_19", amount: 0.12 }],
+      },
     });
     expect(ok).toBe(false);
   });

@@ -28,5 +28,16 @@ export interface ProjectIntent {
      * Goals the assistant should aim for, e.g. 'build tension toward the drop'.
      */
     targets?: string[];
+    /**
+     * D-12 authored-default harmonic center. When present, transforms use this key/mode directly (no inference). When absent, a transform MAY run one-shot inference with an assumptions[] disclosure + refuse-below-bar (INV-12).
+     */
+    harmonicCenter?: {
+      key: "A" | "Bb" | "B" | "C" | "Db" | "D" | "Eb" | "E" | "F" | "F#" | "G" | "Ab";
+      mode: "major" | "minor";
+    };
+    /**
+     * D-14 genre profile opt-in. Absent → generic core runs literally (ARCH-02). 'techno' opts into the electronic/techno profile shipped inside the daemon package.
+     */
+    profile?: "generic" | "techno";
   };
 }

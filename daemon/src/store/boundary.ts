@@ -20,17 +20,36 @@
 import querySchema from "../../../schemas/cli-query/query.schema.json" with { type: "json" };
 
 /**
- * The allowed read-only cli-query op set in M1. Every op in
- * cli-query/query.schema.json's enum MUST be in this set. The only durable-
- * write path (apply.patch) lands in M2 via a SEPARATE edit schema, NOT here.
+ * The allowed cli-query op set. Every op in cli-query/query.schema.json's enum
+ * MUST be in this set. MEM-02 / SC#5 invariant: no op causes a DIRECT CLI-side
+ * write of ephemeral data to `.bw-brain/`. Phase 1/2 ops are read-only.
+ *
+ * Phase 3 (EDIT-02/04/05, MIDI-02..05) adds `edit.preview/apply/revert` and
+ * `midi.vary/counterline/voice_leading_fix/humanize`:
+ *   - `edit.apply` triggers a durable patch-history.jsonl append, BUT the write
+ *     is daemon-mediated through the D-03 daemon-authoritative spine (the
+ *     candidate store stays EPHEMERAL in-memory; the journal append happens
+ *     only after a successful bridge apply.patch round-trip). The CLI never
+ *     writes directly. MEM-02 holds.
+ *   - `edit.preview/revert` and the `midi.*` transform ops query/transform
+ *     state in the daemon; they cause no CLI-side durable write at all.
  */
-const ALLOWED_READ_ONLY_OPS: ReadonlySet<string> = new Set([
+const ALLOWED_QUERY_OPS: ReadonlySet<string> = new Set([
+  // Phase 1/2 — read-only context ops.
   "focus.export",
   "project.summary",
   "project.region",
   "midi.inspect",
   "device.inspect",
   "diff",
+  // Phase 3 — daemon-mediated edit + MIDI transform ops (see comment above).
+  "edit.preview",
+  "edit.apply",
+  "edit.revert",
+  "midi.vary",
+  "midi.counterline",
+  "midi.voice_leading_fix",
+  "midi.humanize",
 ]);
 
 /**
@@ -62,9 +81,9 @@ export function checkMemoryBoundary(schema: QuerySchemaShape): string[] {
   const errors: string[] = [];
   const ops: string[] = schema.properties?.op?.enum ?? [];
   for (const op of ops) {
-    if (!ALLOWED_READ_ONLY_OPS.has(op)) {
+    if (!ALLOWED_QUERY_OPS.has(op)) {
       errors.push(
-        `op "${op}" is not an allowed read-only cli-query op (MEM-02 / SC#5: no ephemeral-write op in the query channel)`,
+        `op "${op}" is not an allowed cli-query op (MEM-02 / SC#5: no ephemeral-write op in the query channel)`,
       );
     }
   }

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/profile.schema.json",
+  "title": "Profile",
+  "description": "ARCH-01 genre-profile contract. A declarative JSON config of constants + a small fixed set of OPTIONAL override hooks (designed, exercised only when a real genre-specific constraint emerges — D-13). Used by the daemon profile loader (Plan 03). Source: CONTEXT.md D-13/D-14 + RESEARCH.md §Code Examples 'profile JSON shape'.",
+  "$comment": "ARCH-01/02 contract. Source-of-truth decisions: D-13 (profile = data + optional hooks — electronic/techno v1 ships JSON-only so the hook contract is exercised only when a real need emerges), D-14 (generic default, techno opted-in — the daemon ships a STRICT generic core with hardcoded neutral defaults; electronic/techno is a SEPARATE profile the producer OPTS INTO via intent.json). Profile-absent → generic core runs LITERALLY (INV-13).",
+  "type": "object",
+  "required": ["name", "thresholds"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Profile identifier. 'generic' is the strict neutral default (D-14); 'techno' is the first opt-in profile."
+    },
+    "extends": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional parent profile name. The loader deep-merges over the parent (thresholds/curves/scales/roleSalience). 'techno' extends 'generic'."
+    },
+    "thresholds": {
+      "type": "object",
+      "required": ["vary", "counterline", "voiceLeadingFix", "humanize"],
+      "additionalProperties": false,
+      "description": "Motif-similarity thresholds per transform type. Creative transforms (vary/counterline) refuse below threshold (D-08); cleanup transforms (voiceLeadingFix/humanize) skip the motif gate (D-10 → 0.0).",
+      "properties": {
+        "vary": { "type": "number", "minimum": 0, "maximum": 1 },
+        "counterline": { "type": "number", "minimum": 0, "maximum": 1 },
+        "voiceLeadingFix": { "type": "number", "minimum": 0, "maximum": 1 },
+        "humanize": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "velocityHumanize": {
+      "type": "object",
+      "required": ["jitter", "curve"],
+      "additionalProperties": false,
+      "description": "MIDI-05 velocity humanize parameters. jitter = ±N velocity (gaussian); curve shapes the distribution.",
+      "properties": {
+        "jitter": { "type": "number", "minimum": 0 },
+        "curve": { "enum": ["gaussian", "uniform"] }
+      }
+    },
+    "timingHumanize": {
+      "type": "object",
+      "required": ["jitterBeats"],
+      "additionalProperties": false,
+      "description": "MIDI-05 timing humanize parameters. jitterBeats = ±N beats (gaussian).",
+      "properties": {
+        "jitterBeats": { "type": "number", "minimum": 0 }
+      }
+    },
+    "roleSalience": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+      "description": "Track role → motif-salience weight. 'kick', 'bass', 'lead', 'pad', 'hats', 'percussion', 'fx' are the conventional keys; the open map allows profile-specific extensions."
+    },
+    "preferredScales": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Scale/mode names preferred for the inferred-harmony fallback (D-12). tonal Scale.get() consumes these. Generic prefers [minor, dorian, phrygian]; techno prefers [minor, phrygian, locrian]."
+    },
+    "strongBeatGrid": {
+      "type": "array",
+      "items": { "type": "number" },
+      "description": "Beat positions within a 4/4 bar that count as 'strong' (counterline target, vary anchor). Generic: [0,1,2,3] (every beat); techno: [0,2] (4-on-the-floor)."
+    }
+  }
+}

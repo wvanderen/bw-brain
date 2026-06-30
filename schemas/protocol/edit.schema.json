@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/protocol/edit.schema.json",
   "title": "Edit",
   "description": "An edit request (apply.patch). This is the trust-spine: payload.undoLabel is MANDATORY and payload.operations MUST be a non-empty array (PROJECT.md / AGENTS.md line 17: 'undo labels mandatory'). Frozen from docs/seed.md §Edit request example + §data model patch operations.",
-  "$comment": "TRUST-SPINE ENFORCEMENT: payload.undoLabel is non-optional at the schema level — the bridge refuses any edit without it. The operation element discriminated union (midi_velocity_scale, insert_notes, ...) from seed.md §data model (scope/operations/rationale/reversibility/risk) is tightened in Phase 3 (EDIT-01). For the Phase 1 spike we freeze the envelope-level requirement (undoLabel + operations present), not the full operation catalog. D-01's deep-verify of undo behavior informs whether undoLabel is honored natively or only used for daemon-authoritative revert (recorded in bitwig-capabilities.md).",
+  "$comment": "TRUST-SPINE ENFORCEMENT: payload.undoLabel is non-optional at the schema level — the bridge refuses any edit without it. The operation element shape IS the primitive discriminated union (add_note/remove_note/update_note_field) $ref'd from patch.schema.json#/$defs/PrimitiveOp (D-01 hybrid catalog — primitives canonical). The bridge resolves the cross-file $ref by $id at runtime (all schemas registered in one Ajv instance). Phase 3 (EDIT-01) tightened operations.items from the Phase-1 placeholder {type:object} to the primitive union. undoLabel + non-empty operations stay MANDATORY. D-03 self-inverting primitives + bitwig-capabilities.md §1 (no labelled-undo API) together make the daemon-authoritative revert path the spine.",
   "type": "object",
   "required": ["version", "type", "id", "payload"],
   "additionalProperties": false,
@@ -34,9 +34,9 @@
         "operations": {
           "type": "array",
           "minItems": 1,
-          "description": "Non-empty array of patch operations. Element shapes (midi_velocity_scale, insert_notes, ...) from seed.md §data model; tightened in Phase 3 (EDIT-01). For the spike, freeze the envelope-level requirement (non-empty array), not the element union.",
+          "description": "Non-empty array of primitive patch operations (add_note/remove_note/update_note_field). Element shape tightened (Phase 3, EDIT-01) to the patch.schema.json#/$defs/PrimitiveOp union — the cross-file $ref is resolved by $id at runtime when both schemas are registered in one Ajv instance.",
           "items": {
-            "type": "object"
+            "$ref": "https://bw-brain.local/schemas/patch.schema.json#/$defs/PrimitiveOp"
           }
         }
       }
