@@ -1,0 +1,22 @@
+{
+  "name": "generic",
+  "thresholds": {
+    "vary": 0.85,
+    "counterline": 0.80,
+    "voiceLeadingFix": 0.0,
+    "humanize": 0.0
+  },
+  "velocityHumanize": { "jitter": 5, "curve": "gaussian" },
+  "timingHumanize": { "jitterBeats": 0.01 },
+  "roleSalience": {
+    "kick": 1.0,
+    "bass": 0.9,
+    "lead": 0.8,
+    "pad": 0.5,
+    "hats": 0.4,
+    "percussion": 0.4,
+    "fx": 0.3
+  },
+  "preferredScales": ["minor", "dorian", "phrygian"],
+  "strongBeatGrid": [0, 1, 2, 3]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "techno",
+  "extends": "generic",
+  "thresholds": { "vary": 0.88, "counterline": 0.82 },
+  "velocityHumanize": { "jitter": 3, "curve": "gaussian" },
+  "preferredScales": ["minor", "phrygian", "locrian"],
+  "strongBeatGrid": [0, 2],
+  "roleSalience": { "kick": 1.0, "bass": 0.95, "hats": 0.5 }
+}
