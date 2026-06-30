@@ -42,10 +42,10 @@ Requirements for initial release across all 4 milestones (M1 read-only context â
 ### MIDI Transforms (M2)
 
 - [x] **MIDI-01**: Motif signature (pitch-class + rhythm quantization) and preserve-motif-identity mode are implemented; every creative transform runs in preserve-motif mode by default
-- [ ] **MIDI-02**: `bw-midi vary` produces motif-preserving A/B/C variant patch candidates
-- [ ] **MIDI-03**: `bw-midi counterline` generates a companion voice respecting harmonic center and motif identity
-- [ ] **MIDI-04**: `bw-midi voice-leading-fix` produces a low-risk cleanup patch (parallel fifths, leading tones, spacing)
-- [ ] **MIDI-05**: Velocity/timing humanization produces a low-risk humanization patch
+- [x] **MIDI-02**: `bw-midi vary` produces motif-preserving A/B/C variant patch candidates
+- [x] **MIDI-03**: `bw-midi counterline` generates a companion voice respecting harmonic center and motif identity
+- [x] **MIDI-04**: `bw-midi voice-leading-fix` produces a low-risk cleanup patch (parallel fifths, leading tones, spacing)
+- [x] **MIDI-05**: Velocity/timing humanization produces a low-risk humanization patch
 
 ### Arrangement Intelligence (M3)
 
