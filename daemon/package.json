@@ -23,7 +23,7 @@
     "start": "tsx src/runtime/boot.ts",
     "dev": "tsx src/runtime/boot.ts",
     "test": "vitest run",
-    "test:property": "vitest run --grep property",
+    "test:property": "vitest run --testNamePattern property",
     "check:capabilities": "node ../scripts/check-capabilities-doc.mjs"
   },
   "dependencies": {

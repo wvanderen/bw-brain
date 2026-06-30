@@ -91,8 +91,12 @@ describe("inverse-ops — property (INV-3 double-revert identity, pure half)", (
 
 describe("inverse-ops — property (INV-1 round-trip reversibility)", () => {
   it("resolveOps(resolveOps(base, ops), inverseOps(ops)) set-equals base (numRuns: 500)", () => {
+    // ops are derived FROM base (via arbOpSeq's diffToOps), so the sequence is
+    // internally consistent (no remove/update of a note absent from base). The
+    // round-trip only holds for VALID sequences — two independent note sets
+    // would test a nonsensical property (ops from one base applied to another).
     fc.assert(
-      fc.property(arbNoteSet, arbOpSeq, (base, { ops }) => {
+      fc.property(arbOpSeq, ({ base, ops }) => {
         const after = resolveOps(base, ops);
         const reverted = resolveOps(after, inverseOps(ops));
         expect(notesEqualSet(reverted, base)).toBe(true);
@@ -134,8 +138,10 @@ describe("noteKey (identity scheme — D-01/D-03)", () => {
   });
 
   it("quantizes off-grid starts to the nearest 1/64 beat", () => {
-    // 1/64 = 0.015625. A start of 0.014 snaps to 0; 0.02 snaps to 0.015625.
-    expect(noteKey(60, 0.014)).toBe("n:60:0.0000");
+    // 1/64 = 0.015625. 0.007/0.015625 = 0.448 → rounds to 0; 0.014/0.015625 =
+    // 0.896 → rounds to 1 (= 0.015625); 0.02/0.015625 = 1.28 → rounds to 1.
+    expect(noteKey(60, 0.007)).toBe("n:60:0.0000");
+    expect(noteKey(60, 0.014)).toBe("n:60:0.0156");
     expect(noteKey(60, 0.02)).toBe("n:60:0.0156");
   });
 
