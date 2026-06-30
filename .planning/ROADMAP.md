@@ -103,14 +103,14 @@ Plans:
   4. `bw-midi vary` produces A/B/C motif-preserving variants; counterline, voice-leading-fix, and humanization all default to preserve-motif-identity mode, and below-threshold transforms refuse rather than emit "casino MIDI."
   5. Pi `/vary` + `/apply` drive the edit pipeline with a diff pane rendering patch diffs; the genre-profile interface (ARCH-01) is in place with electronic/techno as the first profile, and the generic reasoning core runs without a profile (profiles enhance, never gate).
 
-**Plans**: 0/5 plans executed
+**Plans**: 1/5 plans executed
 **UI hint**: yes
 **Research needed**: Bitwig undo-grouping behavior (does the host auto-coalesce consecutive edits on a ~1s window?); motif signature algorithm (chroma/rhythm features adapted from librosa concepts to MIDI).
 Plans:
 
 **Wave 1** *(foundation — trust-spine primitives lock before I/O consumers)*
 
-- [ ] 03-01-PLAN.md — Trust-spine schema + pure primitives (patch.schema.json + inverse-ops + patch-resolve + risk-classifier + fast-check harness; INV-1..5,9,10) (autonomous, Wave 1)
+- [x] 03-01-PLAN.md — Trust-spine schema + pure primitives (patch.schema.json + inverse-ops + patch-resolve + risk-classifier + fast-check harness; INV-1..5,9,10) (autonomous, Wave 1)
 
 **Wave 2** *(blocked on Wave 1 — pure primitives lock before I/O + musical knowledge; zero file overlap between 03-02 and 03-03)*
 
@@ -171,6 +171,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
-| 3. Reversible MIDI Patching (M2) | 0/5 | Not started | - |
+| 3. Reversible MIDI Patching (M2) | 1/5 | In Progress|  |
 | 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

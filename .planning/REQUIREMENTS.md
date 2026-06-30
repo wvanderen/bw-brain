@@ -9,35 +9,35 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 
 ### Foundation — Bridge & Context (M1)
 
-- [ ] **BRIDGE-01**: Java `.bwextension` runs inside Bitwig and mirrors live selection (track/clip/device/region) and transport state to an external process via newline-delimited JSON over localhost
-- [ ] **BRIDGE-02**: Bridge mirrors tracks, clips, launcher-clip notes, device chains (including loaded VST/AU plugins), and exposed parameters via the Bitwig observer API
-- [ ] **BRIDGE-03**: Bridge emits change events (`selection.changed`, etc.) and applies edit primitives (note add/remove, parameter set) labelled with the extension name
+- [x] **BRIDGE-01**: Java `.bwextension` runs inside Bitwig and mirrors live selection (track/clip/device/region) and transport state to an external process via newline-delimited JSON over localhost
+- [x] **BRIDGE-02**: Bridge mirrors tracks, clips, launcher-clip notes, device chains (including loaded VST/AU plugins), and exposed parameters via the Bitwig observer API
+- [x] **BRIDGE-03**: Bridge emits change events (`selection.changed`, etc.) and applies edit primitives (note add/remove, parameter set) labelled with the extension name
 - [x] **PROBE-01**: Bitwig capability probe produces `docs/bitwig-capabilities.md` documenting the verified API surface (note editing scope, automation write, bank paging, observer granularity, undo behavior) before bridge design locks
 - [x] **PROBE-02**: IPC spike confirms Bitwig JVM localhost TCP (or stdio relay) access and freezes the JSON-Lines protocol contract both halves build against
 
 ### Foundation — State Model & CLI (M1)
 
 - [x] **STATE-01**: Daemon ingests bridge snapshots and normalizes them into a raw project-state model (project, transport, selection, tracks, clips, devices, automation) validated against `schemas/project-state.schema.json`
-- [ ] **STATE-02**: Daemon derives composition state (sections, trackRoles, motifs, energyCurve, automationSalience) from raw state, each with confidence scores
-- [ ] **STATE-03**: Daemon maintains an intent-state model (`projectIntent`: summary, constraints, targets) that constrains transforms and suggestions
+- [x] **STATE-02**: Daemon derives composition state (sections, trackRoles, motifs, energyCurve, automationSalience) from raw state, each with confidence scores
+- [x] **STATE-03**: Daemon maintains an intent-state model (`projectIntent`: summary, constraints, targets) that constrains transforms and suggestions
 - [x] **STATE-04**: Daemon synthesizes stable IDs for observed Bitwig objects (Bitwig exposes none) via fingerprint mapping, with reconnect/reconcile-on-connect semantics
 - [x] **CLI-01**: Eight CLI commands (`bw-focus`, `bw-project`, `bw-device`, `bw-midi`, `bw-arrange`, `bw-automation`, `bw-edit`, `bw-diff`) emit compact JSON, fail clearly, and suppress prose unless `--explain` is set
-- [ ] **CLI-02**: `bw-focus export`, `bw-project summary`, `bw-project region` return selected/project/region context as JSON
-- [ ] **CLI-03**: `bw-midi inspect` and `bw-device inspect` return notes/velocity/timing and chain/parameters (including loaded VST/AU plugins) of the selected clip/device as JSON
+- [x] **CLI-02**: `bw-focus export`, `bw-project summary`, `bw-project region` return selected/project/region context as JSON
+- [x] **CLI-03**: `bw-midi inspect` and `bw-device inspect` return notes/velocity/timing and chain/parameters (including loaded VST/AU plugins) of the selected clip/device as JSON
 
 ### Foundation — Memory (M1, cross-cutting)
 
-- [ ] **MEM-01**: Daemon maintains durable project memory in `.bw-brain/` (`state-cache.json`, `intent.json`, `roles.json`, `patch-history.jsonl`) with atomic writes
-- [ ] **MEM-02**: Ephemeral session memory (experiment thread, candidate patches) never writes to the durable store — a hard architectural boundary
+- [x] **MEM-01**: Daemon maintains durable project memory in `.bw-brain/` (`state-cache.json`, `intent.json`, `roles.json`, `patch-history.jsonl`) with atomic writes
+- [x] **MEM-02**: Ephemeral session memory (experiment thread, candidate patches) never writes to the durable store — a hard architectural boundary
 
 ### Edit Pipeline (M2)
 
-- [ ] **EDIT-01**: Patch object schema (`scope → operations → rationale → reversibility → risk`) is defined at `schemas/patch.schema.json` and validated at every boundary (daemon entry/exit, CLI emit, bridge apply)
-- [ ] **EDIT-02**: `bw-edit preview` renders a diff of what a patch would change without applying it
-- [ ] **EDIT-03**: `bw-diff` surfaces notes added/removed/changed, automation targets touched, and scope (track/clip/region) between two states
+- [x] **EDIT-01**: Patch object schema (`scope → operations → rationale → reversibility → risk`) is defined at `schemas/patch.schema.json` and validated at every boundary (daemon entry/exit, CLI emit, bridge apply)
+- [x] **EDIT-02**: `bw-edit preview` renders a diff of what a patch would change without applying it
+- [x] **EDIT-03**: `bw-diff` surfaces notes added/removed/changed, automation targets touched, and scope (track/clip/region) between two states
 - [ ] **EDIT-04**: `bw-edit apply` applies a patch only after preview unless `--force` is used; every applied patch is recorded with a daemon-authoritative undo entry
-- [ ] **EDIT-05**: Undo is daemon-authoritative: `patch-history.jsonl` + `bw-edit revert` replay inverse operations (Bitwig native undo is caveated, not relied upon)
-- [ ] **EDIT-06**: Risk class gating classifies edits low/medium/high; only low-risk edits are one-step, medium/high require explicit confirmation
+- [x] **EDIT-05**: Undo is daemon-authoritative: `patch-history.jsonl` + `bw-edit revert` replay inverse operations (Bitwig native undo is caveated, not relied upon)
+- [x] **EDIT-06**: Risk class gating classifies edits low/medium/high; only low-risk edits are one-step, medium/high require explicit confirmation
 
 ### MIDI Transforms (M2)
 
@@ -64,12 +64,12 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 
 ### UX & Architecture (cross-cutting, M1–M4)
 
-- [ ] **UX-01**: Pi `/analyze` skill reads selection/section/intent and produces critique + 2–4 next actions (M1)
+- [x] **UX-01**: Pi `/analyze` skill reads selection/section/intent and produces critique + 2–4 next actions (M1)
 - [ ] **UX-02**: Pi `/vary`, `/apply` skills drive the edit pipeline and a diff pane renders patch diffs (M2)
 - [ ] **UX-03**: Pi `/review` skill + arrangement pane render section timeline + energy sparkline (M3)
 - [ ] **UX-04**: Pi `/device` skill + device pane render chain summary + macro opportunities (M4)
-- [ ] **UX-05**: State pane renders selected track/clip/device + section label (M1)
-- [ ] **UX-06**: Every suggestion/transform output includes an `assumptions[]` field stating its assumptions
+- [x] **UX-05**: State pane renders selected track/clip/device + section label (M1)
+- [x] **UX-06**: Every suggestion/transform output includes an `assumptions[]` field stating its assumptions
 - [ ] **ARCH-01**: Genre-pluggable profile interface is designed in M2; electronic/techno ships as the first profile, expanded in M4
 - [ ] **ARCH-02**: Generic reasoning core runs without a profile (defaults to generic electronic); profiles enhance, never gate, the core
 

@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 3
-current_phase_name: M2
-status: verifying
+current_phase: 03
+current_phase_name: reversible-midi-patching-m2
+status: executing
 stopped_at: Phase 3 context gathered
-last_updated: "2026-06-29T17:17:32.248Z"
+last_updated: "2026-06-30T14:27:10.884Z"
 last_activity: 2026-06-29
-last_activity_desc: Phase 02 UAT complete (4/4), marked complete, transitioned to Phase 3
+last_activity_desc: Phase 03 execution started
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 16
+  completed_plans: 12
   percent: 40
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 3 — reversible-midi-patching (M2)
+**Current focus:** Phase 03 — reversible-midi-patching-m2
 
 ## Current Position
 
-Phase: 3 — Reversible MIDI Patching (M2)
-Plan: Not started
-Status: Phase 02 verified + complete (UAT 4/4 passed); ready to plan Phase 3
-Last activity: 2026-06-29 — Phase 02 UAT complete (4/4), marked complete, transitioned to Phase 3
+Phase: 03 (reversible-midi-patching-m2) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-06-29 — Phase 03 execution started
 
 Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 next
 
@@ -61,6 +61,7 @@ Progress: [██████░░░░] 40% — 2/5 phases complete; Phase 3 
 - Phase 02 P07: 19 min | 2 tasks | 10 files
 
 *Updated after each plan completion*
+| Phase 03 P01 | 95 | 2 tasks | 29 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,8 @@ Recent decisions affecting current work:
 - [Phase 02-07]: M1 LIMITATION (Minor 3 fix): the bridge's get.project_summary returns ONLY {tracks:[{slot,name}]} — no project metadata. The daemon supplies defaults (name='', tempo=120, timeSignature='4/4'). Pulling project metadata is a Phase-3+ concern (no get.project_meta handler in PullHandlers.java today). Documented in boot.ts + SUMMARY.
 - [Phase 02-07]: Handshake wired but non-blocking: the dispatcher's hello branch calls negotiateVersion + replies hello.response WHEN a hello arrives, but the reconnect trigger is NOT 'hello arrived' — it is 'TCP accept + get.project_summary response.' The current bridge (BridgeExtension.startConnector) does NOT emit hello (verified). The hello path is forward-compatible + exercised by the smoke test's fake bridge.
 - [Phase 02 UAT]: A1 NEGATED (2026-06-29) — VST/AU parameters do NOT surface via CursorRemoteControlsPage; `CursorDevice` exposes no `getRemoteControls()` in extension-api:21 (verified live with Surge XT + javap). `bw-device inspect` returns empty pages by design. The `cursorDevice.getParameter(int)` direct-enumeration fallback is documented in docs/bitwig-capabilities.md §4 + deferred to Phase 5 (device workflows). All 3 human_verification checkpoints PASSED live (Tests 2/3/4); 5/5 bridge event types now verified end-to-end over loopback TCP (clip.name_changed captured in the /analyze session).
+- [Phase ?]: Phase 03-01: Pitfall 2 (before.key===after.key for update_note_field) enforced at TS+runtime+arb layer, NOT JSON Schema — pure 2020-12 cannot express cross-property equality and the $data extension would break the Java bridge's Jackson parser. Runtime guard pinned by INV-1/INV-2 fast-check.
+- [Phase ?]: Phase 03-01: note identity = n:${pitch}:${startQuantized} (1/64-beat grid); pitch change = remove_note+add_note, never update_note_field (Pitfall 2 — a different pitch IS a different identity).
 
 ### Pending Todos
 
@@ -107,6 +110,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-29T17:17:32.240Z
+Last session: 2026-06-30T14:26:49.285Z
 Stopped at: Phase 3 context gathered
 Resume file: .planning/phases/03-reversible-midi-patching-m2/03-CONTEXT.md
