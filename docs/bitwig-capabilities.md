@@ -144,8 +144,16 @@ selected clip — pending in-app run. Does not block Phase 2 transport.
 > `createLauncherCursorClip` gridWidth to shortest note, OR quantize patch-op
 > `start` to the grid) changes here:
 >
-> - _Observed NoteStep.start positioning (M4):_ **PENDING — record after the live probe (grid-locked vs free-beat).**
-> - _Mitigation if grid-locked (M4):_ **PENDING.**
+> - _Observed NoteStep.start positioning (M4):_ **BLOCKED — clip-read path returns no notes against live Bitwig (see finding below).** The grid-positioning probe (apply a note at `start=0.237` and observe snap vs free-beat) could not be exercised because the upstream clip-note **read** path returns an empty note array, so no candidate patch can be generated or applied. This is itself the M4 live-probe result.
+> - _Mitigation if grid-locked (M4):_ **PENDING — unblocked once the clip-read path is fixed (see below).**
+>
+> **M4 FINDING (live, 2026-06-30) — `get.selected_clip` grid enumeration returns ZERO notes against a real launcher clip.** With a 4-bar launcher clip containing chords + notes selected in Bitwig, `bw-midi vary` (which calls `pullLiveClipNotes` → bridge `PullHandlers.handleSelectedClip`) returned 3 candidates all `status:"refused"`, `motifSimilarity:0.3`, with assumption `"harmonicCenter: could not infer"`. The identical `0.3` floor + "could not infer" (detector needs ≥4 notes) was reproduced on a second, sparse clip — only explainable if the pulled `notes[]` array is **empty/degenerate**. `state.clips` was `undefined` and `state.selection.clipSid` never populated.
+>
+> **Root cause (pending focused investigation):** `handleSelectedClip` enumerates `cursorClip.getStep(x, y, 0)` over a fixed 16×128 grid (`PullHandlers.java:161-183`), a path the code comment itself flagged as "confirmed live in Task 3" — i.e. never live-verified. Most likely: the `PinnableCursorClip` from `cursorTrack.createLauncherCursorClip(16, 128)` is **not following / not pinned to** the GUI-selected clip (it reads an empty clip), OR the 16-column grid doesn't cover the clip's steps and scene index 0 is wrong for launcher clips. The clip `name` accessor is also still pending (the bridge uses `getLoopLength()` as a change proxy).
+>
+> **Impact:** blocks Phase-3 UAT M2 (apply round-trip), M3 (motif recognition — no notes to score), M5 (profile comparison), and the grid-positioning half of M4 itself. The daemon-side transform + risk-gating + audit-trail code is **proven correct** (the refused candidates correctly carry `risk:"high"` per D-09/INV-10; the freshness gate + bridge TCP transport all work — bridge delivered `selection.changed`, `transport.changed`, and 8 tracks via `get.project_summary`). The blocker is exclusively the bridge's clip-note read path.
+>
+> **Fix path (follow-up task):** live-probe the `PinnableCursorClip` — (a) confirm whether it follows the GUI selection or needs explicit `pin()`/`subscribeToOverrides()`, (b) verify `getStep(x,y,scene)` scene indexing for launcher clips, (c) size the grid to the clip's real step count (a 4-bar clip at 16th notes = 64 columns, not 16). Then record the NoteStep.start grid-positioning result here.
 
 **Mitigation:** DRAFT (pending observation) — if arranger-clip editing turns
 out to be unsupported (likely per ROADMAP Phase 4), Phase 3 patch operations
@@ -437,6 +445,8 @@ whether `bw-project summary` returns 8 track entries. The clip `name` field is
 expected to be empty until the live probe confirms the launcher-clip name
 accessor (the bridge uses `getLoopLength()` as a clip-change proxy — see Plan
 02-02 Observers.java comment).
+
+**Recorded (live, 2026-06-30) — clip-note read returns EMPTY.** With a 4-bar launcher clip (chords + notes) selected in Bitwig and the daemon `stateFreshness:"live"` (bridge connected, transport + track events flowing), `bw-midi vary` → `pullLiveClipNotes` returned a degenerate/empty note array: all 3 candidates `status:"refused"`, `motifSimilarity:0.3` (identical floor reproduced on a second sparse clip), assumption `"harmonicCenter: could not infer"` (detector needs ≥4 notes). The 5 event types DO round-trip (`selection.changed`, `transport.changed`, `track.name_changed` confirmed) and `get.project_summary` returns the 8-track window — only the **`get.selected_clip` NoteStep enumeration** (`PullHandlers.handleSelectedClip`, 16×128 `getStep(x,y,0)` grid) fails to capture notes. See §2 M4 finding for the root-cause hypotheses + fix path. This is a Phase-2 read-path live-verification gap (the code was explicitly marked "confirmed live in Task 3" without having been run); it blocks Phase-3 M2/M3/M5 UAT.
 
 ### Sub-check 2 — VST/AU PARAMETER EXPOSURE (Open Question A1 / BRIDGE-02 / CLI-03)
 
