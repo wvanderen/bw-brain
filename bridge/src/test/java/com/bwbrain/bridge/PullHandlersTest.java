@@ -31,9 +31,10 @@ class PullHandlersTest {
 
     @Test
     void buildClipResponseCarriesNonEmptyNotesArray() throws Exception {
+        // NoteView is the daemon's Note shape: (key, pitch, start-beats, length-beats, velocity-1-127).
         final List<PullHandlers.NoteView> notes = List.of(
-                new PullHandlers.NoteView(0, 60, 100.0, 0.25),
-                new PullHandlers.NoteView(2, 64, 95.0, 0.125));
+                new PullHandlers.NoteView("n:60:0.0000", 60, 0.0, 0.25, 100.0),
+                new PullHandlers.NoteView("n:64:0.5000", 64, 0.5, 0.125, 95.0));
         final String line = PullHandlers.buildClipResponse("req-1", notes);
         final JsonNode node = parseResponse(line);
         assertEquals("req-1", node.get("id").asText());
@@ -41,10 +42,11 @@ class PullHandlersTest {
         assertTrue(node.get("payload").get("notes").isArray());
         assertEquals(2, node.get("payload").get("notes").size());
         final JsonNode first = node.get("payload").get("notes").get(0);
-        assertEquals(0, first.get("x").asInt());
-        assertEquals(60, first.get("y").asInt());
+        assertEquals("n:60:0.0000", first.get("key").asText());
+        assertEquals(60, first.get("pitch").asInt());
+        assertEquals(0.0, first.get("start").asDouble(), 0.001);
+        assertEquals(0.25, first.get("length").asDouble(), 0.001);
         assertEquals(100.0, first.get("velocity").asDouble(), 0.001);
-        assertEquals(0.25, first.get("duration").asDouble(), 0.001);
     }
 
     @Test

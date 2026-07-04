@@ -61,7 +61,9 @@ public final class BridgeExtension extends ControllerExtension {
         // cursor device is created from the cursor track (-> PinnableCursorDevice,
         // which IS-A CursorDevice).
         final CursorTrack cursorTrack = host.createCursorTrack(0, 0);
-        final PinnableCursorClip cursorClip = cursorTrack.createLauncherCursorClip(16, 128);
+        // gridWidth=64 covers a 4-bar clip at 16th-note resolution; must match
+        // PullHandlers.GRID_W. See capabilities doc §2 (M4 live finding).
+        final PinnableCursorClip cursorClip = cursorTrack.createLauncherCursorClip(64, 128);
         final CursorDevice cursorDevice = cursorTrack.createCursorDevice(); // deprecated-allow: 0-arg overload (non-deprecated); javadoc deprecates only the 4-arg (String,String,int,CursorDeviceFollowMode) form
         final Transport transport = host.createTransport();
         final TrackBank trackBank = host.createTrackBank(BANK_SIZE, 0, 0);

@@ -5,8 +5,9 @@
 // (one socket, two directions), dispatches each request, and offers the response
 // line back through the shared Outbox (so the writer thread sends it).
 //
-//   get.selected_clip        -> enumerate cursorClip.getStep(x,y,0) over the grid,
-//                               filter velocity>0, map to NoteView -> response
+//   get.selected_clip        -> enumerate cursorClip.getStep(channel, x, y) over
+//                               the grid (channel 0), filter velocity>0, map to
+//                               NoteView -> response
 //   get.selected_device_chain-> (DEFERRED to Task-3 live verification, Open
 //                               Question A1 / Pitfall 10) CursorDevice exposes no
 //                               getRemoteControls() accessor in extension-api:21's
@@ -37,17 +38,24 @@ public final class PullHandlers {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // Grid dims match createLauncherCursorClip(16, 128). x = time column,
-    // y = pitch row. The exact note-vs-step semantics are confirmed live in
-    // Task 3; velocity > 0 is the heuristic for "a note is present here".
-    static final int GRID_W = 16;
+    // Grid dims match createLauncherCursorClip(gridWidth, gridHeight) in
+    // BridgeExtension. x = time column, y = pitch row. gridWidth=64 covers a
+    // 4-bar clip at 16th-note resolution (the common producer case); longer/
+    // finer clips will need paging via scrollToStep (deferred). The exact
+    // note-vs-step semantics + grid-vs-clip-length coverage are confirmed live
+    // in Task 3 (capabilities doc §2); velocity > 0 is the heuristic for "a
+    // note is present here".
+    static final int GRID_W = 64;
     static final int GRID_H = 128;
 
     private PullHandlers() {}
 
     // --- pure-logic view records (testable without live Bitwig) ---
 
-    public record NoteView(int x, int y, double velocity, double duration) {}
+    // Note fields use the DAEMON'S Note contract (diff-logic.ts): key, pitch
+    // (0-127), start (beats), length (beats), velocity (1-127). The bridge owns
+    // the grid->beats conversion (it knows Bitwig's loop length + step grid).
+    public record NoteView(String key, int pitch, double start, double length, double velocity) {}
 
     public record RemoteView(String name, double value) {}
 
@@ -61,10 +69,11 @@ public final class PullHandlers {
         final List<Map<String, Object>> notesPayload = new ArrayList<>();
         for (final NoteView n : notes) {
             final Map<String, Object> nm = new LinkedHashMap<>();
-            nm.put("x", n.x());
-            nm.put("y", n.y());
+            nm.put("key", n.key());
+            nm.put("pitch", n.pitch());
+            nm.put("start", n.start());
+            nm.put("length", n.length());
             nm.put("velocity", n.velocity());
-            nm.put("duration", n.duration());
             notesPayload.add(nm);
         }
         return LineJson.response(id, true, Map.of("notes", notesPayload));
@@ -159,27 +168,47 @@ public final class PullHandlers {
     }
 
     private static String handleSelectedClip(final String id, final PinnableCursorClip cursorClip) {
-        // Enumerate the step grid via Clip.getStep(x, y, scene) and keep steps
-        // with velocity > 0 (a note is present). The grid dims, scene indexing,
-        // and note-vs-rest semantics are confirmed live in Task 3 (capabilities
-        // doc §2); velocity>0 is the conservative heuristic for now.
+        // Enumerate the step grid via Clip.getStep(channel, x, y) (channel 0) and
+        // keep steps with velocity > 0. Map each NoteStep to the daemon's Note
+        // contract (key/pitch/start-beats/length-beats/velocity-1-127) — the bridge
+        // owns the grid->beats conversion since it knows Bitwig's loop length.
+        // API signature confirmed from in-app Javadoc 6.0.6 (Clip.html):
+        // NoteStep getStep(int channel, int x, int y).
+        final double loopBeats;
+        try {
+            loopBeats = cursorClip.getLoopLength().get();
+        } catch (final Exception e) {
+            // Loop length unavailable — fall back to 1 beat/column.
+            return buildClipResponse(id, enumerateNotes(cursorClip, 1.0));
+        }
+        final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;
+        return buildClipResponse(id, enumerateNotes(cursorClip, beatsPerColumn));
+    }
+
+    private static List<NoteView> enumerateNotes(final PinnableCursorClip cursorClip,
+                                                  final double beatsPerColumn) {
         final List<NoteView> notes = new ArrayList<>();
         for (int x = 0; x < GRID_W; x++) {
             for (int y = 0; y < GRID_H; y++) {
                 final NoteStep step;
                 try {
-                    step = cursorClip.getStep(x, y, 0);
+                    step = cursorClip.getStep(0, x, y);
                 } catch (final Exception ignored) {
                     continue; // grid index out of range on this clip — skip
                 }
                 if (step == null) { continue; }
-                final double vel = step.velocity();
-                if (vel > 0.0) {
-                    notes.add(new NoteView(x, y, vel, step.duration()));
+                final double vel01 = step.velocity();
+                if (vel01 > 0.0) {
+                    final int pitch = y;
+                    final double start = x * beatsPerColumn;
+                    final double length = step.duration(); // NoteStep.duration() is in beats
+                    final int velocity = Math.max(1, (int) Math.round(vel01 * 127.0));
+                    final String key = "n:" + pitch + ":" + String.format(java.util.Locale.ROOT, "%.4f", start);
+                    notes.add(new NoteView(key, pitch, start, length, velocity));
                 }
             }
         }
-        return buildClipResponse(id, notes);
+        return notes;
     }
 
     private static String handleSelectedDeviceChain(final String id) {
@@ -249,6 +278,7 @@ public final class PullHandlers {
         }
         int applied = 0;
         int failed = 0;
+        final List<Map<String, Object>> failureDetails = new ArrayList<>();
         for (final JsonNode opNode : ops) {
             final String opType = opNode.path("op").asText("");
             try {
@@ -282,9 +312,20 @@ public final class PullHandlers {
                 }
             } catch (final Exception e) {
                 failed++; // grid out of range, etc. — do not crash the handler
+                final Map<String, Object> fd = new LinkedHashMap<>();
+                fd.put("op", opType);
+                fd.put("start", opNode.path("note").path("start").asDouble(opNode.path("after").path("start").asDouble()));
+                fd.put("pitch", opNode.path("note").path("pitch").asInt(opNode.path("after").path("pitch").asInt()));
+                fd.put("beatsPerColumn", beatsPerColumn);
+                fd.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+                failureDetails.add(fd);
             }
         }
-        return LineJson.response(id, failed == 0, Map.of("applied", applied, "failed", failed));
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("applied", applied);
+        payload.put("failed", failed);
+        payload.put("failures", failureDetails);
+        return LineJson.response(id, failed == 0, payload);
     }
 
     /**
@@ -312,9 +353,15 @@ public final class PullHandlers {
 
     /** Build a NoteStepWriter backed by the live cursor clip's NoteStep setters. */
     private static NoteStepWriter cursorClipWriter(final PinnableCursorClip cursorClip) {
+        // getStep signature is (channel, x, y) — see handleSelectedClip. channel 0.
+        // Velocity: the daemon stores/imports velocity in MIDI 0-127, but Bitwig's
+        // NoteStep.setVelocity expects 0.0-1.0 (live finding 2026-06-30: passing
+        // 119.0 throws "Parameter velocity must be in the range 0.0 to 1.0"). Scale
+        // here at the bridge boundary so the daemon's contract stays 0-127.
+        // remove_note ops pass velocity 0.0 (0/127 = 0.0 = no note — valid).
         return (x, y, velocity, duration) -> {
-            final NoteStep step = cursorClip.getStep(x, y, 0);
-            step.setVelocity(velocity);
+            final NoteStep step = cursorClip.getStep(0, x, y);
+            step.setVelocity(Math.max(0.0, Math.min(1.0, velocity / 127.0)));
             step.setDuration(duration);
         };
     }
