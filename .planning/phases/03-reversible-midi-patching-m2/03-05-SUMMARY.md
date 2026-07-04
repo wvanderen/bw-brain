@@ -140,6 +140,28 @@ _TDD gate compliance: Task 1 ships test(03-05) RED `e3e6af4` → feat(03-05) GRE
 
 The autonomous docs-prep piece was done (commit `4edf805`): clearly-labelled PENDING recording slots marked in `docs/bitwig-capabilities.md` §1 (M1) + §2 (M4). NO observed values fabricated (D-02).
 
+## UAT Results (live, 2026-07-04)
+
+The live UAT was run against Bitwig Studio 6.0.6 + the rebuilt `bw-brain.bwextension`. It surfaced FOUR bridge bugs (all "Task-3 live-verification" deferrals that had never run against real Bitwig) and one daemon gate issue — all fixed + committed — plus one new architectural blocker (clip-identity) that needs a follow-up.
+
+**Fixed + live-proven (commits below):**
+- **M3 (motif recognition): PASS** — `bw-midi vary` returns 3 candidates with `motifSimilarity` 0.93–1.0 (above the 0.85 threshold), `harmonicCenter` inferred (G major / C minor / D major across clips). INV-7/8 hold.
+- **INV-8 (no casino MIDI): PASS** — a sparse clip correctly yields 3 `status:"refused"` candidates at the 0.3 floor with `risk:"high"` (D-09/INV-10 audit-trail floor proven in vivo).
+- **M2 (apply round-trip): PARTIAL PASS** — `bw-edit apply` writes ops to Bitwig and `bw-edit revert` restores them via `patch-history.jsonl` (20-op round-trip green, INV-14). The mechanics work. **CAVEAT — see clip-identity blocker below.**
+- **Bridge fixes (4):** (1) `getStep` arg order `(x,y,0)`→`(0,x,y)` (signature is `channel, x, y`); (2) `gridWidth` 16→64 (cover a 4-bar clip); (3) NoteView shape mapped to the daemon's `{key,pitch,start,length,velocity}`; (4) `setVelocity` 0–127→0–1 at the bridge boundary.
+- **Daemon fixes (2):** (5) `vary` rhythmic-displacement boundary guard (don't emit ops past the clip grid); (6) freshness gate relaxed from `==="live"` to `==="disconnected"` (the 5s watchdog window + Pi latency made the strict gate impractical; all gated handlers pull fresh state anyway).
+
+**NEW BLOCKER (needs Phase-3 follow-up — design work, not a live patch):**
+- **Clip-identity tracking** — `state.selection` carries `trackSid` but never a `clipSid`. After a daemon restart / bridge reconnect (or with multiple clips), the `PinnableCursorClip` can sit on a different clip than the producer intends. Observed: a `bw-edit apply` of candidate C reported `{applied:320, ok:true}` but the 320 ops landed on an ~8-bar clip (ops spanned start 0→31.5 beats), NOT the producer's 4-bar clip. For a trust-spine phase, "apply silently lands on the wrong clip" is a serious gap, and daemon `revert` is unreliable in that state (it replays inverse ops to wherever the cursor currently points). **Fix:** surface a stable clip id from the bridge; populate `state.selection.clipSid`; refuse `apply` when the cursor clip's id ≠ the preview-time clipSid. Until then, producers must confirm the target clip visually and use Bitwig native undo (⌘Z) as recovery.
+
+**Secondary findings (also follow-up):**
+- Bridge does not auto-reconnect on daemon restart (connector sets `socket` once, never nullifies on loss) — current workaround: toggle the Bitwig controller off/on.
+- The Pi skill prompts still treat `stateFreshness:"stale"` as untrustworthy, which mismatches the daemon's relaxed gate — needs a matching skill-prompt update.
+
+**Not yet exercised:** M1 (native undo step-count — non-blocking), M5 (techno profile comparison).
+
+**Commits:** bridge fixes `fix(bridge): live-Bitwig clip read/write path (M4 UAT findings)`, daemon fixes `fix(daemon): relax freshness gate + vary clip-boundary guard (M4 UAT)`, docs `docs(03): record M4 UAT findings` + this SUMMARY.
+
 ## Issues Encountered
 - **vitest 4.x ANSI + the rg discriminator (see Deviation 2):** the AC7 rg pattern needs `NO_COLOR=1` to match vitest's piped output. Not a defect — a verification-invocation convention. Documented so the verifier + future executors run AC7 correctly.
 
