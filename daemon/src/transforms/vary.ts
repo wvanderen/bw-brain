@@ -160,12 +160,23 @@ function sourceSig(source: Note[]): ReturnType<typeof motifSignature> {
  *
  * The shifted notes' starts change → their keys change (start IS identity) →
  * diffToOps emits remove_note(old)+add_note(new) pairs (Pitfall 2-correct).
+ *
+ * Boundary guard (live finding, 2026-06-30): the clip has a finite grid (bridge
+ * `gridWidth` columns ↔ `loopBeats`). A note near the clip end, displaced
+ * forward, would land past the boundary → the bridge's `getStep` rejects it →
+ * apply.patch records a partial failure → the patch is NOT journaled → revert
+ * can't find it. So derive the effective clip end from the source notes (the
+ * last note's start is the closest proxy for `loopBeats` the pure transform
+ * has) and SKIP displacing any note whose shifted start would exceed it. This
+ * keeps every emitted op in-grid, so apply is clean + journaled + revertable.
  */
 function rhythmicDisplacement(src: Note[]): Note[] {
+  const maxStart = src.reduce((m, n) => (n.start > m ? n.start : m), 0);
   return src.map((n, i) => {
     if (i % 5 !== 0) return n; // ~20% of notes
-    const start = n.start + SIXTEENTH;
-    return { ...n, start, key: noteKey(n.pitch, start) };
+    const shifted = n.start + SIXTEENTH;
+    if (shifted > maxStart) return n; // boundary guard — would overflow the clip grid
+    return { ...n, start: shifted, key: noteKey(n.pitch, shifted) };
   });
 }
 

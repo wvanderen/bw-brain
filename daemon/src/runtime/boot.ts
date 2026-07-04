@@ -277,7 +277,10 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     correlator
       .send("apply.patch", { undoLabel, operations })
       .then((resp) => {
-        const r = resp as { applied?: number; failed?: number };
+        const r = resp as { applied?: number; failed?: number; failures?: unknown[] };
+        if ((r.failures?.length ?? 0) > 0) {
+          console.error(`[debug apply.patch] ${r.failures!.length} failure(s): ${JSON.stringify(r.failures)}`);
+        }
         return { applied: r.applied ?? 0, failed: r.failed ?? 0 };
       });
   startQueryServer({

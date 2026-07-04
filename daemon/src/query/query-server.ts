@@ -555,8 +555,8 @@ async function handleEditPreview(
   msg: { payload?: { patch?: unknown } },
 ): Promise<void> {
   // SC#3 P2 watchdog gate: refuse when state is not live.
-  if (freshness !== "live") {
-    safeSendErr(deps.transport, freshness, "state_stale");
+  if (freshness === "disconnected") {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
     return;
   }
   if (!deps.candidateStore) {
@@ -614,8 +614,8 @@ async function handleEditApply(
   msg: { payload?: EditApplyPayload },
 ): Promise<void> {
   // SC#3 P2 watchdog gate.
-  if (freshness !== "live") {
-    safeSendErr(deps.transport, freshness, "state_stale");
+  if (freshness === "disconnected") {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
     return;
   }
   if (!deps.candidateStore || !deps.patchHistory || !deps.applyPatchOverBridge) {
@@ -701,8 +701,8 @@ async function handleEditRevert(
   msg: { payload?: { patchId?: string } },
 ): Promise<void> {
   // SC#3 P2 watchdog gate.
-  if (freshness !== "live") {
-    safeSendErr(deps.transport, freshness, "state_stale");
+  if (freshness === "disconnected") {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
     return;
   }
   if (!deps.patchHistory || !deps.applyPatchOverBridge) {
@@ -886,8 +886,8 @@ async function prepareMidiDispatch(
   intent: ProjectIntent | null,
   freshness: "live" | "stale" | "disconnected",
 ): Promise<MidiDispatchCtx | null> {
-  if (freshness !== "live") {
-    safeSendErr(deps.transport, freshness, "state_stale");
+  if (freshness === "disconnected") {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
     return null;
   }
   if (!deps.candidateStore) {
