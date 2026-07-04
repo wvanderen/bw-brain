@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 03
-current_phase_name: reversible-midi-patching-m2
+current_phase: 03.1
 status: verifying
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-06-30T22:51:24.063Z"
-last_activity: 2026-06-29
-last_activity_desc: Phase 03 execution started
+stopped_at: Phase 03.1 context gathered
+last_updated: "2026-07-04T23:56:24.083Z"
+last_activity: 2026-06-30
+last_activity_desc: Plan 03-05 Task 1 (Pi /vary /apply /diff skills) shipped; Task 2 UAT gate pending human
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 3
   total_plans: 16
   completed_plans: 16
-  percent: 60
+  percent: 50
+current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 ## Current Position
 
-Phase: 03 (reversible-midi-patching-m2) — VERIFYING (all 5 plans executed; M1–M5 UAT pending human)
+Phase: 03.1
 Plan: 5 of 5 (executed)
 Status: ready_for_verification — Plan 03-05 Task 1 done; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint (CHECKPOINT REACHED)
 Last activity: 2026-06-30 — Plan 03-05 Task 1 (Pi /vary /apply /diff skills) shipped; Task 2 UAT gate pending human
@@ -115,6 +115,10 @@ None yet.
 - [Phase 3 — to watch]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5.
 - Phase 03 UAT pending: M1–M5 manual checkpoints (Plan 03-05 Task 2) require live Bitwig 6.0.6 + human ears + Pi. M2/M3/M4/M5 BLOCKING; M1 non-blocking. docs/bitwig-capabilities.md §1/§2 PENDING slots marked. Until these pass, Phase 3 is NOT complete (status: ready_for_verification / pending-uat). If M4 finds NoteStep.start grid-locked, flag to planner — bridge write path changes.
 
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 3: Gap closure: clip-identity scope, apply pre-flight, bridge auto-reconnect, skill-prompt stale update (URGENT)
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:
@@ -125,6 +129,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-30T22:51:24.056Z
-Stopped at: Completed 03-03-PLAN.md
-Resume file: None
+Last session: 2026-07-04T23:56:24.076Z
+Stopped at: Phase 03.1 context gathered
+Resume file: .planning/phases/03.1-gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto/03.1-CONTEXT.md
