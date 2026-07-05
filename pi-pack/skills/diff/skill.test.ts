@@ -84,4 +84,19 @@ describe("/diff SKILL.md contract (UX-02 / D-15 on-demand diff pane)", () => {
     expect(body.toLowerCase()).not.toContain("json-lines");
     expect(body).not.toMatch(/\bapply\.patch\b/);
   });
+
+  it("states live AND stale are trustworthy (D-10 — relaxed gate)", () => {
+    // The relaxed daemon gate (commit 7a7e7cf) refuses only on `disconnected`;
+    // `stale` proceeds because the daemon pulls fresh state per call. The skill
+    // prompts must echo this verbatim.
+    expect(body).toMatch(/stale.*trustworthy|trustworthy.*stale/i);
+    expect(body).toMatch(/disconnected.*refus|refus.*disconnected/i);
+  });
+
+  it("does NOT frame stale as untrustworthy (D-10 regression guard)", () => {
+    // BLOCKER-02 discipline: guard against re-introducing stale-as-untrustworthy
+    // phrasing in future skill edits. The daemon gate is the contract; the skills
+    // match it without dramatization.
+    expect(body).not.toMatch(/stale.*(untrustworthy|unreliable|refus)/i);
+  });
 });
