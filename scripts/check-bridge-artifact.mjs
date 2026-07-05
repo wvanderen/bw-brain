@@ -51,9 +51,27 @@ import { resolve } from "node:path";
 // ARTIFACT_PATH_OVERRIDE is a testing escape hatch (mirrors
 // check-deprecated-bridge.mjs's BITWIG_JAVADOC env); production runs stat the
 // default path.
+//
+// All paths are anchored at the git repo root (`git rev-parse --show-toplevel`)
+// so the script is CWD-independent: it works invoked from the repo root OR via
+// `cd daemon && npm run check:bridge-artifact` (the npm wiring lives in
+// daemon/package.json). The override, when set, resolves relative to CWD as
+// passed (testing convenience — typically an absolute /tmp/ path).
+let REPO_ROOT;
+try {
+  REPO_ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+} catch {
+  console.error(
+    "✗ Could not determine git repo root (`git rev-parse --show-toplevel` failed). Run from inside the bw-brain repo.",
+  );
+  process.exit(1);
+}
 const ARTIFACT_PATH = process.env.ARTIFACT_PATH_OVERRIDE
   ? resolve(process.env.ARTIFACT_PATH_OVERRIDE)
-  : resolve("bridge/target/bw-brain.bwextension");
+  : resolve(REPO_ROOT, "bridge/target/bw-brain.bwextension");
 
 // The git-tracked source set that feeds the `mvn -pl bridge package` (shade)
 // phase, per bridge/pom.xml + Maven defaults. Compiled main Java classes +
@@ -226,6 +244,7 @@ function main(argv) {
     try {
       out = execFileSync("git", ["log", "-1", "--format=%cI", "--", path], {
         encoding: "utf8",
+        cwd: REPO_ROOT,
         stdio: ["ignore", "pipe", "ignore"],
       }).trim();
     } catch {

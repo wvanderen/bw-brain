@@ -24,7 +24,8 @@
     "dev": "tsx src/runtime/boot.ts",
     "test": "vitest run",
     "test:property": "vitest run --testNamePattern property",
-    "check:capabilities": "node ../scripts/check-capabilities-doc.mjs"
+    "check:capabilities": "node ../scripts/check-capabilities-doc.mjs",
+    "check:bridge-artifact": "node ../scripts/check-bridge-artifact.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
