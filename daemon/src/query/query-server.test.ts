@@ -295,19 +295,19 @@ function makeMidiDeps(opts: {
   return { deps, transport, store };
 }
 
-/** Drive an ASYNC op through the server (await microtask drain for fire-and-forget handlers). */
+/** Drive an ASYNC op through the server (poll for the result so multi-await chains including disk I/O complete reliably). */
 async function driveAsync(deps: QueryServerDeps, queryLine: string): Promise<Record<string, unknown>> {
   const transport = deps.transport as CapturingTransport;
   transport.sent.length = 0;
   transport.handler(queryLine);
-  // midi.* handlers are async (they pull live clip notes); drain microtasks so
-  // the async continuation's transport.send lands before we assert.
-  // edit.* handlers additionally await patchHistory.append (disk I/O) — give the
-  // macrotask queue enough rounds to drain. setTimeout(0) is a macrotask;
-  // run it twice to cover multi-await chains (apply → append → send).
-  await new Promise((r) => setTimeout(r, 0));
-  await new Promise((r) => setTimeout(r, 0));
-  await new Promise((r) => setImmediate(r));
+  // midi.* + edit.* handlers are async + may await disk I/O (patchHistory.append)
+  // or on-demand pulls (pullSelectedClip). Poll for transport.sent.length === 1
+  // with a 1s timeout — robust against test-runner load spikes that change the
+  // number of macrotask drains needed.
+  const deadline = Date.now() + 1000;
+  while (transport.sent.length === 0 && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
   expect(transport.sent).toHaveLength(1);
   return transport.sent[0] as Record<string, unknown>;
 }
@@ -572,12 +572,12 @@ function previewCandidate(store: CandidateStore, previewClipSid: string, opts?: 
 async function makeApplyDeps(opts: {
   state?: RawState | null;
   liveClipSid?: string; // overrides state.selection.clipSid
-}): Promise<{ deps: QueryServerDeps; transport: CapturingTransport; store: CandidateStore; hist: PatchHistory; applyCalls: number; tmpDir: string }> {
+}): Promise<{ deps: QueryServerDeps; transport: CapturingTransport; store: CandidateStore; hist: PatchHistory; applyCalls: () => number; tmpDir: string }> {
   const transport = makeCapturingTransport();
   const store = new CandidateStore();
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-apply-"));
   const hist = new PatchHistory(path.join(tmpDir, "patch-history.jsonl"));
-  let applyCalls = 0;
+  const counter = { n: 0 };
   const state: RawState = opts.state ?? fixtureRaw();
   if (opts.liveClipSid !== undefined) {
     state.selection = { ...state.selection, clipSid: opts.liveClipSid };
@@ -590,12 +590,12 @@ async function makeApplyDeps(opts: {
     candidateStore: store,
     patchHistory: hist,
     applyPatchOverBridge: async () => {
-      applyCalls++;
+      counter.n++;
       return { applied: 1, failed: 0 };
     },
   };
   startQueryServer(deps);
-  return { deps, transport, store, hist, applyCalls, tmpDir };
+  return { deps, transport, store, hist, applyCalls: () => counter.n, tmpDir };
 }
 
 describe("D-04 apply pre-flight gate (wrong_clip_targeted)", () => {
@@ -616,7 +616,7 @@ describe("D-04 apply pre-flight gate (wrong_clip_targeted)", () => {
       expect(res.actualClipSid).toBe("clip_LIVE_live12345");
       expect(res.hint).toMatch(/re-select|re-preview/);
       // CRITICAL: the gate fires BEFORE the bridge round-trip — no mutation.
-      expect(applyCalls).toBe(0);
+      expect(applyCalls()).toBe(0);
       // The candidate is NOT evicted (producer can still apply after re-selecting).
       expect(store.get(patchId)).toBeDefined();
     } finally {
@@ -633,7 +633,7 @@ describe("D-04 apply pre-flight gate (wrong_clip_targeted)", () => {
         payload: { patchId, confirm: true },
       }) + "\n");
       expect(res.ok).toBe(true);
-      expect(applyCalls).toBe(1);
+      expect(applyCalls()).toBe(1);
       // Candidate evicted after successful apply.
       expect(store.get(patchId)).toBeUndefined();
       // Journal entry carries the apply-time clipSid (D-05 stamping).

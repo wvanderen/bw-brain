@@ -633,6 +633,30 @@ async function handleEditApply(
     safeSendErr(deps.transport, freshness, "candidate_not_found");
     return;
   }
+  // D-04 (Phase 03.1 Plan 03): apply pre-flight — refuse when the cursor clip's
+  // live clipSid ≠ the preview-time clipSid captured at mint. The gate fires
+  // BEFORE the risk gate + the bridge round-trip — no mutation on refusal.
+  // Pre-fix candidates (previewClipSid === undefined or "") are caveated via
+  // assumptions[] + proceed (symmetric to the D-05 migration policy for
+  // pre-fix journal entries — preserves the recovery path for legacy candidates).
+  const liveClipSid = state.selection.clipSid ?? "";
+  const previewClipSid = candidate.previewClipSid;
+  const applyAssumptions: Assumption[] = [...liveAssumptions(state, intent)];
+  if (previewClipSid === undefined || previewClipSid === "") {
+    // Pre-Plan-03 candidate (no previewClipSid stamped). Surface honestly.
+    applyAssumptions.push({
+      claim: "applying a pre-clipSid candidate; cursor clip unverified",
+      confidence: 0.5,
+      source: "selection",
+    });
+  } else if (liveClipSid !== previewClipSid) {
+    safeSendErr(deps.transport, freshness, "wrong_clip_targeted", {
+      expectedClipSid: previewClipSid,
+      actualClipSid: liveClipSid,
+      hint: "re-select the clip you previewed (or re-preview)",
+    });
+    return;
+  }
   const confirm = msg.payload?.confirm ?? false;
   const force = msg.payload?.force ?? false;
   const allowBelowBar = msg.payload?.allowBelowBar ?? false;
@@ -669,7 +693,7 @@ async function handleEditApply(
       deps.transport,
       freshness,
       { ok: false, error: "apply_failed", applied: applied.applied, failed: applied.failed },
-      liveAssumptions(state, intent),
+      applyAssumptions,
     );
     return;
   }
@@ -680,6 +704,9 @@ async function handleEditApply(
     inverseOperations,
     appliedAt: Date.now(),
     stateHashBefore: `clip:${state.selection.clipSid ?? ""}`,
+    // D-05 (Phase 03.1 Plan 03): stamp the apply-time clipSid so the revert
+    // pre-flight can compare it to the live state.selection.clipSid.
+    clipSid: liveClipSid,
   };
   try {
     await deps.patchHistory.append(entry);
@@ -693,7 +720,7 @@ async function handleEditApply(
     deps.transport,
     freshness,
     { ok: true, appliedOps: applied.applied, patchId, undoLabel: candidate.undoLabel ?? "bw-edit apply" },
-    liveAssumptions(state, intent),
+    applyAssumptions,
   );
 }
 
@@ -720,6 +747,30 @@ async function handleEditRevert(
     safeSendErr(deps.transport, freshness, "not_found");
     return;
   }
+  // D-05 (Phase 03.1 Plan 03): revert pre-flight — refuse when the cursor
+  // clip's live clipSid ≠ the apply-time clipSid stamped in the journal.
+  // Symmetric to the D-04 apply gate. Pre-fix entries (clipSid undefined)
+  // are caveated via assumptions[] + proceed (D-05 migration policy per
+  // RESEARCH §D-05 Discretion — preserves the recovery path for legacy
+  // journal entries).
+  const liveClipSid = state.selection.clipSid ?? "";
+  const entryClipSid = entry.clipSid;
+  const revertAssumptions: Assumption[] = [...liveAssumptions(state, intent)];
+  if (entryClipSid === undefined) {
+    // Pre-fix journal entry (no clipSid stamped at apply time). Caveated, NOT refused.
+    revertAssumptions.push({
+      claim: "reverting a pre-clipSid journal entry; cursor clip unverified",
+      confidence: 0.5,
+      source: "selection",
+    });
+  } else if (liveClipSid !== entryClipSid) {
+    safeSendErr(deps.transport, freshness, "wrong_clip_targeted", {
+      expectedClipSid: entryClipSid,
+      actualClipSid: liveClipSid,
+      hint: "re-select the clip you applied this patch to (or use Bitwig ⌘Z)",
+    });
+    return;
+  }
   // Build a NEW patch whose operations = entry.inverseOperations (D-03 LIFO
   // replay through the SAME bridge path). Revert is itself recorded.
   const revertOps = entry.inverseOperations;
@@ -736,7 +787,7 @@ async function handleEditRevert(
       deps.transport,
       freshness,
       { ok: false, error: "apply_failed", applied: applied.applied, failed: applied.failed },
-      liveAssumptions(state, intent),
+      revertAssumptions,
     );
     return;
   }
@@ -756,6 +807,9 @@ async function handleEditRevert(
     inverseOperations: entry.operations as PrimitiveOp[],
     appliedAt: now,
     stateHashBefore: entry.stateHashBefore,
+    // D-05 (Phase 03.1 Plan 03): the revert entry ALSO carries the live clipSid
+    // (reverting-the-revert re-applies the original — the live clipSid must match).
+    clipSid: liveClipSid,
   };
   try {
     await deps.patchHistory.append(revertEntry);
@@ -770,7 +824,7 @@ async function handleEditRevert(
     deps.transport,
     freshness,
     { ok: true, patchId, appliedRevertedAt: now, appliedOps: applied.applied },
-    liveAssumptions(state, intent),
+    revertAssumptions,
   );
 }
 
