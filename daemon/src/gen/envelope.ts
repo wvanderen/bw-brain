@@ -67,6 +67,10 @@ export type Envelope = {
          * Transport play state for transport.changed (from Transport.isPlaying()).
          */
         playing?: boolean;
+        /**
+         * STATE-04 fingerprint of the clip (D-03 push). Populated by the bridge on every clip.name_changed event; the daemon folds this into selection.clipSid immediately. Pre-fix bridges omit it (backward-compat NO-OP in fold-event.ts).
+         */
+        clipSid?: string;
       };
     }
   | {
