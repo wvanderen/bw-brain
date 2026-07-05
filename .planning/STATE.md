@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 03.1
-status: verifying
-stopped_at: Phase 03.1 context gathered
-last_updated: "2026-07-04T23:56:24.083Z"
-last_activity: 2026-06-30
-last_activity_desc: Plan 03-05 Task 1 (Pi /vary /apply /diff skills) shipped; Task 2 UAT gate pending human
+current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
+status: executing
+stopped_at: Completed 03.1-01-PLAN.md (bridge auto-reconnect D-07/D-08)
+last_updated: "2026-07-05T01:21:02.001Z"
+last_activity: 2026-07-05
+last_activity_desc: Phase 03.1 execution started
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 20
+  completed_plans: 17
   percent: 50
-current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 ---
 
 # Project State
@@ -24,14 +24,14 @@ current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 03 — reversible-midi-patching-m2
+**Current focus:** Phase 03.1 — gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 
 ## Current Position
 
-Phase: 03.1
-Plan: 5 of 5 (executed)
-Status: ready_for_verification — Plan 03-05 Task 1 done; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint (CHECKPOINT REACHED)
-Last activity: 2026-06-30 — Plan 03-05 Task 1 (Pi /vary /apply /diff skills) shipped; Task 2 UAT gate pending human
+Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-07-05 — Phase 03.1 execution started
 
 Progress: [██████░░░░] 60% — 2/5 phases complete; Phase 3 plans all executed, blocking end-of-phase UAT (M1–M5) pending human
 
@@ -66,6 +66,7 @@ Progress: [██████░░░░] 60% — 2/5 phases complete; Phase 3 
 | Phase 03 P03 | 88 | 2 tasks | 10 files |
 | Phase 03 P04 | 95 | 2 tasks | 12 files |
 | Phase 03 P05 | 6 | 2 tasks | 8 files |
+| Phase 03.1 P01 | 16 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,7 @@ Recent decisions affecting current work:
 - [Phase ?]: midi.* dispatch DRY preamble (prepareMidiDispatch): watchdog + candidateStore gates + pullLiveClipNotes + loadProfile + resolveHarmonic shared across the 4 handlers (Plan 03-04)
 - [Phase 03]: Phase 03-05: Pi /vary /apply /diff skills (UX-02) shipped — 3 SKILL.md shelling to bw-* CLI only (D-15 no inline diffs, D-04/D-09 flag handling, on-demand diff pane) + 3 structural contract tests. BLOCKER-02 vitest-include defense: daemon/vitest.config.ts include extended with ../pi-pack/skills/**/*.test.ts — without it npm test -- skill exits 0 vacuously (vitest 4.x CLI filter does not override include). Proven: Test Files 3 passed (3) under NO_COLOR=1.
 - [Phase 03]: Phase 03-05: plan status is pending-uat (NOT complete). Task 1 (Pi skills + contract tests) done + committed; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint — live Bitwig + human ears (casino-MIDI refusal audibility, techno-enhances-not-gates, NoteStep grid-lock, undo coalescing, /vary UX legibility). UX-02 implemented but not verified; requirements-completed stays [] until M2/M3/M4/M5 pass. Phase 3 not yet complete.
+- [Phase ?]: [Phase 03.1 P01] D-08 lifecycle loop: startConnector refactored to while(running) delegating to package-private static runConnectorCycle (testable without Bitwig host); pull.join() is the reliable socket-loss signal; Outbox.reset()/clear() defeat Pitfall 2 + drop stale events (D-07); exit() gains defensive socket close.
 
 ### Pending Todos
 
@@ -129,6 +131,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-04T23:56:24.076Z
-Stopped at: Phase 03.1 context gathered
-Resume file: .planning/phases/03.1-gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto/03.1-CONTEXT.md
+Last session: 2026-07-05T01:21:01.996Z
+Stopped at: Completed 03.1-01-PLAN.md (bridge auto-reconnect D-07/D-08)
+Resume file: None
