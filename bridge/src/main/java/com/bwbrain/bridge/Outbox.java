@@ -100,4 +100,33 @@ public final class Outbox {
             writerThread.interrupt(); // unblock queue.take()
         }
     }
+
+    /**
+     * Reset the running flag + clear the stale writer-thread reference so
+     * {@link #startWriterThread(Socket)} is re-callable after {@link #stop()}.
+     *
+     * <p>D-08 / Pitfall 2 — called by the BridgeExtension connector loop between
+     * iterations so the next {@code startWriterThread}'s
+     * {@code running.compareAndSet(false, true)} re-arms cleanly. After
+     * {@code stop()} sets {@code running} false, the CAS is already armable;
+     * {@code reset()} makes the re-arm EXPLICIT and drops the stale
+     * {@code writerThread} field so the next writer is not shadowed by the
+     * previous one's reference. Idempotent.</p>
+     */
+    public void reset() {
+        running.set(false);
+        writerThread = null;
+    }
+
+    /**
+     * Drop all queued events.
+     *
+     * <p>D-07 — called by the connector loop on socket loss so the next writer
+     * does not replay stale events into the reconnected daemon. The daemon's
+     * {@code refreshSnapshot} is the source of truth after reconnect, so
+     * replaying pre-loss events risks double-fold.</p>
+     */
+    public void clear() {
+        queue.clear();
+    }
 }

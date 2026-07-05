@@ -45,7 +45,7 @@ class OutboxResetTest {
             final LinkedBlockingQueue<String> receivedA = new LinkedBlockingQueue<>();
             final Thread readerA = startReader(serverA, receivedA);
             try (final Socket socket1 = new Socket("127.0.0.1", serverA.getLocalPort())) {
-                serverA.accept(); // consume the connection on the server side
+                // readerA owns serverA.accept(); the main thread must not race it.
                 final Outbox outbox = new Outbox();
                 outbox.startWriterThread(socket1);
                 // Drain anything + let the writer park on queue.take().
@@ -61,7 +61,7 @@ class OutboxResetTest {
                     final LinkedBlockingQueue<String> receivedB = new LinkedBlockingQueue<>();
                     final Thread readerB = startReader(serverB, receivedB);
                     try (final Socket socket2 = new Socket("127.0.0.1", serverB.getLocalPort())) {
-                        serverB.accept();
+                        // readerB owns serverB.accept().
                         // The re-arm: second startWriterThread MUST start a fresh
                         // writer (not a NO-OP) that drains to socket2.
                         outbox.startWriterThread(socket2);
@@ -92,7 +92,7 @@ class OutboxResetTest {
             final LinkedBlockingQueue<String> received = new LinkedBlockingQueue<>();
             final Thread reader = startReader(server, received);
             try (final Socket client = new Socket("127.0.0.1", server.getLocalPort())) {
-                server.accept();
+                // reader owns server.accept().
                 final Outbox outbox = new Outbox();
                 outbox.offer("stale-event-1\n");
                 outbox.offer("stale-event-2\n");
@@ -120,7 +120,7 @@ class OutboxResetTest {
             final LinkedBlockingQueue<String> received = new LinkedBlockingQueue<>();
             final Thread reader = startReader(server, received);
             try (final Socket client = new Socket("127.0.0.1", server.getLocalPort())) {
-                server.accept();
+                // reader owns server.accept().
                 final Outbox outbox = new Outbox();
                 assertDoesNotThrow(outbox::reset);
                 assertDoesNotThrow(outbox::reset); // twice — idempotent.
