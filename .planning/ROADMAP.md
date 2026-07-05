@@ -125,6 +125,25 @@ Plans:
 
 - [~] 03-05-PLAN.md — Pi /vary /apply /diff skills (UX-02) + end-of-phase manual UAT M1..M5 (autonomous: false — Task 2 blocking checkpoint, Wave 4) — Task 1 done + committed; Task 2 (M1–M5 manual UAT) BLOCKING pending human (CHECKPOINT REACHED)
 
+### Phase 03.1: Gap closure: clip-identity scope, apply pre-flight, bridge auto-reconnect, skill-prompt stale update (INSERTED)
+
+**Goal**: Make "apply silently lands on the wrong clip" impossible, the bridge self-healing, and the Pi prompts honest about the relaxed freshness gate — closing the four trust-spine gaps surfaced by the 2026-07-04 live M4 UAT. The M4 UAT proved the Phase-3 reversible-patching mechanic works end-to-end (vary candidates 0.93–1.0 sim; 20-op apply/revert round-trip green) BUT exposed one critical blocker (apply can silently land on the wrong clip because `state.selection.clipSid` is never populated) plus three secondary gaps (no apply pre-flight, bridge dies on socket loss, Pi prompts contradict the relaxed daemon gate). No new creative capabilities; trust-spine hardening only. Phase 3's M1 (native undo step-count) + M5 (techno profile comparison) live UATs stay explicitly OUT of scope (D-12).
+**Requirements**: No new requirement IDs (D-12) — work hardens Phase 3's EDIT-01/04/05, BRIDGE-01/03, STATE-04, UX-02, ARCH-01/02
+**Depends on**: Phase 3
+**Plans:** 4 plans
+
+Plans:
+
+**Wave 1** *(parallel — zero file overlap between 01/02/04)*
+
+- [ ] 03.1-01-PLAN.md — [GAP CLOSURE] Bridge auto-reconnect lifecycle: Outbox.reset()+clear() (D-07/Pitfall 2) + BridgeExtension.startConnector while(running) loop + defensive exit() + 2 new JUnit tests + live-Bitwig reconnect checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 1)
+- [ ] 03.1-02-PLAN.md — [GAP CLOSURE] clipSid foundation: bridge ClipSid.java V1 sha256(trackSid:loopBeats) derivation (D-01 javap-definitive) + event.schema.json payload field (D-03a) + fold-event.ts push fold (D-03c) + boot.ts refreshSnapshot get.selected_clip pull (D-03d CONTEXT.md correction) + Observers/PullHandlers wiring (D-03a/b) + live-Bitwig clipSid-reads checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 1)
+- [ ] 03.1-04-PLAN.md — [GAP CLOSURE] Pi skill freshness-gate realignment: additive ## Freshness gate (D-10) section to vary/apply/diff SKILL.md + ## Wrong-clip targeting (D-04/D-06) section to apply/SKILL.md only + D-10/D-11 contract assertions in all 3 skill.test.ts (autonomous, Wave 1)
+
+**Wave 2** *(blocked on Wave 1 — Plan 03 reads selection.clipSid populated by Plan 02)*
+
+- [ ] 03.1-03-PLAN.md — [GAP CLOSURE] Apply/revert pre-flight gates: extended safeSendErr(details?) (D-06/Pitfall 8) + candidate-store previewClipSid + patch-history clipSid (D-04/05 plumbing) + handleEditApply + handleEditRevert gates refuse wrong_clip_targeted BEFORE bridge round-trip + CRITICAL blocker-closure tests + live-Bitwig pre-flight checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 2; unblocks the M4 UAT blocker end-to-end)
+
 ### Phase 4: Arrangement Intelligence (M3)
 
 **Goal**: The assistant delivers genuinely useful project-level arrangement critique — sections, repetition, energy, transitions, and track roles — as observation/suggestion only (Bitwig's API cannot edit the arranger, so edits route through launcher clips or remain advisory).
