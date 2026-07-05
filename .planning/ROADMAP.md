@@ -130,9 +130,13 @@ Plans:
 **Goal**: Make "apply silently lands on the wrong clip" impossible, the bridge self-healing, and the Pi prompts honest about the relaxed freshness gate — closing the four trust-spine gaps surfaced by the 2026-07-04 live M4 UAT. The M4 UAT proved the Phase-3 reversible-patching mechanic works end-to-end (vary candidates 0.93–1.0 sim; 20-op apply/revert round-trip green) BUT exposed one critical blocker (apply can silently land on the wrong clip because `state.selection.clipSid` is never populated) plus three secondary gaps (no apply pre-flight, bridge dies on socket loss, Pi prompts contradict the relaxed daemon gate). No new creative capabilities; trust-spine hardening only. Phase 3's M1 (native undo step-count) + M5 (techno profile comparison) live UATs stay explicitly OUT of scope (D-12).
 **Requirements**: No new requirement IDs (D-12) — work hardens Phase 3's EDIT-01/04/05, BRIDGE-01/03, STATE-04, UX-02, ARCH-01/02
 **Depends on**: Phase 3
-**Plans:** 5/5 plans complete
+**Plans:** 5/6 plans complete (Plan 06 gap-closure pending)
 
 Plans:
+
+**Gap Closure** *(post-UAT — Test [4,5] D-06 CLI surfacing gap; standalone, no deps)*
+
+- [ ] 03.1-06-PLAN.md — [GAP CLOSURE] CLI ok:false envelope surfacing: query-client.ts DaemonReplyError preserves the full wrong_clip_targeted envelope (expectedClipSid/actualClipSid/hint + real stateFreshness) + edit.ts catch blocks surface it verbatim (printConnectionError retained for the genuine socket-absent case) + edit.test.ts CLI-layer proof. Daemon UNCHANGED (query-server.test.ts:601-811 proves it correct). Closes UAT Tests [4,5]. (autonomous, Wave 1)
 
 **Wave 1** *(parallel — zero file overlap between 01/02/04)*
 
