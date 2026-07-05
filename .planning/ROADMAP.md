@@ -130,7 +130,7 @@ Plans:
 **Goal**: Make "apply silently lands on the wrong clip" impossible, the bridge self-healing, and the Pi prompts honest about the relaxed freshness gate — closing the four trust-spine gaps surfaced by the 2026-07-04 live M4 UAT. The M4 UAT proved the Phase-3 reversible-patching mechanic works end-to-end (vary candidates 0.93–1.0 sim; 20-op apply/revert round-trip green) BUT exposed one critical blocker (apply can silently land on the wrong clip because `state.selection.clipSid` is never populated) plus three secondary gaps (no apply pre-flight, bridge dies on socket loss, Pi prompts contradict the relaxed daemon gate). No new creative capabilities; trust-spine hardening only. Phase 3's M1 (native undo step-count) + M5 (techno profile comparison) live UATs stay explicitly OUT of scope (D-12).
 **Requirements**: No new requirement IDs (D-12) — work hardens Phase 3's EDIT-01/04/05, BRIDGE-01/03, STATE-04, UX-02, ARCH-01/02
 **Depends on**: Phase 3
-**Plans:** 4/4 plans complete
+**Plans:** 5/5 plans complete
 
 Plans:
 
@@ -139,6 +139,7 @@ Plans:
 - [x] 03.1-01-PLAN.md — [GAP CLOSURE] Bridge auto-reconnect lifecycle: Outbox.reset()+clear() (D-07/Pitfall 2) + BridgeExtension.startConnector while(running) loop + defensive exit() + 2 new JUnit tests + live-Bitwig reconnect checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 1)
 - [x] 03.1-02-PLAN.md — [GAP CLOSURE] clipSid foundation: bridge ClipSid.java V1 sha256(trackSid:loopBeats) derivation (D-01 javap-definitive) + event.schema.json payload field (D-03a) + fold-event.ts push fold (D-03c) + boot.ts refreshSnapshot get.selected_clip pull (D-03d CONTEXT.md correction) + Observers/PullHandlers wiring (D-03a/b) + live-Bitwig clipSid-reads checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 1)
 - [x] 03.1-04-PLAN.md — [GAP CLOSURE] Pi skill freshness-gate realignment: additive ## Freshness gate (D-10) section to vary/apply/diff SKILL.md + ## Wrong-clip targeting (D-04/D-06) section to apply/SKILL.md only + D-10/D-11 contract assertions in all 3 skill.test.ts (autonomous, Wave 1)
+- [ ] 03.1-05-PLAN.md — [GAP CLOSURE] Bridge-artifact staleness CI/verify gate: new scripts/check-bridge-artifact.mjs (sibling to check-deprecated-bridge.mjs / check-capabilities-doc.mjs) compares bridge/target/bw-brain.bwextension mtime vs newest source commit among the shade-plugin input set + check:bridge-artifact npm wiring in daemon/package.json — prevents the stale-.bwextension recurrence class that caused the Phase-03.1 UAT Test-3 blocker (autonomous, Wave 1)
 
 **Wave 2** *(blocked on Wave 1 — Plan 03 reads selection.clipSid populated by Plan 02)*
 
