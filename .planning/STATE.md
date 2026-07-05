@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 03.1
 current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
-status: verifying
-stopped_at: Completed 03.1-03-PLAN.md (apply/revert pre-flight gates — Phase 03.1 code-complete)
-last_updated: "2026-07-05T01:59:30.560Z"
+status: executing
+stopped_at: Completed 03.1-05-PLAN.md (bridge-artifact staleness gate — Phase 03.1 hardened, all 5 plans complete)
+last_updated: "2026-07-05T21:58:00.708Z"
 last_activity: 2026-07-05
-last_activity_desc: Phase 03.1 plan 02 complete (clipSid live)
+last_activity_desc: Phase 03.1 execution started
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 21
+  completed_plans: 21
   percent: 67
 ---
 
@@ -29,9 +29,9 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-07-05 — Phase 03.1 plan 02 complete (clipSid live)
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-07-05 — Phase 03.1 execution started
 
 Progress: [█████████░] 90% — 18/20 plans complete; 03.1 plan 02 (clipSid) shipped; plans 03 (apply pre-flight) + 04 (skill-prompt realignment) remain before end-of-phase UAT
 
@@ -70,6 +70,7 @@ Progress: [█████████░] 90% — 18/20 plans complete; 03.1 pl
 | Phase 03.1 P02 | 6 min | 3 tasks | 10 files |
 | Phase 03.1 P04 | 2 min | 2 tasks | 6 files |
 | Phase 03.1 P03 | 13 min | 3 tasks | 4 files |
+| Phase 03.1 P05 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T01:59:30.553Z
-Stopped at: Completed 03.1-03-PLAN.md (apply/revert pre-flight gates — Phase 03.1 code-complete)
+Last session: 2026-07-05T21:58:00.701Z
+Stopped at: Completed 03.1-05-PLAN.md (bridge-artifact staleness gate — Phase 03.1 hardened, all 5 plans complete)
 Resume file: None
