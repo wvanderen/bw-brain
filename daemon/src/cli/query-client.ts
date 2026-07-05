@@ -19,6 +19,31 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { CliResult } from "../gen/result.js";
 
+/**
+ * Error subclass carrying the FULL ok:false CliResult envelope (stateFreshness +
+ * error + any detail fields like expectedClipSid/actualClipSid/hint). query()
+ * rejects with a DaemonReplyError when the daemon returned a structured ok:false
+ * (e.g. wrong_clip_targeted, confirmation_required, candidate_not_found) so catch
+ * blocks can distinguish "the daemon said no" (DaemonReplyError, has .envelope
+ * → print verbatim) from "the daemon was unreachable" (plain Error, no envelope
+ * → print the disconnected stub truthfully, SC#3).
+ *
+ * The `.message` preserves the existing human-readable shape (`<error>
+ * (available from <X>)`) so any caller that logs `e.message` is unaffected.
+ * Plan 03.1-06 closes the D-06 surface gap.
+ */
+export class DaemonReplyError extends Error {
+  readonly envelope: CliResult;
+  constructor(envelope: CliResult) {
+    const errStr = (envelope as { error?: string }).error ?? "unknown daemon error";
+    const avail = (envelope as { availableFrom?: string }).availableFrom;
+    const tail = avail ? ` (available from ${avail})` : "";
+    super(`${errStr}${tail}`);
+    this.name = "DaemonReplyError";
+    this.envelope = envelope;
+  }
+}
+
 /** Default UDS path: ~/.bw-brain/daemon.sock (Plan 03b). Override via BW_BRAIN_SOCKET. */
 export const DEFAULT_SOCKET: string =
   process.env.BW_BRAIN_SOCKET ?? join(homedir(), ".bw-brain", "daemon.sock");
@@ -38,9 +63,12 @@ export const DEFAULT_SOCKET: string =
  * @param socketPath - UDS path (default {@link DEFAULT_SOCKET}).
  * @returns the daemon's full CliResult envelope (version/ok/stateFreshness/
  *   payload/assumptions) when `ok:true`.
- * @throws when the daemon returns `ok:false` (Error carries error+availableFrom),
- *   the socket is missing/unreachable (clear connection error), or the daemon
- *   closes before sending a complete result line.
+ * @throws when the daemon returns `ok:false` — `DaemonReplyError` carries the
+ *   FULL CliResult envelope (stateFreshness + error + any detail fields like
+ *   expectedClipSid/actualClipSid/hint); a plain `Error` indicates the socket
+ *   was missing/unreachable or the daemon closed before sending a complete
+ *   result (catch blocks distinguish the two: DaemonReplyError → print the
+ *   envelope verbatim; plain Error → print the disconnected stub truthfully).
  *
  * @example
  * const result = await query("focus.export");
@@ -72,8 +100,7 @@ export function query(op: string, payload: unknown = {}, socketPath: string = DE
         if (result.ok) {
           resolve(result);
         } else {
-          const tail = result.availableFrom ? ` (available from ${result.availableFrom})` : "";
-          reject(new Error(`${result.error ?? "unknown daemon error"}${tail}`));
+          reject(new DaemonReplyError(result));
         }
       }
     });

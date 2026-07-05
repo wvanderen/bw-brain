@@ -18,7 +18,7 @@
 // Self-contained: registers + parses process.argv.
 
 import { program } from "commander";
-import { query } from "../query-client.js";
+import { query, DaemonReplyError } from "../query-client.js";
 import { readFileSync } from "node:fs";
 
 interface ExplainOpts {
@@ -31,7 +31,30 @@ interface ApplyOpts extends ExplainOpts {
   allowBelowBar?: boolean;
 }
 
-/** Shared fail-closed envelope (mirrors midi.ts:16-25 — SC#3 disconnected surface). */
+/**
+ * Catch-block dispatcher (Pitfall 8 — ONE helper at the CLI layer too):
+ * - DaemonReplyError → the daemon returned a structured ok:false (e.g.
+ *   wrong_clip_targeted, confirmation_required). Print the envelope VERBATIM so
+ *   the producer sees the daemon's real stateFreshness + the detail fields
+ *   (expectedClipSid/actualClipSid/hint — D-06 surface contract).
+ * - plain Error → the daemon was unreachable (socket absent / closed mid-query).
+ *   Fall through to printConnectionError, whose disconnected stub is the
+ *   TRUTHFUL answer in that case (SC#3).
+ */
+function printResultOrDisconnect(e: unknown, explain?: boolean): void {
+  if (e instanceof DaemonReplyError) {
+    process.stdout.write(`${JSON.stringify(e.envelope, null, explain ? 2 : 0)}\n`);
+  } else {
+    printConnectionError((e as Error).message, explain);
+  }
+}
+
+/**
+ * Shared fail-closed envelope (mirrors midi.ts:16-25 — SC#3 disconnected surface).
+ * This is the honest disconnected stub for the GENUINE daemon-unreachable case
+ * (SC#3); daemon-returned ok:false envelopes are surfaced verbatim via
+ * printResultOrDisconnect and never reach here.
+ */
 function printConnectionError(message: string, explain?: boolean): void {
   const envelope = {
     version: "1.0",
@@ -63,7 +86,7 @@ program
       const result = await query("edit.preview", { patch });
       process.stdout.write(`${JSON.stringify(result, null, opts.explain ? 2 : 0)}\n`);
     } catch (e) {
-      printConnectionError((e as Error).message, opts.explain);
+      printResultOrDisconnect(e, opts.explain);
     }
   });
 
@@ -89,7 +112,7 @@ program
       });
       process.stdout.write(`${JSON.stringify(result, null, opts.explain ? 2 : 0)}\n`);
     } catch (e) {
-      printConnectionError((e as Error).message, opts.explain);
+      printResultOrDisconnect(e, opts.explain);
     }
   });
 
@@ -108,7 +131,7 @@ program
       const result = await query("edit.revert", { patchId });
       process.stdout.write(`${JSON.stringify(result, null, opts.explain ? 2 : 0)}\n`);
     } catch (e) {
-      printConnectionError((e as Error).message, opts.explain);
+      printResultOrDisconnect(e, opts.explain);
     }
   });
 
