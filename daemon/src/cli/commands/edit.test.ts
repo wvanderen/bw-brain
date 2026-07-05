@@ -107,6 +107,31 @@ function errEnvelope(error: string): CliResult {
   } as CliResult;
 }
 
+/**
+ * Build a wrong_clip_targeted envelope matching the EXACT wire shape the real
+ * daemon emits via safeSendErr(details) — query-server.ts:872-882. The detail
+ * family REPLACES availableFrom (no availableFrom key on the wire for the
+ * details family). Plan 03.1-06 closes the D-06 surface gap (Tests 4+5).
+ */
+function wrongClipEnvelope(opts: {
+  expectedClipSid: string;
+  actualClipSid: string;
+  hint: string;
+  freshness?: "live" | "stale" | "disconnected";
+}): CliResult {
+  return {
+    version: "1.0",
+    type: "result",
+    ok: false,
+    stateFreshness: opts.freshness ?? "live",
+    error: "wrong_clip_targeted",
+    expectedClipSid: opts.expectedClipSid,
+    actualClipSid: opts.actualClipSid,
+    hint: opts.hint,
+    // CliResult's index signature [k:string]: unknown permits the detail fields.
+  } as CliResult;
+}
+
 /** The fake daemon's simplified edit.* dispatch (mirrors the daemon's gating rules). */
 function dispatch(q: InboundQuery): CliResult {
   const op = q.op ?? "";
@@ -116,6 +141,24 @@ function dispatch(q: InboundQuery): CliResult {
   if (op === "edit.apply") {
     const p = q.payload ?? {};
     const patchId = p.patchId ?? "";
+    // D-06 wrong_clip_targeted — apply path (Test 4). NOTE: differs from the
+    // revert branch's expected/actual values so a test that accidentally
+    // hardcodes apply values cannot pass the revert assertion.
+    if (patchId.startsWith("pt_wrongclipstale")) {
+      return wrongClipEnvelope({
+        expectedClipSid: "clip_aaaaaaaaaaaaaaaa",
+        actualClipSid: "clip_bbbbbbbbbbbbbbbb",
+        hint: "re-select the clip you previewed (or re-preview)",
+        freshness: "stale",
+      });
+    }
+    if (patchId.startsWith("pt_wrongclip")) {
+      return wrongClipEnvelope({
+        expectedClipSid: "clip_aaaaaaaaaaaaaaaa",
+        actualClipSid: "clip_bbbbbbbbbbbbbbbb",
+        hint: "re-select the clip you previewed (or re-preview)",
+      });
+    }
     // candidate_not_found: an unknown patchId.
     if (patchId === "pt_unknown000000000000000000000") {
       return errEnvelope("candidate_not_found");
@@ -135,7 +178,17 @@ function dispatch(q: InboundQuery): CliResult {
     return applyOk(patchId);
   }
   if (op === "edit.revert") {
-    return revertOk(q.payload?.patchId ?? "");
+    const patchId = q.payload?.patchId ?? "";
+    // D-06 wrong_clip_targeted — revert path (Test 5). DIFFERENT field values
+    // than the apply branch + the real daemon's revert hint (query-server.ts:770).
+    if (patchId.startsWith("pt_wrongclip")) {
+      return wrongClipEnvelope({
+        expectedClipSid: "clip_cccccccccccccccc",
+        actualClipSid: "clip_dddddddddddddddd",
+        hint: "re-select the clip you applied this patch to (or use Bitwig ⌘Z)",
+      });
+    }
+    return revertOk(patchId);
   }
   return errEnvelope("not_implemented");
 }
@@ -268,5 +321,51 @@ describe("bw-edit fail-closed path (SC#3)", () => {
     const out = JSON.parse(r.stdout);
     expect(out.ok).toBe(false);
     expect(out.stateFreshness).toBe("disconnected");
+  });
+});
+
+describe("bw-edit wrong_clip_targeted D-06 surface (Tests 4+5 gap closure)", () => {
+  it("apply surfaces wrong_clip_targeted with expectedClipSid/actualClipSid/hint + the daemon's real stateFreshness (Test 4)", async () => {
+    const r = await runEdit(["apply", "pt_wrongclip_apply_path_0001"]);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.error).toBe("wrong_clip_targeted");
+    expect(out.expectedClipSid).toBe("clip_aaaaaaaaaaaaaaaa");
+    expect(out.actualClipSid).toBe("clip_bbbbbbbbbbbbbbbb");
+    expect(out.hint).toMatch(/re-select|re-preview/i);
+    // The critical D-06 assertion: the CLI relays the daemon's REAL freshness
+    // (live), NOT the hardcoded disconnected stub the current printConnectionError
+    // emits. This fails against the pre-fix CLI and passes after Task 2.
+    expect(out.stateFreshness).toBe("live");
+  });
+
+  it("revert surfaces wrong_clip_targeted with the detail fields + real stateFreshness (Test 5)", async () => {
+    const r = await runEdit(["revert", "pt_wrongclip_revert_path_001"]);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.error).toBe("wrong_clip_targeted");
+    // Revert-branch values (clip_ccc.../clip_ddd...) — distinct from the apply
+    // branch so accidental hardcoding of apply values cannot pass this test.
+    expect(out.expectedClipSid).toBe("clip_cccccccccccccccc");
+    expect(out.actualClipSid).toBe("clip_dddddddddddddddd");
+    expect(out.hint).toMatch(/re-select|⌘Z/i);
+    expect(out.stateFreshness).toBe("live");
+  });
+
+  it("apply wrong_clip_targeted relays stateFreshness:stale honestly (D-10 — stale is trustworthy, not disconnected)", async () => {
+    const r = await runEdit(["apply", "pt_wrongclipstale_apply_0001"]);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(false);
+    expect(out.error).toBe("wrong_clip_targeted");
+    expect(out.expectedClipSid).toBe("clip_aaaaaaaaaaaaaaaa");
+    expect(out.actualClipSid).toBe("clip_bbbbbbbbbbbbbbbb");
+    expect(out.hint).toMatch(/re-select|re-preview/i);
+    // Regression guard: the CLI must relay the daemon's actual freshness rather
+    // than assuming live-or-disconnected only. The watchdog's stale state is
+    // trustworthy per D-10; the CLI must not paper over it.
+    expect(out.stateFreshness).toBe("stale");
   });
 });
