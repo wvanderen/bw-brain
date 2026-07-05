@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 03.1
 current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 status: executing
-stopped_at: Completed 03.1-05-PLAN.md (bridge-artifact staleness gate — Phase 03.1 hardened, all 5 plans complete)
-last_updated: "2026-07-05T21:58:00.708Z"
+stopped_at: Completed 03.1-06-PLAN.md (CLI D-06 surface — wrong_clip_targeted gap closed)
+last_updated: "2026-07-05T23:25:54.969Z"
 last_activity: 2026-07-05
 last_activity_desc: Phase 03.1 execution started
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 21
-  completed_plans: 21
+  total_plans: 22
+  completed_plans: 22
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-07-05 — Phase 03.1 execution started
 
@@ -71,6 +71,7 @@ Progress: [█████████░] 90% — 18/20 plans complete; 03.1 pl
 | Phase 03.1 P04 | 2 min | 2 tasks | 6 files |
 | Phase 03.1 P03 | 13 min | 3 tasks | 4 files |
 | Phase 03.1 P05 | 5min | 2 tasks | 2 files |
+| Phase 03.1 P06 | 4 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 03.1 P04] BLOCKER-02 vitest-include preserved — daemon/vitest.config.ts UNCHANGED. The include '../pi-pack/skills/**/*.test.ts' (Plan 03-05) already covers all three test files; npm test -- --run ../pi-pack/skills runs non-vacuously (Test Files 3 passed, 29/29 green).
 - [Phase ?]: Phase 03.1 P03: D-04 apply pre-flight gate refuses wrong_clip_targeted when candidate.previewClipSid ≠ state.selection.clipSid BEFORE the bridge round-trip — M4 UAT critical blocker mechanically closed. D-05 revert gate symmetric. Pitfall 8 honored (single safeSendErr with optional details arg).
 - [Phase ?]: Phase 03.1 P03: Pre-fix migration policy symmetric across apply + revert — legacy candidates (previewClipSid undefined) and legacy journal entries (clipSid undefined) proceed with surfaced assumptions ('cursor clip unverified'), preserving recovery paths. Refusing would remove the recovery path with no alternative (Bitwig native undo is unreliable per docs/bitwig-capabilities.md §1).
+- [Phase ?]: Phase 03.1 P06: D-06 surface gap closed at CLI layer — DaemonReplyError preserves full ok:false envelope; printResultOrDisconnect surfaces it verbatim; plain-Error asymmetry for genuine-unreachable keeps SC#3 honest. Daemon unchanged; siblings adopt automatically. UAT Tests [4,5] closed.
 
 ### Pending Todos
 
@@ -144,6 +146,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T21:58:00.701Z
-Stopped at: Completed 03.1-05-PLAN.md (bridge-artifact staleness gate — Phase 03.1 hardened, all 5 plans complete)
+Last session: 2026-07-05T23:25:54.962Z
+Stopped at: Completed 03.1-06-PLAN.md (CLI D-06 surface — wrong_clip_targeted gap closed)
 Resume file: None
