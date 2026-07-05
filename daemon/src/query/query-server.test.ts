@@ -14,13 +14,18 @@
 // covers the transport layer end-to-end).
 
 import { describe, it, expect } from "vitest";
-import { startQueryServer, type QueryServerDeps } from "./query-server.js";
+import { startQueryServer, safeSendErr, type QueryServerDeps } from "./query-server.js";
 import { CandidateStore } from "../patch/candidate-store.js";
+import { PatchHistory, type PatchHistoryEntry } from "../patch/patch-history.js";
 import type { StaleWatchdog } from "../state/stale-watchdog.js";
 import type { RawState } from "../state/reconcile.js";
 import type { ProjectIntent } from "../gen/intent.js";
 import type { Transport } from "../transport/transport.js";
 import type { Note } from "../cli/diff-logic.js";
+import type { Patch } from "../gen/patch.js";
+import * as os from "node:os";
+import * as path from "node:path";
+import * as fs from "node:fs/promises";
 
 /** Fake transport: captures the registered handler + every sent message. */
 interface CapturingTransport extends Transport {
@@ -397,5 +402,138 @@ describe("midi.counterline / voice_leading_fix / humanize dispatch (MIDI-03/04/0
     const payload = res.payload as { patchId: string; risk: string };
     expect(payload.patchId).toMatch(/^pt_/);
     expect(payload.risk).toBe("low");
+  });
+});
+
+// ============================================================================
+// Phase 03.1 Plan 03 Task 1 — D-04/05/06 plumbing tests (RED).
+//   safeSendErr(details?) extension (D-06, Pitfall 8 — single function),
+//   candidateStore.mint stamps previewClipSid (D-04),
+//   patch-history PatchHistoryEntry carries additive clipSid? (D-05).
+// ============================================================================
+
+describe("safeSendErr details extension (D-06, Pitfall 8)", () => {
+  it("safeSendErrWithDetails: details arg appends expectedClipSid/actualClipSid/hint INSTEAD OF availableFrom", () => {
+    const transport = makeCapturingTransport();
+    safeSendErr(transport, "live", "wrong_clip_targeted", {
+      expectedClipSid: "clip_aaa1111122223333",
+      actualClipSid: "clip_bbb2222233334444",
+      hint: "re-select the clip you previewed (or re-preview)",
+    });
+    expect(transport.sent).toHaveLength(1);
+    const sent = transport.sent[0] as Record<string, unknown>;
+    expect(sent.ok).toBe(false);
+    expect(sent.error).toBe("wrong_clip_targeted");
+    expect(sent.stateFreshness).toBe("live");
+    expect(sent.expectedClipSid).toBe("clip_aaa1111122223333");
+    expect(sent.actualClipSid).toBe("clip_bbb2222233334444");
+    expect(sent.hint).toBe("re-select the clip you previewed (or re-preview)");
+    // When details is provided, availableFrom:"M2" MUST NOT appear (Pitfall 8 —
+    // the details REPLACE the availableFrom field, not append to it).
+    expect(sent.availableFrom).toBeUndefined();
+  });
+
+  it("safeSendErrBackwardCompat: no details arg still sends availableFrom:'M2' (existing callers unchanged)", () => {
+    const transport = makeCapturingTransport();
+    safeSendErr(transport, "live", "candidate_not_found");
+    expect(transport.sent).toHaveLength(1);
+    const sent = transport.sent[0] as Record<string, unknown>;
+    expect(sent.ok).toBe(false);
+    expect(sent.error).toBe("candidate_not_found");
+    expect(sent.availableFrom).toBe("M2");
+    // No detail fields spill when details is absent.
+    expect(sent.expectedClipSid).toBeUndefined();
+    expect(sent.actualClipSid).toBeUndefined();
+    expect(sent.hint).toBeUndefined();
+  });
+
+  it("safeSendErr: stale freshness rides through; details still spread", () => {
+    const transport = makeCapturingTransport();
+    safeSendErr(transport, "stale", "wrong_clip_targeted", {
+      expectedClipSid: "clip_ccc3333344445555",
+      actualClipSid: "clip_ddd4444455556666",
+      hint: "re-select",
+    });
+    const sent = transport.sent[0] as Record<string, unknown>;
+    expect(sent.stateFreshness).toBe("stale");
+    expect(sent.expectedClipSid).toBe("clip_ccc3333344445555");
+  });
+});
+
+describe("candidateStore.mint stamps previewClipSid (D-04)", () => {
+  it("candidateStoreMintStampsPreviewClipSid: the second mint arg appears on the stored Patch", () => {
+    const store = new CandidateStore();
+    const minted = store.mint(
+      {
+        scope: { clipSid: "clip_aaa1111122223333" },
+        operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+        rationale: "test",
+        reversibility: "self-inverse",
+        risk: "low",
+      },
+      "clip_preview_aaa1111122223333",
+    );
+    expect(minted.patchId).toMatch(/^pt_/);
+    // previewClipSid stamped at mint time — D-04 plumbing.
+    expect((minted as Patch & { previewClipSid?: string }).previewClipSid).toBe("clip_preview_aaa1111122223333");
+    // The store round-trips the field (LRU refresh preserves it).
+    const got = store.get(minted.patchId);
+    expect(got).toBeDefined();
+    expect((got as Patch & { previewClipSid?: string }).previewClipSid).toBe("clip_preview_aaa1111122223333");
+  });
+});
+
+describe("patch-history PatchHistoryEntry carries additive clipSid (D-05)", () => {
+  it("patchHistoryEntryCarriesClipSid: entry with clipSid round-trips through append + find", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-ph-"));
+    const journalPath = path.join(dir, "patch-history.jsonl");
+    try {
+      const hist = new PatchHistory(journalPath);
+      const entry: PatchHistoryEntry = {
+        patchId: "pt_test_clipSid_roundtrip",
+        scope: { clipSid: "clip_aaa1111122223333" },
+        operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+        rationale: "test",
+        reversibility: "self-inverse",
+        risk: "low",
+        inverseOperations: [{ op: "remove_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+        appliedAt: Date.now(),
+        stateHashBefore: "clip:test",
+        // D-05: additive field, stamped at apply time.
+        clipSid: "clip_aaa1111122223333",
+      };
+      await hist.append(entry);
+      const found = await hist.find("pt_test_clipSid_roundtrip");
+      expect(found).not.toBeNull();
+      expect(found!.clipSid).toBe("clip_aaa1111122223333");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("patchHistoryEntryWithoutClipSid: pre-fix entry (no clipSid) round-trips with clipSid undefined", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-ph-"));
+    const journalPath = path.join(dir, "patch-history.jsonl");
+    try {
+      const hist = new PatchHistory(journalPath);
+      const entry: PatchHistoryEntry = {
+        patchId: "pt_test_prefix_no_clipsid",
+        scope: { clipSid: "" },
+        operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+        rationale: "pre-fix",
+        reversibility: "self-inverse",
+        risk: "low",
+        inverseOperations: [{ op: "remove_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+        appliedAt: Date.now(),
+        stateHashBefore: "clip:pre-fix",
+        // clipSid intentionally absent (pre-fix journal entry).
+      };
+      await hist.append(entry);
+      const found = await hist.find("pt_test_prefix_no_clipsid");
+      expect(found).not.toBeNull();
+      expect(found!.clipSid).toBeUndefined();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 });
