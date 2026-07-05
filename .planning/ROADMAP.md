@@ -130,7 +130,7 @@ Plans:
 **Goal**: Make "apply silently lands on the wrong clip" impossible, the bridge self-healing, and the Pi prompts honest about the relaxed freshness gate — closing the four trust-spine gaps surfaced by the 2026-07-04 live M4 UAT. The M4 UAT proved the Phase-3 reversible-patching mechanic works end-to-end (vary candidates 0.93–1.0 sim; 20-op apply/revert round-trip green) BUT exposed one critical blocker (apply can silently land on the wrong clip because `state.selection.clipSid` is never populated) plus three secondary gaps (no apply pre-flight, bridge dies on socket loss, Pi prompts contradict the relaxed daemon gate). No new creative capabilities; trust-spine hardening only. Phase 3's M1 (native undo step-count) + M5 (techno profile comparison) live UATs stay explicitly OUT of scope (D-12).
 **Requirements**: No new requirement IDs (D-12) — work hardens Phase 3's EDIT-01/04/05, BRIDGE-01/03, STATE-04, UX-02, ARCH-01/02
 **Depends on**: Phase 3
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 
@@ -142,7 +142,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 — Plan 03 reads selection.clipSid populated by Plan 02)*
 
-- [ ] 03.1-03-PLAN.md — [GAP CLOSURE] Apply/revert pre-flight gates: extended safeSendErr(details?) (D-06/Pitfall 8) + candidate-store previewClipSid + patch-history clipSid (D-04/05 plumbing) + handleEditApply + handleEditRevert gates refuse wrong_clip_targeted BEFORE bridge round-trip + CRITICAL blocker-closure tests + live-Bitwig pre-flight checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 2; unblocks the M4 UAT blocker end-to-end)
+- [x] 03.1-03-PLAN.md — [GAP CLOSURE] Apply/revert pre-flight gates: extended safeSendErr(details?) (D-06/Pitfall 8) + candidate-store previewClipSid + patch-history clipSid (D-04/05 plumbing) + handleEditApply + handleEditRevert gates refuse wrong_clip_targeted BEFORE bridge round-trip + CRITICAL blocker-closure tests + live-Bitwig pre-flight checkpoint (autonomous: false — Task 3 blocking checkpoint, Wave 2; unblocks the M4 UAT blocker end-to-end)
 
 ### Phase 4: Arrangement Intelligence (M3)
 

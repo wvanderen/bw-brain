@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 03.1
 current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
-status: executing
-stopped_at: Completed 03.1-04-PLAN.md (skill-prompt D-10/D-11 realignment)
-last_updated: "2026-07-05T01:40:49.822Z"
+status: verifying
+stopped_at: Completed 03.1-03-PLAN.md (apply/revert pre-flight gates — Phase 03.1 code-complete)
+last_updated: "2026-07-05T01:59:30.560Z"
 last_activity: 2026-07-05
 last_activity_desc: Phase 03.1 plan 02 complete (clipSid live)
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 20
-  completed_plans: 19
-  percent: 50
+  completed_plans: 20
+  percent: 67
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-05 — Phase 03.1 plan 02 complete (clipSid live)
 
 Progress: [█████████░] 90% — 18/20 plans complete; 03.1 plan 02 (clipSid) shipped; plans 03 (apply pre-flight) + 04 (skill-prompt realignment) remain before end-of-phase UAT
@@ -69,6 +69,7 @@ Progress: [█████████░] 90% — 18/20 plans complete; 03.1 pl
 | Phase 03.1 P01 | 16 min | 3 tasks | 4 files |
 | Phase 03.1 P02 | 6 min | 3 tasks | 10 files |
 | Phase 03.1 P04 | 2 min | 2 tasks | 6 files |
+| Phase 03.1 P03 | 13 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 03.1 P04] Wrong-clip targeting section in apply/SKILL.md ONLY — wrong_clip_targeted is apply+revert per D-06; revert surfaces via bw-edit CLI (no /revert skill). The error code itself is IMPLEMENTED in Plan 03.1-03 (next); this plan only prepares the /apply prompt to surface it gracefully. vary/diff intentionally do NOT carry this section.
 - [Phase ?]: [Phase 03.1 P04] Task 2 TDD path (GREEN-from-start): planner split implementation (Task 1) and tests (Task 2) across two tasks in a type:execute plan (not type:tdd). Task 2's contract assertions pass on first run — expected 'feature already exists' path. Single test(03.1-04) commit; no RED applicable.
 - [Phase ?]: [Phase 03.1 P04] BLOCKER-02 vitest-include preserved — daemon/vitest.config.ts UNCHANGED. The include '../pi-pack/skills/**/*.test.ts' (Plan 03-05) already covers all three test files; npm test -- --run ../pi-pack/skills runs non-vacuously (Test Files 3 passed, 29/29 green).
+- [Phase ?]: Phase 03.1 P03: D-04 apply pre-flight gate refuses wrong_clip_targeted when candidate.previewClipSid ≠ state.selection.clipSid BEFORE the bridge round-trip — M4 UAT critical blocker mechanically closed. D-05 revert gate symmetric. Pitfall 8 honored (single safeSendErr with optional details arg).
+- [Phase ?]: Phase 03.1 P03: Pre-fix migration policy symmetric across apply + revert — legacy candidates (previewClipSid undefined) and legacy journal entries (clipSid undefined) proceed with surfaced assumptions ('cursor clip unverified'), preserving recovery paths. Refusing would remove the recovery path with no alternative (Bitwig native undo is unreliable per docs/bitwig-capabilities.md §1).
 
 ### Pending Todos
 
@@ -140,6 +143,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T01:40:49.815Z
-Stopped at: Completed 03.1-04-PLAN.md (skill-prompt D-10/D-11 realignment)
+Last session: 2026-07-05T01:59:30.553Z
+Stopped at: Completed 03.1-03-PLAN.md (apply/revert pre-flight gates — Phase 03.1 code-complete)
 Resume file: None
