@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 03.1
 current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 status: executing
-stopped_at: Completed 03.1-02-PLAN.md (clipSid schema + daemon fold + bridge derivation)
-last_updated: "2026-07-05T01:32:56.746Z"
+stopped_at: Completed 03.1-04-PLAN.md (skill-prompt D-10/D-11 realignment)
+last_updated: "2026-07-05T01:40:49.822Z"
 last_activity: 2026-07-05
 last_activity_desc: Phase 03.1 plan 02 complete (clipSid live)
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 50
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-05 — Phase 03.1 plan 02 complete (clipSid live)
 
@@ -68,6 +68,7 @@ Progress: [█████████░] 90% — 18/20 plans complete; 03.1 pl
 | Phase 03 P05 | 6 | 2 tasks | 8 files |
 | Phase 03.1 P01 | 16 min | 3 tasks | 4 files |
 | Phase 03.1 P02 | 6 min | 3 tasks | 10 files |
+| Phase 03.1 P04 | 2 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,11 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 03.1 P01] D-08 lifecycle loop: startConnector refactored to while(running) delegating to package-private static runConnectorCycle (testable without Bitwig host); pull.join() is the reliable socket-loss signal; Outbox.reset()/clear() defeat Pitfall 2 + drop stale events (D-07); exit() gains defensive socket close.
 - [Phase ?]: [Phase 03.1 P02] D-01 V1 clipSid: "clip_" + sha256(trackSid:loopBeats).slice(0,16) — javap-definitive on the absence of a Clip.name() reader in extension-api:21. Closes the OBSERVED M4 UAT failure (4-bar vs 8-bar). Push/pull paths share hash inputs (cursorTrackName + getLoopLength().get()) so they agree. Residual same-track-same-length collision documented (RESEARCH §D-01(c)); V2 deferred.
 - [Phase ?]: [Phase 03.1 P02] D-03d refreshSnapshot hardening: also pulls get.selected_clip + folds clipSid on reconnect — CONTEXT.md claim that refreshSnapshot already pulled it corrected (Pitfall 3). Best-effort secondary pull; primary get.project_summary stays authoritative.
+- [Phase ?]: [Phase 03.1 P04] D-10 additive skill-prompt realignment: gap was OMISSION not contradiction — purely additive ## Freshness gate (D-10) section appended to /vary /apply /diff SKILL.md after Hard rules.
+- [Phase ?]: [Phase 03.1 P04] Per-skill command substitution in D-10 freshness body — vary lists 'bw-midi vary'; diff lists 'bw-diff'; apply lists all three. Literal phrases 'live and stale are BOTH trustworthy' + 'disconnected ... HARD REFUSAL' stay verbatim (contract tests grep them).
+- [Phase ?]: [Phase 03.1 P04] Wrong-clip targeting section in apply/SKILL.md ONLY — wrong_clip_targeted is apply+revert per D-06; revert surfaces via bw-edit CLI (no /revert skill). The error code itself is IMPLEMENTED in Plan 03.1-03 (next); this plan only prepares the /apply prompt to surface it gracefully. vary/diff intentionally do NOT carry this section.
+- [Phase ?]: [Phase 03.1 P04] Task 2 TDD path (GREEN-from-start): planner split implementation (Task 1) and tests (Task 2) across two tasks in a type:execute plan (not type:tdd). Task 2's contract assertions pass on first run — expected 'feature already exists' path. Single test(03.1-04) commit; no RED applicable.
+- [Phase ?]: [Phase 03.1 P04] BLOCKER-02 vitest-include preserved — daemon/vitest.config.ts UNCHANGED. The include '../pi-pack/skills/**/*.test.ts' (Plan 03-05) already covers all three test files; npm test -- --run ../pi-pack/skills runs non-vacuously (Test Files 3 passed, 29/29 green).
 
 ### Pending Todos
 
@@ -134,6 +140,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T01:32:28.726Z
-Stopped at: Completed 03.1-02-PLAN.md (clipSid schema + daemon fold + bridge derivation)
+Last session: 2026-07-05T01:40:49.815Z
+Stopped at: Completed 03.1-04-PLAN.md (skill-prompt D-10/D-11 realignment)
 Resume file: None
