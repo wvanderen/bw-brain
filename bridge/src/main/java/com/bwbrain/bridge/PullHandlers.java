@@ -65,7 +65,7 @@ public final class PullHandlers {
 
     // --- pure-logic response builders (exercised by PullHandlersTest) ---
 
-    public static String buildClipResponse(final String id, final List<NoteView> notes) {
+    public static String buildClipResponse(final String id, final List<NoteView> notes, final String clipSid) {
         final List<Map<String, Object>> notesPayload = new ArrayList<>();
         for (final NoteView n : notes) {
             final Map<String, Object> nm = new LinkedHashMap<>();
@@ -76,7 +76,15 @@ public final class PullHandlers {
             nm.put("velocity", n.velocity());
             notesPayload.add(nm);
         }
-        return LineJson.response(id, true, Map.of("notes", notesPayload));
+        // D-03b (Phase 03.1-02): top-level clipSid alongside notes. Response
+        // payloads are open at the envelope level (LineJson.response carries
+        // arbitrary Map<String,?>), so no response-schema change. The daemon
+        // reads resp.clipSid in (a) handleMidiInspect + (b) refreshSnapshot
+        // (boot.ts D-03d reconcile-on-reconnect).
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("notes", notesPayload);
+        payload.put("clipSid", clipSid);
+        return LineJson.response(id, true, payload);
     }
 
     public static String buildDeviceChainResponse(final String id, final List<PageView> pages) {
@@ -153,7 +161,7 @@ public final class PullHandlers {
         final String type = req.has("type") ? req.get("type").asText() : "";
         try {
             switch (type) {
-                case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip));
+                case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip, observers));
                 case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id));
                 case "get.project_summary" -> outbox.offer(handleProjectSummary(id, observers));
                 // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
@@ -167,22 +175,33 @@ public final class PullHandlers {
         }
     }
 
-    private static String handleSelectedClip(final String id, final PinnableCursorClip cursorClip) {
+    private static String handleSelectedClip(final String id, final PinnableCursorClip cursorClip,
+                                               final Observers observers) {
         // Enumerate the step grid via Clip.getStep(channel, x, y) (channel 0) and
         // keep steps with velocity > 0. Map each NoteStep to the daemon's Note
         // contract (key/pitch/start-beats/length-beats/velocity-1-127) — the bridge
         // owns the grid->beats conversion since it knows Bitwig's loop length.
         // API signature confirmed from in-app Javadoc 6.0.6 (Clip.html):
         // NoteStep getStep(int channel, int x, int y).
+        //
+        // D-03b (Phase 03.1-02): derive the V1 clipSid from the parent cursor
+        // track name + the live loop length (ClipSid.derive is the SAME hash
+        // used by the D-03a push path, so push + pull agree). On the
+        // loop-length-unavailable fallback, pass the pattern-valid constant
+        // clip_0000000000000000 so the response is never missing clipSid
+        // (the daemon's pre-flight catches any mismatch downstream).
         final double loopBeats;
         try {
             loopBeats = cursorClip.getLoopLength().get();
         } catch (final Exception e) {
-            // Loop length unavailable — fall back to 1 beat/column.
-            return buildClipResponse(id, enumerateNotes(cursorClip, 1.0));
+            // Loop length unavailable — fall back to 1 beat/column + the
+            // pattern-valid clipSid fallback so the response shape is preserved.
+            return buildClipResponse(id, enumerateNotes(cursorClip, 1.0),
+                    "clip_0000000000000000");
         }
         final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;
-        return buildClipResponse(id, enumerateNotes(cursorClip, beatsPerColumn));
+        final String clipSid = ClipSid.derive(observers.getCursorTrackName(), loopBeats);
+        return buildClipResponse(id, enumerateNotes(cursorClip, beatsPerColumn), clipSid);
     }
 
     private static List<NoteView> enumerateNotes(final PinnableCursorClip cursorClip,

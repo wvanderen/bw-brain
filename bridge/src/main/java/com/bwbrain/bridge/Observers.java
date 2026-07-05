@@ -102,16 +102,29 @@ public final class Observers {
     }
 
     private void wireCursorClip(final PinnableCursorClip cursorClip) {
-        // NOTE: the public Clip/CursorClip surface has no name() accessor (Clip
-        // extends ObjectProxy; the launcher-clip NAME accessor is pending Task-3
-        // live verification). getLoopLength() (Clip) changes whenever a different
-        // clip is selected/pinned, so it serves as the clip-selection-change proxy
-        // that emits clip.name_changed — the event TYPE is emitted; the human
-        // name string is filled in by the Task-3 live probe.
+        // D-01 / D-03a (Phase 03.1-02): the public Clip/CursorClip surface
+        // still has no name() reader (javap-verified against extension-api:21
+        // — see RESEARCH §D-01 + ClipSid.java javadoc). getLoopLength() (Clip)
+        // changes whenever a different clip is selected/pinned, so it remains
+        // the clip-selection-change proxy that emits clip.name_changed. BUT
+        // the bridge now ALSO derives a V1 clipSid from the cached cursor
+        // track name + the loop length (sha256(name:len).slice(0,16)) and
+        // includes it in the payload. The daemon folds this into
+        // selection.clipSid (D-03c) so Plan 03's apply/revert pre-flight
+        // gates have a clip identity to read.
+        //
+        // For V1 the bridge hashes the RAW cursor track name (the daemon-side
+        // STATE-04 sid map is not bridge-reachable). The daemon treats the
+        // bridge-supplied clipSid as opaque — the schema enforces the OUTPUT
+        // pattern only (^clip_[0-9a-f]{16}$), and ClipSid.derive produces
+        // pattern-valid output regardless of whether `cursorTrackName` is a
+        // sid or a raw name.
         final AtomicBoolean skip = new AtomicBoolean(true);
         cursorClip.getLoopLength().addValueObserver((DoubleValueChangedCallback) (double len) -> {
             if (skip.getAndSet(false)) { return; }
-            outbox.offer(LineJson.event("clip.name_changed", mapOf(), ts()));
+            final String clipSid = ClipSid.derive(cursorTrackName, len);
+            outbox.offer(LineJson.event("clip.name_changed",
+                    mapOf("clipSid", clipSid), ts()));
         });
     }
 

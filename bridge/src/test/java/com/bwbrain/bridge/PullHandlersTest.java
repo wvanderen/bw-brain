@@ -35,7 +35,8 @@ class PullHandlersTest {
         final List<PullHandlers.NoteView> notes = List.of(
                 new PullHandlers.NoteView("n:60:0.0000", 60, 0.0, 0.25, 100.0),
                 new PullHandlers.NoteView("n:64:0.5000", 64, 0.5, 0.125, 95.0));
-        final String line = PullHandlers.buildClipResponse("req-1", notes);
+        // Phase 03.1-02 D-03b: buildClipResponse now carries the top-level clipSid.
+        final String line = PullHandlers.buildClipResponse("req-1", notes, "clip_a1b2c3d4e5f60718");
         final JsonNode node = parseResponse(line);
         assertEquals("req-1", node.get("id").asText());
         assertTrue(node.get("ok").asBoolean());
@@ -47,14 +48,17 @@ class PullHandlersTest {
         assertEquals(0.0, first.get("start").asDouble(), 0.001);
         assertEquals(0.25, first.get("length").asDouble(), 0.001);
         assertEquals(100.0, first.get("velocity").asDouble(), 0.001);
+        // D-03b: clipSid rides at the payload top level alongside notes.
+        assertEquals("clip_a1b2c3d4e5f60718", node.get("payload").get("clipSid").asText());
     }
 
     @Test
     void buildClipResponseEmptyNotesIsStillValidOkResponse() throws Exception {
-        final String line = PullHandlers.buildClipResponse("req-2", List.of());
+        final String line = PullHandlers.buildClipResponse("req-2", List.of(), "clip_0000000000000000");
         final JsonNode node = parseResponse(line);
         assertTrue(node.get("ok").asBoolean());
         assertEquals(0, node.get("payload").get("notes").size());
+        assertEquals("clip_0000000000000000", node.get("payload").get("clipSid").asText());
     }
 
     @Test
