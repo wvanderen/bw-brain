@@ -302,6 +302,11 @@ async function driveAsync(deps: QueryServerDeps, queryLine: string): Promise<Rec
   transport.handler(queryLine);
   // midi.* handlers are async (they pull live clip notes); drain microtasks so
   // the async continuation's transport.send lands before we assert.
+  // edit.* handlers additionally await patchHistory.append (disk I/O) — give the
+  // macrotask queue enough rounds to drain. setTimeout(0) is a macrotask;
+  // run it twice to cover multi-await chains (apply → append → send).
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setImmediate(r));
   expect(transport.sent).toHaveLength(1);
   return transport.sent[0] as Record<string, unknown>;
@@ -534,6 +539,283 @@ describe("patch-history PatchHistoryEntry carries additive clipSid (D-05)", () =
       expect(found!.clipSid).toBeUndefined();
     } finally {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});
+
+// ============================================================================
+// Phase 03.1 Plan 03 Task 2 — D-04 apply pre-flight + D-05 revert pre-flight
+// gate tests (CRITICAL blocker closure). The gate refuses wrong_clip_targeted
+// BEFORE the bridge round-trip (no mutation on refusal). Pre-fix candidates
+// (previewClipSid undefined/empty) + pre-fix journal entries (clipSid undefined)
+// are CAVEATED, not refused (D-05 migration policy).
+// ============================================================================
+
+/** A patch-shape draft for handleEditApply tests (matches fixtureRaw scope). */
+function previewCandidate(store: CandidateStore, previewClipSid: string, opts?: { belowBar?: boolean; risk?: "low" | "medium" | "high" }): string {
+  const minted = store.mint(
+    {
+      scope: { clipSid: previewClipSid || "clip_0123456789abcdef" },
+      operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      rationale: "test candidate",
+      reversibility: "self-inverse",
+      risk: opts?.risk ?? "low",
+      undoLabel: "test undo",
+      belowBar: opts?.belowBar,
+    },
+    previewClipSid,
+  );
+  return minted.patchId;
+}
+
+/** Build deps that wire REAL CandidateStore + PatchHistory + capturing applyPatchOverBridge. */
+async function makeApplyDeps(opts: {
+  state?: RawState | null;
+  liveClipSid?: string; // overrides state.selection.clipSid
+}): Promise<{ deps: QueryServerDeps; transport: CapturingTransport; store: CandidateStore; hist: PatchHistory; applyCalls: number; tmpDir: string }> {
+  const transport = makeCapturingTransport();
+  const store = new CandidateStore();
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-apply-"));
+  const hist = new PatchHistory(path.join(tmpDir, "patch-history.jsonl"));
+  let applyCalls = 0;
+  const state: RawState = opts.state ?? fixtureRaw();
+  if (opts.liveClipSid !== undefined) {
+    state.selection = { ...state.selection, clipSid: opts.liveClipSid };
+  }
+  const deps: QueryServerDeps = {
+    transport,
+    watchdog: makeFakeWatchdog("live"),
+    getState: () => state,
+    getIntent: () => fixtureIntent(),
+    candidateStore: store,
+    patchHistory: hist,
+    applyPatchOverBridge: async () => {
+      applyCalls++;
+      return { applied: 1, failed: 0 };
+    },
+  };
+  startQueryServer(deps);
+  return { deps, transport, store, hist, applyCalls, tmpDir };
+}
+
+describe("D-04 apply pre-flight gate (wrong_clip_targeted)", () => {
+  it("D-04 apply REFUSES on mismatch — wrong_clip_targeted + 3 detail fields + applyPatchOverBridge NOT called", async () => {
+    const { deps, transport, store, applyCalls, tmpDir } = await makeApplyDeps({ liveClipSid: "clip_LIVE_live12345" });
+    try {
+      // Preview-time clipSid differs from live.
+      const patchId = previewCandidate(store, "clip_PREVIEW_preview_");
+      // Sanity: the live state's clipSid was overridden.
+      expect(deps.getState()!.selection.clipSid).toBe("clip_LIVE_live12345");
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.apply",
+        payload: { patchId, confirm: true },
+      }) + "\n");
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe("wrong_clip_targeted");
+      expect(res.expectedClipSid).toBe("clip_PREVIEW_preview_");
+      expect(res.actualClipSid).toBe("clip_LIVE_live12345");
+      expect(res.hint).toMatch(/re-select|re-preview/);
+      // CRITICAL: the gate fires BEFORE the bridge round-trip — no mutation.
+      expect(applyCalls).toBe(0);
+      // The candidate is NOT evicted (producer can still apply after re-selecting).
+      expect(store.get(patchId)).toBeDefined();
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("D-04 apply PROCEEDS on match — applyPatchOverBridge called, journal entry stamped with clipSid, candidate evicted", async () => {
+    const { deps, store, hist, applyCalls, tmpDir } = await makeApplyDeps({ liveClipSid: "clip_same_sametoken1" });
+    try {
+      const patchId = previewCandidate(store, "clip_same_sametoken1");
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.apply",
+        payload: { patchId, confirm: true },
+      }) + "\n");
+      expect(res.ok).toBe(true);
+      expect(applyCalls).toBe(1);
+      // Candidate evicted after successful apply.
+      expect(store.get(patchId)).toBeUndefined();
+      // Journal entry carries the apply-time clipSid (D-05 stamping).
+      const entry = await hist.find(patchId);
+      expect(entry).not.toBeNull();
+      expect(entry!.clipSid).toBe("clip_same_sametoken1");
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("D-04 apply pre-fix candidate (no previewClipSid) PROCEEDS with a surfaced assumption (caveated, not refused)", async () => {
+    // Simulate a pre-Plan-03 candidate by constructing one without previewClipSid.
+    const transport = makeCapturingTransport();
+    const store = new CandidateStore();
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-prefix-"));
+    const hist = new PatchHistory(path.join(tmpDir, "patch-history.jsonl"));
+    let applyCalls = 0;
+    const state = fixtureRaw();
+    state.selection.clipSid = "clip_live_live1234";
+    // Pre-Plan-03 candidate: directly inject a Patch with NO previewClipSid.
+    const legacyPatchId = "pt_legacy_no_prev_clipsid";
+    const map = store as unknown as { map: Map<string, unknown> };
+    map.map.set(legacyPatchId, {
+      patchId: legacyPatchId,
+      scope: { clipSid: "clip_live_live1234" },
+      operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      rationale: "legacy candidate",
+      reversibility: "self-inverse",
+      risk: "low",
+      undoLabel: "legacy undo",
+      // previewClipSid intentionally absent — simulates a pre-Plan-03 candidate.
+    });
+    const deps: QueryServerDeps = {
+      transport,
+      watchdog: makeFakeWatchdog("live"),
+      getState: () => state,
+      getIntent: () => fixtureIntent(),
+      candidateStore: store,
+      patchHistory: hist,
+      applyPatchOverBridge: async () => {
+        applyCalls++;
+        return { applied: 1, failed: 0 };
+      },
+    };
+    startQueryServer(deps);
+    try {
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.apply",
+        payload: { patchId: legacyPatchId, confirm: true },
+      }) + "\n");
+      expect(res.ok).toBe(true);
+      // Caveated, not refused — the assumption discloses the unverified clip.
+      const claims = (res.assumptions as Array<{ claim: string }>).map((a) => a.claim);
+      expect(claims.some((c) => /pre-clipSid|unverified/i.test(c))).toBe(true);
+      // The apply proceeded — the bridge round-trip happened.
+      expect(applyCalls).toBe(1);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});
+
+describe("D-05 revert pre-flight gate (wrong_clip_targeted)", () => {
+  it("D-05 revert REFUSES on mismatch — wrong_clip_targeted + applyPatchOverBridge NOT called", async () => {
+    const transport = makeCapturingTransport();
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-revert-"));
+    const hist = new PatchHistory(path.join(tmpDir, "patch-history.jsonl"));
+    let applyCalls = 0;
+    // The journal entry was applied to clip_APPLIED_applied1; the live cursor is on clip_LIVE_live1234.
+    await hist.append({
+      patchId: "pt_apply_test_1",
+      scope: { clipSid: "clip_APPLIED_applied1" },
+      operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      rationale: "test apply",
+      reversibility: "self-inverse",
+      risk: "low",
+      undoLabel: "test undo",
+      inverseOperations: [{ op: "remove_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      appliedAt: Date.now(),
+      stateHashBefore: "clip:test",
+      clipSid: "clip_APPLIED_applied1",
+    });
+    const state = fixtureRaw();
+    state.selection.clipSid = "clip_LIVE_live1234";
+    const deps: QueryServerDeps = {
+      transport,
+      watchdog: makeFakeWatchdog("live"),
+      getState: () => state,
+      getIntent: () => fixtureIntent(),
+      patchHistory: hist,
+      applyPatchOverBridge: async () => {
+        applyCalls++;
+        return { applied: 1, failed: 0 };
+      },
+    };
+    startQueryServer(deps);
+    try {
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.revert",
+        payload: { patchId: "pt_apply_test_1" },
+      }) + "\n");
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe("wrong_clip_targeted");
+      expect(res.expectedClipSid).toBe("clip_APPLIED_applied1");
+      expect(res.actualClipSid).toBe("clip_LIVE_live1234");
+      expect(res.hint).toMatch(/re-select|⌘Z/);
+      // CRITICAL: the gate fires BEFORE the bridge round-trip — no mutation.
+      expect(applyCalls).toBe(0);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("D-05 revert pre-fix entry (clipSid undefined) PROCEEDS with a surfaced assumption (D-05 migration policy)", async () => {
+    const transport = makeCapturingTransport();
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-revert-prefix-"));
+    const hist = new PatchHistory(path.join(tmpDir, "patch-history.jsonl"));
+    let applyCalls = 0;
+    // Pre-fix entry: no clipSid stamped (predates Phase 03.1 Plan 03).
+    await hist.append({
+      patchId: "pt_prefix_apply_1",
+      scope: { clipSid: "" },
+      operations: [{ op: "add_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      rationale: "pre-fix",
+      reversibility: "self-inverse",
+      risk: "low",
+      undoLabel: "pre-fix undo",
+      inverseOperations: [{ op: "remove_note", note: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 100 } }],
+      appliedAt: Date.now(),
+      stateHashBefore: "clip:pre-fix",
+      // clipSid intentionally absent (pre-fix journal entry).
+    });
+    const state = fixtureRaw();
+    state.selection.clipSid = "clip_LIVE_live1234";
+    const deps: QueryServerDeps = {
+      transport,
+      watchdog: makeFakeWatchdog("live"),
+      getState: () => state,
+      getIntent: () => fixtureIntent(),
+      patchHistory: hist,
+      applyPatchOverBridge: async () => {
+        applyCalls++;
+        return { applied: 1, failed: 0 };
+      },
+    };
+    startQueryServer(deps);
+    try {
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.revert",
+        payload: { patchId: "pt_prefix_apply_1" },
+      }) + "\n");
+      expect(res.ok).toBe(true);
+      const claims = (res.assumptions as Array<{ claim: string }>).map((a) => a.claim);
+      expect(claims.some((c) => /pre-clipSid|unverified/i.test(c))).toBe(true);
+      expect(applyCalls).toBe(1);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("D-06 error shape completeness: wrong_clip_targeted carries expectedClipSid + actualClipSid + hint (deep fields)", async () => {
+    const { deps, store, tmpDir } = await makeApplyDeps({ liveClipSid: "clip_actual_real4567" });
+    try {
+      const patchId = previewCandidate(store, "clip_expected_real1");
+      const res = await driveAsync(deps, JSON.stringify({
+        version: "1.0", type: "query", op: "edit.apply",
+        payload: { patchId, confirm: true },
+      }) + "\n");
+      // Deep-equal the three detail fields + the standard envelope.
+      expect(res).toMatchObject({
+        ok: false,
+        error: "wrong_clip_targeted",
+        expectedClipSid: "clip_expected_real1",
+        actualClipSid: "clip_actual_real4567",
+        hint: expect.stringMatching(/re-select|re-preview/),
+        stateFreshness: "live",
+        type: "result",
+        version: "1.0",
+      });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     }
   });
 });
