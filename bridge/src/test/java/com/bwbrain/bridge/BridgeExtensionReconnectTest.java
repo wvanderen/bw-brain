@@ -81,6 +81,10 @@ class BridgeExtensionReconnectTest {
                     "connector did not connect to server A within 3s");
             waitFor(() -> acceptedA.get() != null, 3,
                     "server A did not accept the connection within 3s");
+            // Capture the first socket so we can detect a FRESH reconnect
+            // (the null-window between cycles is sub-millisecond on loopback,
+            // so polling for null is unreliable — poll for a different socket).
+            final Socket firstSocket = liveSocket.get();
 
             // (2) Kill server A — close the accepted socket (kills the bridge
             //     connection → pull thread dies → join returns → cycle retries)
@@ -96,15 +100,18 @@ class BridgeExtensionReconnectTest {
             final LinkedBlockingQueue<String> receivedB = new LinkedBlockingQueue<>();
             final Thread acceptorB = startAcceptorReader(serverB, acceptedB, receivedB);
             try {
-                // (4) Wait for reconnect: liveSocket is re-published.
-                //     NOTE: liveSocket is nulled by the cycle between iterations,
-                //     so we wait for it to become non-null again (the new socket).
-                waitFor(() -> liveSocket.get() != null, 5,
-                        "connector did not reconnect to server B within 5s "
-                                + "(lifecycle loop did not re-enter CONNECT — D-08 broken)");
+                // (4) Wait for reconnect: liveSocket must publish a FRESH socket
+                //     (different from firstSocket). The lifecycle loop re-entered
+                //     CONNECT after the pull thread detected the loss.
+                waitFor(() -> {
+                    final Socket cur = liveSocket.get();
+                    return cur != null && cur != firstSocket;
+                }, 7, "connector did not reconnect to a fresh socket within 7s "
+                        + "(lifecycle loop did not re-enter CONNECT — D-08 broken)");
 
-                // (5) Offer a line AFTER the loss; it must arrive at server B
-                //     within ~3s (proves the writer re-armed via reset()).
+                // (5) Offer a line AFTER the fresh socket is published; it must
+                //     arrive at server B within ~3s (proves the writer re-armed
+                //     via reset() on the new socket).
                 outbox.offer("after-reconnect\n");
                 final String line = receivedB.poll(3, TimeUnit.SECONDS);
                 assertNotNull(line, "line offered after reconnect did not arrive at server B "
