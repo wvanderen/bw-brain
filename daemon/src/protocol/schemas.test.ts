@@ -608,6 +608,30 @@ describe("extended event/request enums (Phase 2 bridge surface)", () => {
     expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
   });
 
+  // Phase 03.1-02 D-03a — the event payload now carries an optional `clipSid`
+  // field on clip.name_changed (populated by the bridge from the V1 hash
+  // sha256(trackSid:loopBeats).slice(0,16)). additionalProperties stays false
+  // (trust-spine); only the allowed-properties list grew by one entry.
+  it("event.schema.json: clip.name_changed carries a pattern-valid clipSid (Phase 03.1-02 D-03a)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "clip.name_changed",
+      timestamp: 1,
+      payload: { clipSid: "clip_a1b2c3d4e5f60718" },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event.schema.json: REJECTS a malformed clipSid (pattern enforcement — D-03a)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "clip.name_changed",
+      timestamp: 1,
+      payload: { clipSid: "not-a-clip-sid" },
+    });
+    expect(ok).toBe(false);
+  });
+
   it("event.schema.json: rejects an unknown payload property (additionalProperties: false preserved)", () => {
     const ok = validateEvent({
       version: "1.0",

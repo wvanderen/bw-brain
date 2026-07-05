@@ -23,12 +23,11 @@
 // practice — but defensive (a future event type added to the schema
 // without a fold branch should not crash the dispatcher).
 //
-// clip.name_changed empty-payload NO-OP (Observers.java:104-116): the
-// bridge emits the event TYPE via cursorClip.getLoopLength() but cannot
-// fill in the clip name (the public Clip/CursorClip surface has no name()
-// accessor). The daemon CANNOT synthesize a clip sid from an empty
-// payload — selection.clipSid is set ONLY via the snapshot/reconcile path
-// (a clip pull). This is the documented M1 limitation.
+// clip.name_changed (Phase 03.1-02 D-03c): the bridge now derives a V1
+// clipSid (sha256(trackSid:loopBeats).slice(0,16)) and emits it in the
+// payload; this fold writes it into selection.clipSid. Pre-fix bridges
+// (no clipSid in the payload) keep the documented NO-OP — see the
+// backward-compat branch in the case below.
 
 import type { RawState, StableIdMap } from "../state/reconcile.js";
 
@@ -103,11 +102,20 @@ export function foldEvent(
     }
 
     case "clip.name_changed": {
-      // NO-OP (Observers.java:104-116): the bridge emits the event type via
-      // cursorClip.getLoopLength() but cannot fill in the name (Clip has no
-      // name() accessor). The daemon's selection.clipSid comes from the
-      // snapshot/reconcile path only. Documented as a known M1 limitation.
-      return state;
+      // D-03c (Phase 03.1-02): the bridge now derives a V1 clipSid from the
+      // cursor clip's parent track sid + loop length (sha256(trackSid:loopBeats)
+      // .slice(0,16), see bridge/.../ClipSid.java + RESEARCH §D-01) and emits
+      // it in the clip.name_changed payload. Fold it into selection.clipSid so
+      // Plan 03's apply/revert pre-flight gates have an identity to read.
+      //
+      // BACKWARD COMPAT: a pre-fix bridge (no clipSid in the payload) keeps the
+      // documented NO-OP — selection.clipSid is left untouched. The defensive
+      // typeof check also covers a malformed (non-string) clipSid.
+      const clipSid = typeof p.clipSid === "string" ? p.clipSid : undefined;
+      if (clipSid === undefined) {
+        return state;
+      }
+      return { ...state, selection: { ...state.selection, clipSid } };
     }
 
     case "device.name_changed": {

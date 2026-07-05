@@ -121,6 +121,41 @@ describe("foldEvent (PURE event -> RawState fold for the 5 event types)", () => 
     expect(original).toEqual(before); // purity
   });
 
+  // Phase 03.1-02 D-03c — clip.name_changed now populates selection.clipSid
+  // from the bridge-supplied payload (the bridge derives it via
+  // sha256(trackSid:loopBeats).slice(0,16)). These two cases pin the fold +
+  // the backward-compat NO-OP when the clipSid is absent or malformed.
+  it("clip.name_changed {clipSid} (Phase 03.1-02 D-03c) -> selection.clipSid populated", () => {
+    const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
+    const original = baselineState({ selection: { trackSid: "trk_aaaaaaaaaaaaaaaa" } });
+    const before = snapshot(original);
+    const out = foldEvent(
+      original,
+      { type: "clip.name_changed", payload: { clipSid: "clip_a1b2c3d4e5f60718" } },
+      ctx,
+    );
+    expect(out.selection.clipSid).toBe("clip_a1b2c3d4e5f60718");
+    // existing selection fields preserved (spread)
+    expect(out.selection.trackSid).toBe("trk_aaaaaaaaaaaaaaaa");
+    expect(original).toEqual(before); // purity
+    expect(out).not.toBe(original); // new reference
+  });
+
+  it("clip.name_changed with non-string clipSid (payload.clipSid: 42) -> state UNCHANGED (backward-compat NO-OP)", () => {
+    const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
+    const original = baselineState({ selection: { clipSid: "clip_deadbeefcafebabe" } });
+    const out = foldEvent(
+      original,
+      // Simulate a malformed payload (non-string clipSid). The defensive
+      // typeof check must treat this like an absent clipSid — NO-OP.
+      { type: "clip.name_changed", payload: { clipSid: 42 } as unknown as Record<string, unknown> },
+      ctx,
+    );
+    expect(out).toEqual(original);
+    // existing clipSid NOT overwritten by the malformed payload
+    expect(out.selection.clipSid).toBe("clip_deadbeefcafebabe");
+  });
+
   it("device.name_changed {name} -> devices array updated with the cursor device entry", () => {
     const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
     const original = baselineState({ devices: [] });
@@ -183,6 +218,9 @@ describe("foldEvent (PURE event -> RawState fold for the 5 event types)", () => 
       { type: "track.name_changed", payload: { slot: 0, name: "Kick2" } },
       { type: "track.name_changed", payload: { name: "Cursor" } },
       { type: "clip.name_changed", payload: {} },
+      // Phase 03.1-02 D-03c: also exercise the new clipSid-bearing fold path
+      // (must return a new RawState without mutating the input).
+      { type: "clip.name_changed", payload: { clipSid: "clip_a1b2c3d4e5f60718" } },
       { type: "device.name_changed", payload: { name: "Serum" } },
       { type: "transport.changed", payload: { playing: true } },
       { type: "unknown.future.event", payload: {} },

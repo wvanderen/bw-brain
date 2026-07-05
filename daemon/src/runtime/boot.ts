@@ -200,7 +200,29 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       summaryTracks = summaryTrackList;
       reconcile(observed, stableIds, Date.now());
       lastState = observed;
-      schedulePersist(observed);
+
+      // D-03d (Phase 03.1-02): eagerly reconcile selection.clipSid on
+      // (re)connect. CONTEXT.md claimed refreshSnapshot already pulled
+      // get.selected_clip — it did NOT (only get.project_summary, RESEARCH
+      // §D-03d / Pitfall 3). The bridge's get.selected_clip response now
+      // carries the top-level clipSid field (D-03b); fold it into
+      // selection.clipSid so the apply pre-flight has a fresh clipSid on
+      // reconnect without waiting for the next clip.name_changed event.
+      // Best-effort: the project_summary pull already succeeded; clipSid
+      // populates lazily on the next clip.name_changed event if this fails.
+      try {
+        const clipResp = (await correlator.send("get.selected_clip")) as { clipSid?: string };
+        if (typeof clipResp.clipSid === "string" && clipResp.clipSid) {
+          lastState = {
+            ...lastState,
+            selection: { ...lastState.selection, clipSid: clipResp.clipSid },
+          };
+        }
+      } catch (e) {
+        console.error("[boot] get.selected_clip clipSid reconcile failed:", (e as Error).message);
+      }
+
+      schedulePersist(lastState);
     } catch (e) {
       console.error("[boot] get.project_summary pull failed:", (e as Error).message);
     }
