@@ -50,3 +50,14 @@ to the `bw-midi` CLI; you never speak the daemon wire protocol.
   reclassifies as high risk + still requires `--confirm`).
 - Shell to `bw-midi` / `bw-edit` ONLY. Never teach the producer (or emit) the
   daemon wire protocol — the CLI is the stable interface (AGENTS.md).
+
+## Freshness gate (D-10)
+
+The daemon's `stateFreshness` field is `live` | `stale` | `disconnected`.
+- `live` and `stale` are BOTH trustworthy — the daemon pulls fresh state over the
+  connected bridge on every `bw-midi vary` call. Mutation safety is the
+  daemon-authoritative journal + the fresh pull, NOT the watchdog's last-push
+  timestamp (commit 7a7e7cf).
+- `disconnected` (no bridge) is a HARD REFUSAL — the CLI returns
+  `error:"state_disconnected"`. Tell the producer to relaunch Bitwig / re-enable
+  the bw-brain controller.

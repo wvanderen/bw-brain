@@ -46,3 +46,14 @@ producer wants the note-level detail before applying (D-15). You shell out to
 - EVERY diff pane carries the motif score + risk + assumptions (UX-06).
 - Shell to `bw-edit` ONLY. Never teach the producer (or emit) the daemon
   wire protocol — the CLI is the stable interface (AGENTS.md).
+
+## Freshness gate (D-10)
+
+The daemon's `stateFreshness` field is `live` | `stale` | `disconnected`.
+- `live` and `stale` are BOTH trustworthy — the daemon pulls fresh state over the
+  connected bridge on every `bw-diff` call. Mutation safety is the
+  daemon-authoritative journal + the fresh pull, NOT the watchdog's last-push
+  timestamp (commit 7a7e7cf).
+- `disconnected` (no bridge) is a HARD REFUSAL — the CLI returns
+  `error:"state_disconnected"`. Tell the producer to relaunch Bitwig / re-enable
+  the bw-brain controller.
