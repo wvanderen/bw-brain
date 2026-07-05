@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 03.1
 current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
 status: executing
-stopped_at: Completed 03.1-01-PLAN.md (bridge auto-reconnect D-07/D-08)
-last_updated: "2026-07-05T01:21:02.001Z"
+stopped_at: Completed 03.1-02-PLAN.md (clipSid schema + daemon fold + bridge derivation)
+last_updated: "2026-07-05T01:32:56.746Z"
 last_activity: 2026-07-05
-last_activity_desc: Phase 03.1 execution started
+last_activity_desc: Phase 03.1 plan 02 complete (clipSid live)
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 20
-  completed_plans: 17
+  completed_plans: 18
   percent: 50
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-07-05 — Phase 03.1 execution started
+Last activity: 2026-07-05 — Phase 03.1 plan 02 complete (clipSid live)
 
-Progress: [██████░░░░] 60% — 2/5 phases complete; Phase 3 plans all executed, blocking end-of-phase UAT (M1–M5) pending human
+Progress: [█████████░] 90% — 18/20 plans complete; 03.1 plan 02 (clipSid) shipped; plans 03 (apply pre-flight) + 04 (skill-prompt realignment) remain before end-of-phase UAT
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [██████░░░░] 60% — 2/5 phases complete; Phase 3 
 | Phase 03 P04 | 95 | 2 tasks | 12 files |
 | Phase 03 P05 | 6 | 2 tasks | 8 files |
 | Phase 03.1 P01 | 16 min | 3 tasks | 4 files |
+| Phase 03.1 P02 | 6 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,8 @@ Recent decisions affecting current work:
 - [Phase 03]: Phase 03-05: Pi /vary /apply /diff skills (UX-02) shipped — 3 SKILL.md shelling to bw-* CLI only (D-15 no inline diffs, D-04/D-09 flag handling, on-demand diff pane) + 3 structural contract tests. BLOCKER-02 vitest-include defense: daemon/vitest.config.ts include extended with ../pi-pack/skills/**/*.test.ts — without it npm test -- skill exits 0 vacuously (vitest 4.x CLI filter does not override include). Proven: Test Files 3 passed (3) under NO_COLOR=1.
 - [Phase 03]: Phase 03-05: plan status is pending-uat (NOT complete). Task 1 (Pi skills + contract tests) done + committed; Task 2 (M1–M5 manual UAT) is a blocking human-verify checkpoint — live Bitwig + human ears (casino-MIDI refusal audibility, techno-enhances-not-gates, NoteStep grid-lock, undo coalescing, /vary UX legibility). UX-02 implemented but not verified; requirements-completed stays [] until M2/M3/M4/M5 pass. Phase 3 not yet complete.
 - [Phase ?]: [Phase 03.1 P01] D-08 lifecycle loop: startConnector refactored to while(running) delegating to package-private static runConnectorCycle (testable without Bitwig host); pull.join() is the reliable socket-loss signal; Outbox.reset()/clear() defeat Pitfall 2 + drop stale events (D-07); exit() gains defensive socket close.
+- [Phase ?]: [Phase 03.1 P02] D-01 V1 clipSid: "clip_" + sha256(trackSid:loopBeats).slice(0,16) — javap-definitive on the absence of a Clip.name() reader in extension-api:21. Closes the OBSERVED M4 UAT failure (4-bar vs 8-bar). Push/pull paths share hash inputs (cursorTrackName + getLoopLength().get()) so they agree. Residual same-track-same-length collision documented (RESEARCH §D-01(c)); V2 deferred.
+- [Phase ?]: [Phase 03.1 P02] D-03d refreshSnapshot hardening: also pulls get.selected_clip + folds clipSid on reconnect — CONTEXT.md claim that refreshSnapshot already pulled it corrected (Pitfall 3). Best-effort secondary pull; primary get.project_summary stays authoritative.
 
 ### Pending Todos
 
@@ -131,6 +134,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T01:21:01.996Z
-Stopped at: Completed 03.1-01-PLAN.md (bridge auto-reconnect D-07/D-08)
+Last session: 2026-07-05T01:32:28.726Z
+Stopped at: Completed 03.1-02-PLAN.md (clipSid schema + daemon fold + bridge derivation)
 Resume file: None
