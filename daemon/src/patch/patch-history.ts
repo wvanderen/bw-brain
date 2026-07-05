@@ -45,6 +45,14 @@ export interface PatchHistoryEntry extends Patch {
   appliedRevertedAt?: number;
   /** sha256 of the canonical-JSON before-state notes (audit + drift detection). */
   stateHashBefore: string;
+  /**
+   * D-05 (Phase 03.1 Plan 03): clipSid stamped at apply time. The revert
+   * pre-flight compares this against the live `state.selection.clipSid` to
+   * refuse wrong-clip targeting. Undefined on pre-fix journal entries (pre
+   * Phase 03.1) — the revert gate treats `undefined` as a caveated, NOT
+   * refused, path (D-05 migration policy: preserves the recovery path).
+   */
+  clipSid?: string;
 }
 
 /** Rotate (compact) the journal once it exceeds this size. 10 MB default. */

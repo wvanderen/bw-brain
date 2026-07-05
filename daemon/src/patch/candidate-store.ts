@@ -46,17 +46,25 @@ export const MAX_CANDIDATES = 64;
  * store.evict(candidate.patchId);
  */
 export class CandidateStore {
-  /** Insertion-ordered Map<string, Patch> — the LRU order is the iteration order. */
-  private readonly map = new Map<string, Patch>();
+  /** Insertion-ordered map of patchId → stored candidate (Patch + previewClipSid). */
+  private readonly map = new Map<string, Patch & { previewClipSid?: string }>();
 
   /**
    * Mint a new candidate: stamp a fresh `pt_<randomUUID>` patchId onto `patch`,
    * store it, and LRU-evict the oldest when the cap is exceeded.
    *
-   * @returns the full Patch (with the minted patchId).
+   * D-04 (Phase 03.1 Plan 03): the second param `previewClipSid` is sourced
+   * from `state.selection.clipSid` at mint time and stamped onto the stored
+   * Patch as `previewClipSid`. The apply pre-flight reads it back + compares
+   * to the live `state.selection.clipSid` to refuse wrong-clip targeting. The
+   * empty-string fallback handles a missing clipSid (pre-Plan-02 state or a
+   * disconnected bridge fold) — the gate treats `previewClipSid === ""` as a
+   * pre-fix candidate (caveated, not refused).
+   *
+   * @returns the full Patch (with the minted patchId + stamped previewClipSid).
    */
-  mint(patch: Omit<Patch, "patchId">): Patch {
-    const full: Patch = { ...patch, patchId: `pt_${randomUUID()}` };
+  mint(patch: Omit<Patch, "patchId">, previewClipSid: string = ""): Patch & { previewClipSid: string } {
+    const full = { ...patch, patchId: `pt_${randomUUID()}`, previewClipSid };
     this.map.set(full.patchId, full);
     if (this.map.size > MAX_CANDIDATES) {
       // Map.keys().next().value is the OLDEST entry (insertion order).
@@ -77,8 +85,8 @@ export class CandidateStore {
    * to the tail / most-recently-used position), so a candidate the producer is
    * actively considering survives eviction.
    */
-  get(patchId: string): Patch | undefined {
-    const p = this.map.get(patchId);
+  get(patchId: string): (Patch & { previewClipSid?: string }) | undefined {
+    const p = this.map.get(patchId) as (Patch & { previewClipSid?: string }) | undefined;
     if (p) {
       // Refresh LRU: delete + re-set re-orders the entry to most-recently-used.
       this.map.delete(patchId);

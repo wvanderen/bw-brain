@@ -593,11 +593,16 @@ async function handleEditPreview(
     return;
   }
   // Mint the ephemeral candidate (D-05). The minted patchId is the apply key.
-  const candidate = deps.candidateStore.mint({
-    ...patch,
-    risk,
-    operations: ops as Patch["operations"],
-  });
+  // D-04 (Phase 03.1 Plan 03): stamp the preview-time clipSid so the apply
+  // pre-flight can compare it to the live state.selection.clipSid.
+  const candidate = deps.candidateStore.mint(
+    {
+      ...patch,
+      risk,
+      operations: ops as Patch["operations"],
+    },
+    state.selection.clipSid ?? "",
+  );
   const assumptions: Assumption[] = [
     ...liveAssumptions(state, intent),
     { claim: `preview mints candidate ${candidate.patchId} (risk ${risk})`, confidence: 1.0, source: "selection" },
@@ -790,11 +795,24 @@ function safeSendOk(
   }
 }
 
-/** Construct a schema-valid ok:false result + send it (edit.* error arms). */
-function safeSendErr(
+/**
+ * Construct a schema-valid ok:false result + send it (edit.* error arms).
+ *
+ * D-06 (Phase 03.1 Plan 03): the optional `details` arg appends arbitrary
+ * detail fields (e.g. `expectedClipSid`/`actualClipSid`/`hint` for the
+ * `wrong_clip_targeted` error) to the result object INSTEAD of the default
+ * `availableFrom:"M2"`. When `details` is absent, the existing family
+ * (`state_disconnected`/`not_implemented`/`candidate_not_found`/
+ * `confirmation_required`/`below_bar_requires_confirm`/`invalid_patch`/
+ * `scope_mismatch`/`apply_failed`/`not_found`/`invalid_query`/`unknown_request`)
+ * keeps its `availableFrom:"M2"` shape unchanged — Pitfall 8 explicitly forbids
+ * a parallel `safeSendDetailedErr` function. Exported for direct testing.
+ */
+export function safeSendErr(
   transport: Transport,
   freshness: "live" | "stale" | "disconnected",
   error: string,
+  details?: Record<string, unknown>,
 ): void {
   try {
     transport.send({
@@ -803,8 +821,10 @@ function safeSendErr(
       ok: false,
       stateFreshness: freshness,
       error,
-      // result.schema.json forces availableFrom on ok:false; M2 edits are live.
-      availableFrom: "M2",
+      // When details is provided, the detail fields (expectedClipSid/actualClipSid/hint)
+      // REPLACE availableFrom — they are the structured-failure family for wrong_clip_targeted.
+      // When details is absent, existing callers keep the availableFrom:"M2" shape.
+      ...(details ?? { availableFrom: "M2" }),
     });
   } catch (e) {
     console.error("[query-server] transport.send failed from edit.* error arm:", (e as Error).message);
@@ -962,19 +982,23 @@ async function handleMidiVary(
       console.error("[query-server] midi.vary classifyRisk scope_mismatch:", (e as Error).message);
       risk = candidate.risk;
     }
-    const minted = deps.candidateStore!.mint({
-      scope: scopeDeclared,
-      operations: candidate.operations as Patch["operations"],
-      rationale: `vary ${candidate.label}: ${candidate.description}`,
-      reversibility: "self-inverse",
-      transformIntent: { name: "vary", variant: candidate.label, profile: profileName },
-      risk,
-      motifSimilarity: candidate.motifSimilarity,
-      // belowBar: candidate.status === "refused" — the minted patch carries the
-      // belowBar flag so patch-history.jsonl records it as a below-bar override.
-      belowBar: candidate.status === "refused",
-      assumptions,
-    });
+    const minted = deps.candidateStore!.mint(
+      {
+        scope: scopeDeclared,
+        operations: candidate.operations as Patch["operations"],
+        rationale: `vary ${candidate.label}: ${candidate.description}`,
+        reversibility: "self-inverse",
+        transformIntent: { name: "vary", variant: candidate.label, profile: profileName },
+        risk,
+        motifSimilarity: candidate.motifSimilarity,
+        // belowBar: candidate.status === "refused" — the minted patch carries the
+        // belowBar flag so patch-history.jsonl records it as a below-bar override.
+        belowBar: candidate.status === "refused",
+        assumptions,
+      },
+      // D-04 (Phase 03.1 Plan 03): preview-time clipSid for the apply gate.
+      scopeDeclared.clipSid,
+    );
     const entry: { label: string; description: string; patchId: string; risk: string; motifSimilarity: number; status?: string } = {
       label: candidate.label,
       description: candidate.description,
@@ -1017,17 +1041,21 @@ async function handleMidiCounterline(
     scopeDeclared,
     belowBar,
   });
-  const minted = deps.candidateStore!.mint({
-    scope: scopeDeclared,
-    operations: result.operations as Patch["operations"],
-    rationale: `counterline: companion voice (${result.operations.length} add_note ops)`,
-    reversibility: "self-inverse",
-    transformIntent: { name: "counterline", profile: profileName },
-    risk,
-    motifSimilarity: result.motifSimilarity,
-    belowBar,
-    assumptions,
-  });
+  const minted = deps.candidateStore!.mint(
+    {
+      scope: scopeDeclared,
+      operations: result.operations as Patch["operations"],
+      rationale: `counterline: companion voice (${result.operations.length} add_note ops)`,
+      reversibility: "self-inverse",
+      transformIntent: { name: "counterline", profile: profileName },
+      risk,
+      motifSimilarity: result.motifSimilarity,
+      belowBar,
+      assumptions,
+    },
+    // D-04 (Phase 03.1 Plan 03): preview-time clipSid for the apply gate.
+    scopeDeclared.clipSid,
+  );
   const payload: { patchId: string; risk: string; operations: number; motifSimilarity: number; status?: string } = {
     patchId: minted.patchId,
     risk,
@@ -1063,15 +1091,19 @@ async function handleMidiVoiceLeadingFix(
 
   const result = voiceLeadingFix(before);
   const risk = result.risk; // D-10 cleanup tier — self-declared "low" is authoritative
-  const minted = deps.candidateStore!.mint({
-    scope: scopeDeclared,
-    operations: result.operations as Patch["operations"],
-    rationale: `voice-leading-fix: parallel-fifth/octave resolution (${result.operations.length} ops)`,
-    reversibility: "self-inverse",
-    transformIntent: { name: "voice-leading-fix", profile: profileName },
-    risk,
-    assumptions,
-  });
+  const minted = deps.candidateStore!.mint(
+    {
+      scope: scopeDeclared,
+      operations: result.operations as Patch["operations"],
+      rationale: `voice-leading-fix: parallel-fifth/octave resolution (${result.operations.length} ops)`,
+      reversibility: "self-inverse",
+      transformIntent: { name: "voice-leading-fix", profile: profileName },
+      risk,
+      assumptions,
+    },
+    // D-04 (Phase 03.1 Plan 03): preview-time clipSid for the apply gate.
+    scopeDeclared.clipSid,
+  );
   safeSendOk(
     deps.transport,
     freshness,
@@ -1097,15 +1129,19 @@ async function handleMidiHumanize(
 
   const result = humanize(before, profile);
   const risk = result.risk; // D-10 cleanup tier — self-declared "low" is authoritative
-  const minted = deps.candidateStore!.mint({
-    scope: scopeDeclared,
-    operations: result.operations as Patch["operations"],
-    rationale: `humanize: velocity + timing jitter (${result.operations.length} update_note_field ops)`,
-    reversibility: "self-inverse",
-    transformIntent: { name: "humanize", profile: profileName },
-    risk,
-    assumptions,
-  });
+  const minted = deps.candidateStore!.mint(
+    {
+      scope: scopeDeclared,
+      operations: result.operations as Patch["operations"],
+      rationale: `humanize: velocity + timing jitter (${result.operations.length} update_note_field ops)`,
+      reversibility: "self-inverse",
+      transformIntent: { name: "humanize", profile: profileName },
+      risk,
+      assumptions,
+    },
+    // D-04 (Phase 03.1 Plan 03): preview-time clipSid for the apply gate.
+    scopeDeclared.clipSid,
+  );
   safeSendOk(
     deps.transport,
     freshness,
