@@ -195,12 +195,99 @@ function main(argv) {
     process.exit(0);
   }
 
-  // RED phase: the real-tree integration path (statSync + git log per source)
-  // is wired in the GREEN step. Prove the pure logic via --self-test first.
-  console.error(
-    "✗ Real-tree validation path not yet implemented (RED). Run with --self-test to prove the pure decision logic.",
+  // 1. Stat the packaged artifact. On ENOENT, fail with the missing-artifact
+  //    remediation. The artifact is untracked build output — it has NO git
+  //    history, which is exactly why we compare filesystem mtime (artifact)
+  //    against git commit time (sources). This asymmetry is the point.
+  let artifactMtimeMs;
+  try {
+    artifactMtimeMs = statSync(ARTIFACT_PATH).mtimeMs;
+  } catch {
+    console.error(
+      `✗ Packaged bridge artifact not found: ${ARTIFACT_PATH}`,
+    );
+    console.error(
+      "  Run `mvn -pl bridge package` (or `cd bridge && mvn package`) to build it, then re-run this check.",
+    );
+    process.exit(1);
+  }
+
+  // 2. For each tracked source path, get the committer-date strict-ISO of the
+  //    last commit touching it (`git log -1 --format=%cI -- <path>`). Track the
+  //    MAX across all paths + record which path/commit produced it (for the
+  //    failure message). execFileSync (not exec) — no shell, no injection
+  //    surface; paths are repo-relative constants, and `--` prevents
+  //    path-as-flag interpretation.
+  let latestSourceCommitMs = -Infinity;
+  let latestSourcePath = null;
+  let latestSourceIso = null;
+  for (const path of SOURCE_PATHS) {
+    let out;
+    try {
+      out = execFileSync("git", ["log", "-1", "--format=%cI", "--", path], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      console.error(
+        `✗ Failed to read git history for source path: ${path} (is this run from the repo root?)`,
+      );
+      process.exit(1);
+    }
+    if (!out) {
+      // Path not tracked / no commit. Skip — do not fail the gate on a
+      // misconfigured SOURCE_PATHS entry; the enumerated list is audited.
+      continue;
+    }
+    const ms = parseIsoToMs(out);
+    if (Number.isNaN(ms)) {
+      console.error(
+        `✗ Could not parse git committer-date for ${path}: ${JSON.stringify(out)}`,
+      );
+      process.exit(1);
+    }
+    if (ms > latestSourceCommitMs) {
+      latestSourceCommitMs = ms;
+      latestSourcePath = path;
+      latestSourceIso = out;
+    }
+  }
+
+  if (latestSourcePath === null) {
+    console.error(
+      "✗ No git history found for any of the enumerated SOURCE_PATHS — cannot evaluate staleness. Ensure the script runs from the repo root.",
+    );
+    process.exit(1);
+  }
+
+  // 3. Decision rule. Stale → fail with the delta + remediation + debug-doc
+  //    reference. Equal/fresh → pass.
+  const artifactIso = new Date(artifactMtimeMs).toISOString();
+  if (isStale(artifactMtimeMs, latestSourceCommitMs)) {
+    const deltaMs = latestSourceCommitMs - artifactMtimeMs;
+    const deltaMin = Math.floor(deltaMs / 60000);
+    const deltaHr = Math.floor(deltaMin / 60);
+    const deltaRemMin = deltaMin % 60;
+    const deltaStr =
+      deltaHr > 0 ? `${deltaHr}h ${deltaRemMin}min` : `${deltaMin}min`;
+    console.error(
+      `✗ Stale packaged bridge artifact: ${ARTIFACT_PATH}`,
+    );
+    console.error(`  artifact mtime: ${artifactIso}`);
+    console.error(
+      `  newest source: ${latestSourcePath} @ ${latestSourceIso}`,
+    );
+    console.error(`  delta (source is newer by): ${deltaStr}`);
+    console.error(
+      "  The packaged .bwextension is older than the newest source commit. Run `mvn -pl bridge package` to rebuild, then reinstall the artifact into Bitwig (restart Bitwig or toggle the bw-brain controller) before UAT. (This regression class caused the Phase-03.1 UAT Test-3 blocker — see .planning/debug/clipsid-not-populating.md.)",
+    );
+    process.exit(1);
+  }
+
+  process.stdout.write(
+    `✓ Bridge-artifact gate PASSED: ${ARTIFACT_PATH} (mtime ${artifactIso}) is newer than the newest source commit (${latestSourcePath} @ ${latestSourceIso}); the packaged extension is up to date.\n`,
   );
-  process.exit(1);
+  process.exit(0);
 }
 
 main(process.argv.slice(2));
