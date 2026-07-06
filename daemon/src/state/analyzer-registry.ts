@@ -15,6 +15,13 @@
 
 import type { ProjectState } from "../gen/project-state.js";
 import type { ProjectIntent } from "../gen/intent.js";
+// P4 / 04-03: type-only Profile import (additive — ctx.profile is OPTIONAL).
+// Wave 5 (Plan 04-05) wires the actual loadProfile() into AnalyzeContext
+// construction; for now the field exists so Wave 3 analyzers (section-detector,
+// repetition-report, energy-curve, track-role-classifier) can consume profile
+// data without each re-deriving the profile name. No runtime cycle: gen/profile
+// has no back-import to this module.
+import type { Profile } from "../gen/profile.js";
 // M2 (Plan 03-03): motif-signature is the FIRST analyzer addition (MIDI-01).
 // motif-signature.ts imports TYPE-ONLY from this module, so runtime import
 // direction is one-way (registry -> motif-signature) — no cycle.
@@ -27,6 +34,9 @@ export type RawState = ProjectState;
  * The set of derived-state field names the framework knows about. Phases 3-5
  * fill sections/trackRoles/motifs/energyCurve/automationSalience; M1 only
  * emits "intent" (STATE-03).
+ *
+ * P4 / 04-03: "repetition" added (D-21 — the ONE additive type member for the
+ * repetition-report analyzer; sections/trackRoles/energyCurve already reserved).
  */
 export type DerivedFieldName =
   | "sections"
@@ -34,7 +44,8 @@ export type DerivedFieldName =
   | "motifs"
   | "energyCurve"
   | "automationSalience"
-  | "intent";
+  | "intent"
+  | "repetition";
 
 /**
  * UX-06 / D-10: every derived field states the assumptions behind it.
@@ -55,6 +66,14 @@ export interface AnalyzeContext {
   intent: ProjectIntent | null;
   /** Injected clock for determinism. */
   now: number;
+  /**
+   * P4 / 04-03: ARCH-01 genre profile (OPTIONAL — generic core runs literally
+   * without it per ARCH-02). Wave 5 (Plan 04-05) constructs this via
+   * `loadProfile(ctx.intent?.projectIntent.profile)` at the runAll call site;
+   * until then the field is undefined and analyzers fall back to profile-less
+   * honest behavior (section labels → "unknown", repetition threshold → 0.7).
+   */
+  profile?: Profile;
 }
 
 /** A single derived field emitted by an analyzer, carrying its confidence + assumptions. */
