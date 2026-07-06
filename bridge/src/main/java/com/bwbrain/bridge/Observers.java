@@ -33,6 +33,7 @@ import com.bitwig.extension.callback.BooleanValueChangedCallback;
 import com.bitwig.extension.callback.DoubleValueChangedCallback;
 import com.bitwig.extension.callback.IntegerValueChangedCallback;
 import com.bitwig.extension.callback.StringValueChangedCallback;
+import com.bitwig.extension.controller.api.ClipLauncherSlotBank;
 import com.bitwig.extension.controller.api.ControllerHost;
 import com.bitwig.extension.controller.api.CursorDevice;
 import com.bitwig.extension.controller.api.CursorTrack;
@@ -71,6 +72,22 @@ public final class Observers {
     // reads the snapshot when building the response.
     private final Map<Integer, String> sceneNames = new ConcurrentHashMap<>();
     private volatile int sceneBankSize = 0;
+    // Phase 4 Plan 04-01 Task 2 fix — ClipLauncherSlot.hasContent() cache
+    // (PULL-ONLY). The hasContent BooleanValue returns its default `false`
+    // until addValueObserver is registered (Bitwig extension-api:21 documented
+    // behavior; confirmed live by the Plan 04-01 Task 2 probe — 0/128 cells
+    // reported hasContent in 5-12ms, the diagnostic signature of an
+    // unsubscribed observer). Pre-fix the walker called
+    // slot.hasContent().get() directly on an unsubscribed value and short-
+    // circuited every cell to empty; post-fix the walker reads this cache
+    // (populated by wireClipLauncherSlots at register() time).
+    //
+    // ConcurrentHashMap<Long,Boolean> keyed by (trackIdx << 16) | sceneIdx —
+    // mirrors the existing bankTrackNames/sceneNames style exactly (controller
+    // thread writes, pull-handler thread reads; thread-safe by construction).
+    // A plain boolean[][] would diverge from the established cache pattern AND
+    // lack a happens-before relationship for element writes across threads.
+    private final Map<Long, Boolean> hasContentCache = new ConcurrentHashMap<>();
     // Phase 4 Plan 04-01 — trackBank reference retained so the pull-handler can
     // build the LauncherGridWalker's SlotSelector/HasContentReader bindings
     // (trackBank.getItemAt(t).clipLauncherSlotBank()...). Set in register();
@@ -129,6 +146,7 @@ public final class Observers {
                          final int sceneCount) {
         register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
         wireSceneBank(sceneBank, sceneCount);
+        wireClipLauncherSlots(trackBank, sceneCount);
         wireWalkerReadySignal(cursorClip);
     }
 
@@ -299,6 +317,68 @@ public final class Observers {
         }
     }
 
+    /**
+     * Phase 4 Plan 04-01 Task 2 fix — wire {@code ClipLauncherSlot.hasContent()}
+     * observers for every (track, scene) in the grid. PULL-ONLY (Pitfall 6 —
+     * NEVER offers an event line; the 5-event protocol enum stays unchanged).
+     *
+     * <p><b>Why this exists.</b> {@code ClipLauncherSlot.hasContent()} returns a
+     * {@code BooleanValue} that defaults to {@code false} until an observer is
+     * registered. The pre-fix walker read {@code slot.hasContent().get()}
+     * directly on an unsubscribed value, so every cell returned {@code false} →
+     * the walker short-circuited every cell as empty, called NO {@code select()},
+     * and finished in milliseconds. The live probe signature (Plan 04-01 Task 2)
+     * was {@code 0/128} hasContent cells in 5–12ms across 5 requests — the
+     * diagnostic of an unsubscribed observer. Post-fix, this method registers
+     * the observer at {@code register()} time so the cache holds the real boot
+     * state by the time the first {@code get.launcher_clips} pull arrives.</p>
+     *
+     * <p><b>Mirrors {@link #wireSceneBank}</b> (line 290-300): same
+     * {@code Bank.getItemAt(int)} non-deprecated accessor chain, same
+     * unconditional boot-state write (NO {@code skipFirstFire} — we WANT the
+     * boot state populated so the very first pull is correct, unlike the 5
+     * push observer groups which skip the boot fire to keep the daemon's first
+     * received line a REAL change). The cache is a {@link ConcurrentHashMap}
+     * keyed by {@code (trackIdx << 16) | sceneIdx} — matches the
+     * {@link #bankTrackNames}/{@link #sceneNames} style exactly.</p>
+     *
+     * <p>Accessor chain (all non-deprecated, per RESEARCH §Bitwig Probe Javadoc
+     * scan + {@code scripts/check-deprecated-bridge.mjs} gate):</p>
+     * <ol>
+     *   <li>{@code trackBank.getItemAt(t)} → {@link Track} (terminal
+     *       non-deprecated Bank accessor; the int-arg AND 0-arg TrackBank
+     *       indexers are BOTH @Deprecated — see {@link #wireTrackBank}).</li>
+     *       <li>{@code track.clipLauncherSlotBank()} → {@link ClipLauncherSlotBank}
+     *       (NOT {@code Track#getClipLauncherSlots()} which is @Deprecated).</li>
+     *   <li>{@code slotBank.getItemAt(s)} → {@code ClipLauncherSlot}
+     *       (terminal non-deprecated Bank accessor).</li>
+     *   <li>{@code slot.hasContent()} → {@code BooleanValue} (the SAME
+     *       non-deprecated surface as {@code transport.isPlaying()} at line 231).</li>
+     * </ol>
+     */
+    private void wireClipLauncherSlots(final TrackBank trackBank, final int sceneCount) {
+        for (int t = 0; t < bankSize; t++) {
+            final Track track = trackBank.getItemAt(t);
+            final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
+            for (int s = 0; s < sceneCount; s++) {
+                final int trackIdx = t;
+                final int sceneIdx = s;
+                // Initialize to false so a pre-boot pull returns false (matching
+                // the unsubscribed default) rather than null — mirrors
+                // wireSceneBank's `sceneNames.put(idx, "")`.
+                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
+                slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
+                        (BooleanValueChangedCallback) (boolean has) ->
+                                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has));
+            }
+        }
+    }
+
+    /** Composite key for {@link #hasContentCache}: {@code (trackIdx << 16) | sceneIdx}. */
+    private static long hasContentKey(final int trackIdx, final int sceneIdx) {
+        return (((long) trackIdx) << 16) | (sceneIdx & 0xFFFFL);
+    }
+
     // --- snapshot getters for PullHandlers (get.project_summary) ---
 
     public int getCursorSlot() { return cursorSlot; }
@@ -310,6 +390,24 @@ public final class Observers {
     /** Phase 4 Plan 04-01 — scene-name cache snapshot for the D-12 grid response. */
     public Map<Integer, String> getSceneNames() { return sceneNames; }
     public int getSceneBankSize() { return sceneBankSize; }
+    /**
+     * Phase 4 Plan 04-01 Task 2 fix — read the cached
+     * {@code ClipLauncherSlot.hasContent()} value for (trackIdx, sceneIdx).
+     * The cache is populated by {@link #wireClipLauncherSlots} at
+     * {@code register()} time; the walker reads this instead of calling
+     * {@code slot.hasContent().get()} on an unsubscribed BooleanValue.
+     *
+     * <p>Defensive bounds: out-of-range indices return {@code false} (the
+     * walker is null-guarded upstream; this never throws).</p>
+     */
+    public boolean getHasContent(final int trackIdx, final int sceneIdx) {
+        if (trackIdx < 0 || trackIdx >= bankSize
+                || sceneIdx < 0 || sceneIdx >= sceneBankSize) {
+            return false;
+        }
+        final Boolean v = hasContentCache.get(hasContentKey(trackIdx, sceneIdx));
+        return v == null ? false : v.booleanValue();
+    }
     /** Phase 4 Plan 04-01 — the wired TrackBank reference for walker bindings. */
     TrackBank getTrackBank() { return trackBankRef; }
 

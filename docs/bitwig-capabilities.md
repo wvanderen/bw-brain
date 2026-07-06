@@ -321,6 +321,110 @@ planned. Cheap to behaviorally confirm on a reorder, high downstream value
 
 ---
 
+## 7. SceneBank / ClipLauncherSlotBank probe (Phase 4 Plan 04-01 Task 2)
+
+> **Status: PARTIALLY VERIFIED — pre-fix diagnostic signature OBSERVED LIVE;
+> post-fix pending re-probe against the rebuilt `.bwextension`.** This section
+> is Plan 04-01 Task 2's deliverable (D-02 capabilities discipline: observed
+> Bitwig behavior is the deliverable, never fabricated). Pre-fix values below
+> are OBSERVED from the live probe; post-fix values are marked "pending
+> re-probe" because they depend on the rebuilt artifact the orchestrator +
+> user will re-test.
+
+**Priority:** D-01 — the launcher-grid cursor-walk is the data foundation every
+P4 analyzer depends on. The behavioral characteristics (latency, observer
+coalescing, GUI focus) are the trust-spine unknowns that gate Wave 2.
+
+**Probe tool:** `scripts/probe-launcher-clips.mjs` — a standalone loopback
+daemon that binds `127.0.0.1:7878`, accepts the Bitwig bridge's reconnect, fires
+`get.launcher_clips` requests, and reports per-request wall-clock latency +
+payload shape (hasContent cell count, tracks × scenes grid).
+
+### Probe 2 — hasContent grid (BLOCKING — pre-fix diagnostic)
+
+**Surface `[VERIFIED: in-app Javadoc 6.0.6 + RESEARCH §Bitwig Probe Javadoc scan]`:**
+`ClipLauncherSlot.hasContent()` returns a `BooleanValue`. `BooleanValue.get()`
+returns the value asynchronously — the value is `false` by default until an
+`addValueObserver` is registered and the host fires the initial boot-state
+callback. This mirrors the documented behavior of every Bitwig value observer
+(see §5 — "value observers fire once on registration with the current value";
+the spike's `skipFirstFire` guard exists because of this).
+
+**Pre-fix observed (2026-07-06, live probe, 5 requests against a real
+8-track × 16-scene project with multiple populated launcher clips):**
+
+```
+[probe] response probe-1 ok=true elapsed=8ms bytes=12778
+[probe]   payload: tracks=8 scenesPerTrack=16 hasContentCells=0/128 extra=[sceneNames]
+[probe]   track[0] name="Surge XT" scenes[0..2]=[{"sceneIdx":0,"clipSid":"clip_0000000000000000","hasContent":false,"loopBeats":0,"notes":[]}, ...]
+Wall-clock per request: n=5 min=5ms max=12ms mean=8.2ms p50=8ms p95=12ms
+```
+
+**Diagnostic signature:** `0/128` hasContent cells across all 5 requests; total
+wall-clock 5–12ms per request (mean 8.2ms). No GUI focus jumps observed in
+Bitwig during the walks.
+
+**Root cause:** the walker's `hasContent` lambda called
+`slotBank.getItemAt(s).hasContent().get()` on a `BooleanValue` that had NEVER
+had `addValueObserver` registered. `BooleanValue.get()` returns the default
+`false` for unsubscribed values. Therefore walker line 277
+(`if (!hasContent)`) short-circuited every cell → emitted `emptyCell()` →
+ADVANCING → next cell. No `select()` was ever called, no `awaitNext()` ever
+fired. The 5–12ms total walk time + zero GUI focus jumps are both consistent
+with `select()` never being called.
+
+**Contrast:** `Observers.wireTrackBank` DOES subscribe
+`Track.name().addValueObserver(...)` — that is why the live project's
+`track.name_changed` events fired on connect. The `hasContent` subscription was
+the missing parallel.
+
+**Mitigation (APPLIED in this fix commit):** mirror the proven `wireTrackBank`
+subscription pattern for `ClipLauncherSlot.hasContent()`. `Observers
+.wireClipLauncherSlots(trackBank, sceneCount)` now iterates every (track, scene)
+pair at `register()` time and registers
+`slotBank.getItemAt(s).hasContent().addValueObserver(cb)` that updates a
+`ConcurrentHashMap<Long, Boolean>` cache keyed by `(trackIdx << 16) | sceneIdx`.
+The boot state is written unconditionally (NO `skipFirstFire` — we WANT the boot
+state populated so the very first pull returns correct values, mirroring
+`wireSceneBank` line 308-318). The walker's `hasContent` lambda in
+`PullHandlers.handleLauncherGrid` reads from `observers.getHasContent(t, s)`
+instead of calling `.get()` on an unsubscribed `BooleanValue`.
+
+**Post-fix observed:** **PENDING RE-PROBE.** The rebuilt `bridge/target
+/bw-brain.bwextension` must be re-installed into Bitwig + the probe re-run. The
+expected post-fix signature: hasContent cells > 0 for populated clips;
+wall-clock per request grows (each hasContent=true cell now triggers a real
+`select()` + loopLength fire + NoteStep drain); GUI focus behavior observed
+(Probe 3 records the per-cell latency + focus-jump UX cost).
+
+### Probes 1, 3, 4, 5 — pending re-probe
+
+- _Probe 1 — Scene enumeration (SceneBank name observers fire on registration):_
+  **PARTIALLY OBSERVED.** The probe payload included a `sceneNames` array
+  (pre-fix), which means `wireSceneBank` observers fired and populated the
+  cache — confirming Scene.name() observers fire on registration. Renaming a
+  scene live was not exercised pre-fix; pending re-probe for the rename-fire
+  count (non-coalesced) assertion.
+- _Probe 3 — Cursor-walk timing (per-cell latency p95, observer coalescing,
+  GUI focus jumps):_ **OBSERVED: PENDING RE-PROBE.** Pre-fix the walk was
+  5–12ms total because no `select()` was called (the bug). Post-fix the walk
+  will exercise the real cursor-walk; per-cell p95 latency + GUI focus behavior
+  recorded here after the re-probe. D-22 acceptance: p95 ≤ 250ms proceed;
+  > 250ms but ≤ 1s increase timeout + document UX cost; > 1s STOP + re-discuss.
+- _Probe 4 — `clipLauncherSlotBank().select(s)` canonical form:_ **VERIFIED.**
+  The pre-fix walker called `trackBank.getItemAt(t).clipLauncherSlotBank()
+  .select(s)` and the call was accepted by the host (no deprecation error at
+  runtime — confirmed by the walk completing without exception, even though
+  every cell short-circuited at hasContent before select was reached). The
+  non-deprecated form is confirmed by `scripts/check-deprecated-bridge.mjs`
+  (0 blocking findings).
+- _Probe 5 — `Scene.name()` behavior:_ **PARTIALLY OBSERVED.** The pre-fix
+  probe payload's `sceneNames` array was populated (non-empty), confirming
+  `Scene.name()` returns producer-authored names on the boot observer fire.
+  Empty-scene name handling pending re-probe.
+
+---
+
 ## Transport Decision
 
 > Resolved in Plan 03 Task 3 (manual checkpoint). The decision tree below is

@@ -480,10 +480,19 @@ public final class PullHandlers {
         };
         final LauncherGridWalker.SlotSelector selector = (t, s) ->
                 trackBank.getItemAt(t).clipLauncherSlotBank().select(s);
+        // Phase 4 Plan 04-01 Task 2 fix — read hasContent from the observers
+        // cache (populated by Observers.wireClipLauncherSlots at register()
+        // time), NOT from slot.hasContent().get() on an unsubscribed
+        // BooleanValue. ClipLauncherSlot.hasContent() is a BooleanValue that
+        // returns its default `false` until addValueObserver is registered;
+        // the pre-fix direct .get() call short-circuited every cell to empty
+        // (live probe signature: 0/128 hasContent cells in 5-12ms across 5
+        // requests — the diagnostic of an unsubscribed observer). The cache
+        // is populated by the time the first get.launcher_clips pull arrives
+        // (register() completes before the connector thread starts).
         final LauncherGridWalker.HasContentReader hasContent = (t, s) -> {
             try {
-                return trackBank.getItemAt(t).clipLauncherSlotBank()
-                        .getItemAt(s).hasContent().get();
+                return observers.getHasContent(t, s);
             } catch (final Exception e) {
                 return false;
             }

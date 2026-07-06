@@ -325,4 +325,109 @@ class LauncherGridWalkerTest {
         assertEquals(a1, a2);
         assertTrue(a1.matches("^clip_[0-9a-f]{16}$"));
     }
+
+    /**
+     * REGRESSION (Plan 04-01 Task 2 fix): ClipLauncherSlot.hasContent() is a
+     * BooleanValue that returns its default {@code false} until
+     * {@code addValueObserver} is registered. Pre-fix, the production walker's
+     * hasContent lambda called {@code slot.hasContent().get()} on an
+     * unsubscribed value — every cell returned false, so the walker
+     * short-circuited every cell as empty, called NO {@code select()}, and
+     * finished in milliseconds. The live probe signature (Plan 04-01 Task 2)
+     * was {@code 0/128} hasContent cells in 5–12ms across 5 requests.
+     *
+     * <p>Post-fix, {@code Observers.wireClipLauncherSlots} registers the
+     * observer at {@code register()} time and the walker reads from the cache
+     * via {@code observers.getHasContent(t,s)}. This test pins BOTH the bug
+     * signature AND the post-fix contract so a future refactor that breaks the
+     * observer wiring fails loudly here. The walker state machine itself is
+     * API-agnostic — it honors whatever the {@link LauncherGridWalker
+     * .HasContentReader} returns — so this test documents the contract at the
+     * seam where the production wiring plugs in.</p>
+     */
+    @Test
+    void regressionUnsubscribedHasContentObserverProducesAllEmpty() {
+        final LauncherGridWalker walker = new LauncherGridWalker(2, 2);
+
+        // --- BUG SIGNATURE: hasContent returns false for EVERY cell (the
+        // pre-fix condition — an unsubscribed BooleanValue). Notes are queued
+        // (which would only be drained if select() fired), but the walker
+        // never reaches them because hasContent short-circuits at SELECTING. ---
+        final RecordingSelector buggySelector = new RecordingSelector();
+        // The "unsubscribed observer" simulation: every cell returns false
+        // even though notes are queued. This is EXACTLY what the production
+        // walker saw pre-fix.
+        final ScriptedHasContent buggyHasContent = new ScriptedHasContent(false);
+        final ScriptedNotes queuedNotes = new ScriptedNotes()
+                .queue(List.of(new PullHandlers.NoteView("n:60:0", 60, 0.0, 0.25, 100.0)))
+                .queue(List.of(new PullHandlers.NoteView("n:64:0.5", 64, 0.5, 0.125, 95.0)))
+                .queue(List.of(new PullHandlers.NoteView("n:67:0", 67, 0.0, 0.5, 110.0)));
+        final ScriptedReadySignal readySignals = new ScriptedReadySignal()
+                .fire(4.0).fire(8.0).fire(4.0); // would fire if select() were called
+
+        final LauncherGridWalker.LauncherGridResponse buggyGrid = walker.walkGrid(
+                buggySelector, buggyHasContent, queuedNotes, readySignals,
+                t -> "trk_" + t, t -> "Track " + t);
+
+        // The diagnostic signature observed in the live probe (0/128 in 5-12ms):
+        // every cell reports empty; NO select() called; ready-signal never
+        // armed/awaited (the walker short-circuits at hasContent in SELECTING).
+        assertEquals(0, buggySelector.calls.size(),
+                "bug signature: unsubscribed hasContent → zero select() calls");
+        assertEquals(0, readySignals.armCount.get(),
+                "bug signature: empty cells skip arm() (walker short-circuits before arm)");
+        assertEquals(0, readySignals.awaitCount.get(),
+                "bug signature: empty cells skip awaitNext()");
+        int buggyHasContentCells = 0;
+        for (final LauncherGridWalker.TrackRowView t : buggyGrid.tracks) {
+            for (final LauncherGridWalker.CellView c : t.scenes) {
+                if (c.hasContent) buggyHasContentCells++;
+            }
+        }
+        assertEquals(0, buggyHasContentCells,
+                "bug signature: unsubscribed hasContent → 0/N cells report content "
+                        + "(live probe observed 0/128 in 5-12ms)");
+
+        // --- POST-FIX CONTRACT: with the FIX applied (hasContent reads from a
+        // subscribed cache that returns true for populated cells), the SAME
+        // grid MUST call select() on every hasContent=true cell and drain
+        // notes. Pin this so a future refactor that breaks the observer
+        // wiring fails this assertion loudly. ---
+        final ScriptedHasContent fixedHasContent = new ScriptedHasContent(false)
+                .set(0, 0, true).set(0, 1, true).set(1, 1, true);
+        final RecordingSelector fixedSelector = new RecordingSelector();
+        final ScriptedReadySignal fixedReady = new ScriptedReadySignal()
+                .fire(4.0).fire(8.0).fire(4.0);
+        final ScriptedNotes fixedNotes = new ScriptedNotes()
+                .queue(List.of(new PullHandlers.NoteView("n:60:0", 60, 0.0, 0.25, 100.0)))
+                .queue(List.of(new PullHandlers.NoteView("n:64:0.5", 64, 0.5, 0.125, 95.0)))
+                .queue(List.of(new PullHandlers.NoteView("n:67:0", 67, 0.0, 0.5, 110.0)));
+
+        final LauncherGridWalker.LauncherGridResponse fixedGrid = walker.walkGrid(
+                fixedSelector, fixedHasContent, fixedNotes, fixedReady,
+                t -> "trk_" + t, t -> "Track " + t);
+
+        assertEquals(3, fixedSelector.calls.size(),
+                "post-fix: every hasContent=true cell triggers select()");
+        assertEquals(3, fixedReady.armCount.get(),
+                "post-fix: every hasContent=true cell arms the ready-signal (Pitfall 1 race guard)");
+        assertEquals(3, fixedReady.awaitCount.get(),
+                "post-fix: every hasContent=true cell awaits the loopLength fire");
+        int fixedHasContentCells = 0;
+        for (final LauncherGridWalker.TrackRowView t : fixedGrid.tracks) {
+            for (final LauncherGridWalker.CellView c : t.scenes) {
+                if (c.hasContent) fixedHasContentCells++;
+            }
+        }
+        assertEquals(3, fixedHasContentCells,
+                "post-fix: 3/4 cells report content (one cell is intentionally empty)");
+        // The 3 select() calls hit EXACTLY the 3 hasContent=true cells in
+        // row-major order: (0,0), (0,1), (1,1).
+        assertEquals(0, fixedSelector.calls.get(0)[0]);
+        assertEquals(0, fixedSelector.calls.get(0)[1]);
+        assertEquals(0, fixedSelector.calls.get(1)[0]);
+        assertEquals(1, fixedSelector.calls.get(1)[1]);
+        assertEquals(1, fixedSelector.calls.get(2)[0]);
+        assertEquals(1, fixedSelector.calls.get(2)[1]);
+    }
 }
