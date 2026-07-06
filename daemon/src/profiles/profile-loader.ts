@@ -16,6 +16,12 @@
 // techno v1 ships JSON-ONLY — the loader detects a `hooks.js` sibling
 // (absent for v1) and skips hook invocation when missing. The ProfileHooks
 // interface is designed-not-exercised in v1.
+//
+// P4 / 04-02 Task 3 — additive extension (D-05/D-07/D-08): mergeProfiles now
+// deep-merges energyWeights (object-spread, child wins per-key) + array-replaces
+// sectionLabels and roleTemplates (child's arrays are complete, NOT appended to
+// parent). The loader emits a warning (NOT a throw — ARCH-02 "enhance never
+// gate") when energyWeights deviates > 0.01 from sum=1.0.
 
 import genericProfile from "./generic.json" with { type: "json" };
 import technoProfile from "./techno.json" with { type: "json" };
@@ -95,11 +101,42 @@ export interface ProfileHooks {
  */
 export function loadProfile(named?: string): Profile {
   // D-14 / INV-13: generic is the strict default. No name -> generic literally.
-  if (!named || named === "generic") return PROFILES.generic;
+  if (!named || named === "generic") {
+    warnIfEnergyWeightsOffSum(PROFILES.generic);
+    return PROFILES.generic;
+  }
   const p = PROFILES[named];
   if (!p) throw new UnknownProfileError(named);
   // If the profile extends a parent, deep-merge child over parent.
-  return p.extends ? mergeProfiles(loadProfile(p.extends), p) : p;
+  const resolved = p.extends ? mergeProfiles(loadProfile(p.extends), p) : p;
+  // D-05 invariant: energyWeights should sum to 1.0 (advisory — ARCH-02 never
+  // gates on profile data; the daemon emits a warning and proceeds).
+  warnIfEnergyWeightsOffSum(resolved);
+  return resolved;
+}
+
+/**
+ * Emit a `console.warn` when `profile.energyWeights` (if present) deviates from
+ * sum=1.0 by more than 0.01. ARCH-02 ("enhance never gate") — the loader NEVER
+ * throws on profile-data drift; analyzers gate on field-presence and use
+ * whatever weights are configured. The warning surfaces the drift so a profile
+ * author notices during development.
+ *
+ * Pure (no throw); reads only.
+ */
+function warnIfEnergyWeightsOffSum(profile: Profile): void {
+  const w = profile.energyWeights;
+  if (!w) return; // ARCH-02: field absent is valid (generic core runs literally)
+  const sum = w.noteDensity + w.velocityAggregate + w.polyphony + w.pitchCentroid;
+  if (Math.abs(sum - 1.0) > 0.01) {
+    // Use console.warn — the daemon has no logger import here (the loader is
+    // intentionally fs-free at call time). The warning is advisory; analyzers
+    // consume the weights as-authored.
+    console.warn(
+      `[bw-brain] profile "${profile.name}" energyWeights sums to ${sum.toFixed(4)} (expected 1.0 ± 0.01). ` +
+        `Analyzers will use the weights as-authored (ARCH-02: enhance, never gate).`,
+    );
+  }
 }
 
 /**
@@ -122,6 +159,13 @@ function mergeProfiles(parent: Profile, child: Profile): Profile {
   // supplies the field; the `as Profile` cast documents that the data invariant
   // (generic authored complete, techno extends generic) guarantees the result
   // satisfies `Profile`. Pure.
+  //
+  // P4 / 04-02 Task 3 (D-05/D-07/D-08):
+  //   - energyWeights: object-spread (techno overrides per-key — e.g. just
+  //     noteDensity; the other three inherit from generic).
+  //   - sectionLabels + roleTemplates: array-replace (child's array is the
+  //     COMPLETE set, not appended to parent). This matches the existing
+  //     preferredScales + strongBeatGrid discipline.
   const merged = {
     ...parent,
     ...child,
@@ -129,9 +173,13 @@ function mergeProfiles(parent: Profile, child: Profile): Profile {
     velocityHumanize: { ...parent.velocityHumanize, ...child.velocityHumanize },
     timingHumanize: { ...parent.timingHumanize, ...child.timingHumanize },
     roleSalience: { ...parent.roleSalience, ...child.roleSalience },
-    // Arrays replace (not concatenate): preferredScales + strongBeatGrid.
+    energyWeights: { ...parent.energyWeights, ...child.energyWeights },
+    // Arrays replace (not concatenate): preferredScales + strongBeatGrid +
+    // sectionLabels + roleTemplates.
     preferredScales: child.preferredScales ?? parent.preferredScales,
     strongBeatGrid: child.strongBeatGrid ?? parent.strongBeatGrid,
+    sectionLabels: child.sectionLabels ?? parent.sectionLabels,
+    roleTemplates: child.roleTemplates ?? parent.roleTemplates,
   };
   return merged as Profile;
 }

@@ -18,5 +18,27 @@
     "fx": 0.3
   },
   "preferredScales": ["minor", "dorian", "phrygian"],
-  "strongBeatGrid": [0, 1, 2, 3]
+  "strongBeatGrid": [0, 1, 2, 3],
+  "energyWeights": {
+    "noteDensity": 0.35,
+    "velocityAggregate": 0.25,
+    "polyphony": 0.20,
+    "pitchCentroid": 0.20
+  },
+  "sectionLabels": [
+    { "label": "intro", "position": "start", "energyRange": [0.0, 0.4] },
+    { "label": "build", "position": "any", "energyRange": [0.3, 0.7] },
+    { "label": "peak", "position": "middle", "energyRange": [0.7, 1.0] },
+    { "label": "breakdown", "position": "any", "energyRange": [0.2, 0.5] },
+    { "label": "outro", "position": "end", "energyRange": [0.0, 0.4] }
+  ],
+  "roleTemplates": [
+    { "role": "kick", "registerLow": 24, "registerHigh": 40, "rhythmProfile": [0.6, 0.2, 0.2, 0, 0], "velocityProfile": { "mean": 0.9, "variance": 0.01 } },
+    { "role": "bass", "registerLow": 28, "registerHigh": 52, "rhythmProfile": [0.5, 0.3, 0.2, 0, 0], "velocityProfile": { "mean": 0.7, "variance": 0.05 } },
+    { "role": "lead", "registerLow": 60, "registerHigh": 84, "rhythmProfile": [0.3, 0.3, 0.3, 0.1, 0], "velocityProfile": { "mean": 0.7, "variance": 0.1 } },
+    { "role": "pad", "registerLow": 48, "registerHigh": 84, "rhythmProfile": [0.1, 0.1, 0.6, 0.1, 0.1], "velocityProfile": { "mean": 0.5, "variance": 0.05 } },
+    { "role": "hats", "registerLow": 60, "registerHigh": 84, "rhythmProfile": [0.7, 0.2, 0.1, 0, 0], "velocityProfile": { "mean": 0.5, "variance": 0.1 } },
+    { "role": "percussion", "registerLow": 40, "registerHigh": 80, "rhythmProfile": [0.4, 0.3, 0.2, 0.1, 0], "velocityProfile": { "mean": 0.6, "variance": 0.15 } },
+    { "role": "fx", "registerLow": 0, "registerHigh": 127, "rhythmProfile": [0.2, 0.2, 0.2, 0.2, 0.2], "velocityProfile": { "mean": 0.5, "variance": 0.3 } }
+  ]
 }

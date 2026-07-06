@@ -52,4 +52,43 @@ export interface Profile {
    * Beat positions within a 4/4 bar that count as 'strong' (counterline target, vary anchor). Generic: [0,1,2,3] (every beat); techno: [0,2] (4-on-the-floor).
    */
   strongBeatGrid?: number[];
+  /**
+   * D-05 energy-curve composite weights. The four weights MUST sum to 1.0 (validated at load by the daemon — Ajv 2020-12 has no native sum constraint, so the loader emits a warning when the sum deviates > 0.01 from 1.0; ARCH-02 'enhance never gate' — the loader logs but never throws).
+   */
+  energyWeights?: {
+    noteDensity: number;
+    velocityAggregate: number;
+    polyphony: number;
+    pitchCentroid: number;
+  };
+  /**
+   * D-07 vocabulary for section labeling. Generic ships [intro, build, peak, breakdown, outro]; techno REPLACES with [drop, break, roll]. Position+energy heuristics map a detected cluster to a label.
+   */
+  sectionLabels?: {
+    label: string;
+    position: "start" | "middle" | "end" | "any";
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    energyRange: [number, number];
+  }[];
+  /**
+   * D-08 track-role templates. Generic ships 7 (kick/bass/lead/pad/hats/percussion/fx); techno REPLACES with 2 (tighter kick/bass register windows — array-replace, not append).
+   */
+  roleTemplates?: {
+    role: string;
+    registerLow: number;
+    registerHigh: number;
+    /**
+     * @minItems 5
+     * @maxItems 5
+     */
+    rhythmProfile: [number, number, number, number, number];
+    velocityProfile: {
+      mean: number;
+      variance: number;
+    };
+    minConfidence?: number;
+  }[];
 }

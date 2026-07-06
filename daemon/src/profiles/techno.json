@@ -5,5 +5,20 @@
   "velocityHumanize": { "jitter": 3, "curve": "gaussian" },
   "preferredScales": ["minor", "phrygian", "locrian"],
   "strongBeatGrid": [0, 2],
-  "roleSalience": { "kick": 1.0, "bass": 0.95, "hats": 0.5 }
+  "roleSalience": { "kick": 1.0, "bass": 0.95, "hats": 0.5 },
+  "energyWeights": {
+    "noteDensity": 0.40,
+    "velocityAggregate": 0.25,
+    "polyphony": 0.15,
+    "pitchCentroid": 0.20
+  },
+  "sectionLabels": [
+    { "label": "drop", "position": "middle", "energyRange": [0.85, 1.0] },
+    { "label": "break", "position": "any", "energyRange": [0.3, 0.6] },
+    { "label": "roll", "position": "any", "energyRange": [0.6, 0.85] }
+  ],
+  "roleTemplates": [
+    { "role": "kick", "registerLow": 24, "registerHigh": 36, "rhythmProfile": [0.7, 0, 0.3, 0, 0], "velocityProfile": { "mean": 0.95, "variance": 0.005 } },
+    { "role": "bass", "registerLow": 28, "registerHigh": 48, "rhythmProfile": [0.5, 0.3, 0.2, 0, 0], "velocityProfile": { "mean": 0.75, "variance": 0.03 } }
+  ]
 }
