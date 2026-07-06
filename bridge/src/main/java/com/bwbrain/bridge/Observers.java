@@ -358,10 +358,21 @@ public final class Observers {
      */
     private void wireClipLauncherSlots(final TrackBank trackBank, final int sceneCount) {
         for (int t = 0; t < bankSize; t++) {
+            final int trackIdx = t;
             final Track track = trackBank.getItemAt(t);
             final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
+            if (slotBank == null) {
+                // Master / FX / Return / Group tracks do not expose a clip
+                // launcher slot bank — pre-populate every scene with false so
+                // the walker reads a coherent all-empty row instead of throwing
+                // NPE on slotBank.getItemAt. Mirrors the pre-init default the
+                // cache already holds, made explicit for readability.
+                for (int s = 0; s < sceneCount; s++) {
+                    hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
+                }
+                continue;
+            }
             for (int s = 0; s < sceneCount; s++) {
-                final int trackIdx = t;
                 final int sceneIdx = s;
                 // Initialize to false so a pre-boot pull returns false (matching
                 // the unsubscribed default) rather than null — mirrors
