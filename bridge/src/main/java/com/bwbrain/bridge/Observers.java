@@ -37,6 +37,8 @@ import com.bitwig.extension.controller.api.ControllerHost;
 import com.bitwig.extension.controller.api.CursorDevice;
 import com.bitwig.extension.controller.api.CursorTrack;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
+import com.bitwig.extension.controller.api.Scene;
+import com.bitwig.extension.controller.api.SceneBank;
 import com.bitwig.extension.controller.api.Track;
 import com.bitwig.extension.controller.api.TrackBank;
 import com.bitwig.extension.controller.api.Transport;
@@ -60,6 +62,31 @@ public final class Observers {
     private volatile String cursorDeviceName = "";
     private volatile boolean playing = false;
     private final Map<Integer, String> bankTrackNames = new ConcurrentHashMap<>();
+    // Phase 4 Plan 04-01 — D-12 grid-response enrichment (PULL-ONLY). The
+    // SceneBank name cache feeds the `sceneNames` array in the
+    // get.launcher_clips response. This is NOT a new event type (D-01 pull-only;
+    // Pitfall 6 — event.schema.json stays at 5 entries; OBSERVATIONAL_EVENT_TYPES
+    // in the daemon reader stays unchanged). The observers fire on the
+    // controller thread + cache the latest name; PullHandlers.handleLauncherGrid
+    // reads the snapshot when building the response.
+    private final Map<Integer, String> sceneNames = new ConcurrentHashMap<>();
+    private volatile int sceneBankSize = 0;
+    // Phase 4 Plan 04-01 — trackBank reference retained so the pull-handler can
+    // build the LauncherGridWalker's SlotSelector/HasContentReader bindings
+    // (trackBank.getItemAt(t).clipLauncherSlotBank()...). Set in register();
+    // null in tests.
+    private TrackBank trackBankRef;
+    // Phase 4 Plan 04-01 — D-01 cursor-walk ready-signal. The walker arms a
+    // one-shot CountDownLatch before each slot.select(); the cursorClip
+    // loopLength observer (NO skipFirstFire — every fire is a real move)
+    // counts it down. Stored as AtomicReference so the observer (registered
+    // once in register()) can read the latest latch across requests without
+    // re-registering (re-registering would leak observers). PullHandlers
+    // publishes its per-request latch via setWalkerReadyLatch; the observer
+    // calls countDown() + clears the slot so a stale fire never bleeds into
+    // the next cell.
+    private final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CountDownLatch> walkerReadyLatch =
+            new java.util.concurrent.atomic.AtomicReference<>(null);
 
     public Observers(final Outbox outbox, final int bankSize) {
         this.outbox = outbox;
@@ -78,6 +105,64 @@ public final class Observers {
         wireCursorDevice(cursorDevice);
         wireTransport(transport);
         wireTrackBank(trackBank);
+    }
+
+    /**
+     * Phase 4 Plan 04-01 overload — also wires the SceneBank name observers
+     * (PULL-ONLY enrichment for the D-12 {@code get.launcher_clips} response
+     * {@code sceneNames} array). The 5-event protocol enum is UNCHANGED —
+     * these observers NEVER offer an event line (Pitfall 6 — D-01 is pull-only).
+     *
+     * <p>ALSO wires the cursor-clip walker ready-signal observer (a SEPARATE
+     * loopLength observer distinct from {@link #wireCursorClip}: that one
+     * carries a skipFirstFire guard because it emits a push event; the walker
+     * observer NEVER skips because every fire — boot or rename — is a real
+     * cursor-clip move the walker is awaiting).</p>
+     */
+    public void register(final ControllerHost host,
+                         final CursorTrack cursorTrack,
+                         final PinnableCursorClip cursorClip,
+                         final CursorDevice cursorDevice,
+                         final Transport transport,
+                         final TrackBank trackBank,
+                         final SceneBank sceneBank,
+                         final int sceneCount) {
+        register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
+        wireSceneBank(sceneBank, sceneCount);
+        wireWalkerReadySignal(cursorClip);
+    }
+
+    /**
+     * Phase 4 Plan 04-01 — wire the walker's loopLength observer. Distinct from
+     * {@link #wireCursorClip}: no skipFirstFire (every fire is a real cursor
+     * move the walker is awaiting). The observer reads the per-request latch
+     * from {@link #walkerReadyLatch} (published by {@link #setWalkerReadyLatch}),
+     * counts it down, + clears the slot so a stale fire never bleeds into the
+     * next cell.
+     */
+    private void wireWalkerReadySignal(final PinnableCursorClip cursorClip) {
+        cursorClip.getLoopLength().addValueObserver((DoubleValueChangedCallback) (double len) -> {
+            final java.util.concurrent.CountDownLatch l = walkerReadyLatch.get();
+            if (l != null) {
+                l.countDown();
+                walkerReadyLatch.compareAndSet(l, null);
+            }
+        });
+    }
+
+    /**
+     * Phase 4 Plan 04-01 — publish a per-request {@link CountDownLatch} that the
+     * walker observer counts down on the next loopLength fire. Called by
+     * {@link PullHandlers#handleLauncherGrid} once per request; the walker's
+     * ReadySignal.arm() publishes a fresh latch here per cell.
+     */
+    void setWalkerReadyLatch(final java.util.concurrent.CountDownLatch latch) {
+        walkerReadyLatch.set(latch);
+    }
+
+    /** Phase 4 Plan 04-01 — clear the per-request latch slot (timeout cleanup). */
+    void clearWalkerReadyLatch() {
+        walkerReadyLatch.set(null);
     }
 
     private void wireCursorTrack(final CursorTrack cursorTrack) {
@@ -152,6 +237,12 @@ public final class Observers {
     }
 
     private void wireTrackBank(final TrackBank trackBank) {
+        // Phase 4 Plan 04-01 — retain the trackBank reference so the pull-handler
+        // can build LauncherGridWalker bindings (trackBank.getItemAt(t)
+        // .clipLauncherSlotBank().select(s)). Set BEFORE the observer loop so a
+        // pull-handler request that races register() sees a non-null ref once
+        // any name observer fires (best-effort; the daemon reconciles downstream).
+        this.trackBankRef = trackBank;
         // Windowed TrackBank[N=8] (D-01). The terminal non-deprecated accessor is
         // Bank.getItemAt(int) (inherited by TrackBank via ChannelBank<Track>); it
         // returns Track and supports .name() unchanged. The int-arg AND 0-arg
@@ -174,6 +265,40 @@ public final class Observers {
         }
     }
 
+    /**
+     * Phase 4 Plan 04-01 — D-12 grid-response scene-name enrichment (PULL-ONLY).
+     * The SceneBank name observers feed {@link #getSceneNames()} for the
+     * {@code get.launcher_clips} response {@code sceneNames} array. These
+     * observers NEVER offer an event line (Pitfall 6 — D-01 pull-only; the
+     * 5-event protocol enum MUST NOT grow). The accessor chain is the same
+     * non-deprecated pattern as {@link #wireTrackBank}: {@code Bank.getItemAt(int)}
+     * (inherited by SceneBank via Bank&lt;Scene&gt;) + {@code Scene.name()}
+     * (the non-deprecated form; the no-arg getter on Scene is deprecated per the
+     * in-app Javadoc 6.0.6 deprecated-list.html — RESEARCH §Bitwig Probe Probe
+     * 5 + Pitfall 2).
+     *
+     * <p>The {@code skipFirstFire} AtomicBoolean guard mirrors the existing
+     * pattern (Observers.java:86-101): Bitwig value observers fire once on
+     * registration with the boot state. Unlike the 5 push observer groups
+     * (which skip the boot fire to keep the daemon's first received line a
+     * REAL change), the scene-name cache STILL writes the boot value on the
+     * first fire — D-01 is pull-only so there is no outbox offer to suppress,
+     * and the pull-handler reads whatever the latest name is (boot state OR
+     * rename). The guard exists purely to skip the redundant cache write on
+     * subsequent identical fires.</p>
+     */
+    private void wireSceneBank(final SceneBank sceneBank, final int size) {
+        sceneBankSize = size;
+        for (int i = 0; i < sceneBankSize; i++) {
+            final Scene s = sceneBank.getItemAt(i);
+            final int idx = i;
+            sceneNames.put(idx, ""); // initialize so a pull before the boot fire returns "" not null
+            s.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+                sceneNames.put(idx, name == null ? "" : name);
+            });
+        }
+    }
+
     // --- snapshot getters for PullHandlers (get.project_summary) ---
 
     public int getCursorSlot() { return cursorSlot; }
@@ -182,6 +307,11 @@ public final class Observers {
     public boolean isPlaying() { return playing; }
     public Map<Integer, String> getBankTrackNames() { return bankTrackNames; }
     public int getBankSize() { return bankSize; }
+    /** Phase 4 Plan 04-01 — scene-name cache snapshot for the D-12 grid response. */
+    public Map<Integer, String> getSceneNames() { return sceneNames; }
+    public int getSceneBankSize() { return sceneBankSize; }
+    /** Phase 4 Plan 04-01 — the wired TrackBank reference for walker bindings. */
+    TrackBank getTrackBank() { return trackBankRef; }
 
     private static long ts() { return System.currentTimeMillis() / 1000L; }
 

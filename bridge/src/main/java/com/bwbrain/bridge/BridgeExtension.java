@@ -21,6 +21,7 @@ import com.bitwig.extension.controller.api.ControllerHost;
 import com.bitwig.extension.controller.api.CursorDevice;
 import com.bitwig.extension.controller.api.CursorTrack;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
+import com.bitwig.extension.controller.api.SceneBank;
 import com.bitwig.extension.controller.api.TrackBank;
 import com.bitwig.extension.controller.api.Transport;
 
@@ -34,6 +35,11 @@ public final class BridgeExtension extends ControllerExtension {
     static final String LOOPBACK = "127.0.0.1";
     static final int PORT = 7878;
     static final int BANK_SIZE = 8; // D-01 windowed TrackBank page size
+    // Phase 4 Plan 04-01 (D-01) — SceneBank page size. 16 covers common producer
+    // projects (RESEARCH §Bitwig Probe acceptance: "8×16=128 cells" worst case).
+    // The live probe (Task 2 capabilities doc §7) confirms the actual project's
+    // scene count; if producers need more, bump here + re-package.
+    static final int SCENE_COUNT = 16;
 
     // Stored from the ctor: the inherited getHost() returns the base Host which
     // lacks println/createCursorTrack (same reason the spike stored host).
@@ -42,6 +48,7 @@ public final class BridgeExtension extends ControllerExtension {
     private volatile boolean running = true;
     private Outbox outbox;
     private Observers observers;
+    private LauncherGridWalker walker;
     private Thread connectorThread;
     private Socket socket;
 
@@ -53,7 +60,7 @@ public final class BridgeExtension extends ControllerExtension {
     @Override
     public void init() {
         host.println("[bw-brain] init — cursor triple + windowed TrackBank[N=" + BANK_SIZE
-                + "] + transport -> " + LOOPBACK + ":" + PORT);
+                + "] + SceneBank[N=" + SCENE_COUNT + "] + transport -> " + LOOPBACK + ":" + PORT);
 
         // === Cursor triple + transport + windowed TrackBank (D-01) ===
         // CursorTrack (2-arg, non-deprecated — proven in spike). The cursor clip is
@@ -68,11 +75,29 @@ public final class BridgeExtension extends ControllerExtension {
         final CursorDevice cursorDevice = cursorTrack.createCursorDevice(); // deprecated-allow: 0-arg overload (non-deprecated); javadoc deprecates only the 4-arg (String,String,int,CursorDeviceFollowMode) form
         final Transport transport = host.createTransport();
         final TrackBank trackBank = host.createTrackBank(BANK_SIZE, 0, 0);
+        // Phase 4 Plan 04-01 (D-01) — SceneBank for the launcher-grid cursor-walk.
+        // VERIFIED non-deprecated per RESEARCH §Bitwig Probe Javadoc scan
+        // (ControllerHost.createSceneBank(int) → SceneBank; the deprecated
+        // alternates are SceneBank.addSceneCountObserver / scrollTo /
+        // scrollUp / scrollDown / scrollPageUp / scrollPageDown / setIndication).
+        final SceneBank sceneBank = host.createSceneBank(SCENE_COUNT);
 
         // === Outbox + observers ===
         outbox = new Outbox(host::println);
         observers = new Observers(outbox, BANK_SIZE);
-        observers.register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
+        // Phase 4 Plan 04-01 — wire the SceneBank name observers (PULL-ONLY;
+        // Pitfall 6 — no new event type, just the sceneNames cache enrichment
+        // for the D-12 grid response).
+        observers.register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank,
+                sceneBank, SCENE_COUNT);
+
+        // === Phase 4 Plan 04-01 (D-01) — LauncherGridWalker construction.
+        // The walker holds the grid dimensions (trackCount × sceneCount) and the
+        // D-22 per-cell timeout budget (500ms default). The Bitwig binding
+        // (SlotSelector / HasContentReader / NotesReader / ReadySignal) is
+        // constructed per-request in PullHandlers.handleLauncherGrid so the
+        // walker stays a pure state machine (testable without Bitwig).
+        walker = new LauncherGridWalker(BANK_SIZE, SCENE_COUNT);
 
         // === Connector thread: retry-connect to the daemon, then start the
         // writer thread (Outbox) + pull-handler thread (PullHandlers) on the same
@@ -88,7 +113,7 @@ public final class BridgeExtension extends ControllerExtension {
             // clean exit() shutdown); a socket loss returns true so the loop
             // re-enters CONNECT and self-heals without a controller toggle.
             while (running) {
-                if (!runConnectorCycle(LOOPBACK, PORT, outbox, cursorClip, observers,
+                if (!runConnectorCycle(LOOPBACK, PORT, outbox, cursorClip, observers, walker,
                         () -> running, s -> socket = s, host::println)) {
                     return;
                 }
@@ -135,6 +160,9 @@ public final class BridgeExtension extends ControllerExtension {
      * @param outbox     the shared Outbox (writer re-arms each cycle via reset).
      * @param cursorClip the cursor clip (nullable in tests — see above).
      * @param observers  the observers (nullable in tests — see above).
+     * @param walker     the launcher-grid walker (nullable in tests — the
+     *                   {@code get.launcher_clips} handler returns
+     *                   {@code "internal"} when the walker is null).
      * @param isRunning  supplies the live {@code running} flag (loop condition).
      * @param setSocket  publishes/nulls the live socket for {@link #exit}'s cleanup.
      * @param logger     receives status/loss lines (production: {@code host::println}).
@@ -145,6 +173,7 @@ public final class BridgeExtension extends ControllerExtension {
                                       final Outbox outbox,
                                       final PinnableCursorClip cursorClip,
                                       final Observers observers,
+                                      final LauncherGridWalker walker,
                                       final BooleanSupplier isRunning,
                                       final Consumer<Socket> setSocket,
                                       final Consumer<String> logger) {
@@ -172,7 +201,7 @@ public final class BridgeExtension extends ControllerExtension {
         //     close is the reliable loss signal.
         outbox.reset();
         outbox.startWriterThread(s);
-        final Thread pull = PullHandlers.start(s, outbox, cursorClip, observers);
+        final Thread pull = PullHandlers.start(s, outbox, cursorClip, observers, walker);
         try {
             pull.join();
         } catch (final InterruptedException ie) {

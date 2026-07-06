@@ -85,6 +85,7 @@ const SOURCE_PATHS = [
   "bridge/src/main/java/com/bwbrain/bridge/BridgeExtension.java",
   "bridge/src/main/java/com/bwbrain/bridge/ClipSid.java",
   "bridge/src/main/java/com/bwbrain/bridge/LineJson.java",
+  "bridge/src/main/java/com/bwbrain/bridge/LauncherGridWalker.java",
   "bridge/src/main/java/com/bwbrain/bridge/Observers.java",
   "bridge/src/main/java/com/bwbrain/bridge/Outbox.java",
   "bridge/src/main/java/com/bwbrain/bridge/PullHandlers.java",

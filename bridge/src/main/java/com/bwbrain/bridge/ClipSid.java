@@ -60,7 +60,7 @@ public final class ClipSid {
      *                  sid-vs-name distinction).
      * @param loopBeats the cursor clip's loop length in beats, from
      *                  {@code cursorClip.getLoopLength().get()}.
-     * @return a 32-char clipSid matching {@code ^clip_[0-9a-f]{16}$}.
+      * @return a 32-char clipSid matching {@code ^clip_[0-9a-f]{16}$}.
      */
     public static String derive(final String trackSid, final double loopBeats) {
         final String input = trackSid + ":" + loopBeats;
@@ -78,5 +78,27 @@ public final class ClipSid {
             // §What NOT to Use forbids jakarta.xml.bind.DatatypeConverter).
             return "clip_0000000000000000";
         }
+    }
+
+    /**
+     * D-12 grid-clip disambiguator overload (Phase 4 Plan 04-01). The V1
+     * {@link #derive(String, double)} hash collides for same-track same-length
+     * clips (RESEARCH §D-01(c) — the documented V1 gap). For launcher-grid
+     * cells, the sceneIdx is a per-track-within-grid disambiguator: same track
+     * + same loop length + DIFFERENT scene → different clipSid.
+     *
+     * <p>Implementation: re-use the existing SHA-256 hash with an extended
+     * input ({@code trackSid + ":s" + sceneIdx}). The output stays
+     * {@code ^clip_[0-9a-f]{16}$} (the STATE-04 family pattern). Used by
+     * {@link LauncherGridWalker} when accumulating the per-cell clipSid in
+     * the D-12 grid response.</p>
+     *
+     * @param trackSid  the parent track's identity (V1: raw cursor track name)
+     * @param loopBeats the cell clip's loop length in beats
+     * @param sceneIdx  the scene slot index within the track's clip-launcher column
+     * @return a clipSid matching {@code ^clip_[0-9a-f]{16}$}
+     */
+    public static String derive(final String trackSid, final double loopBeats, final int sceneIdx) {
+        return derive(trackSid + ":s" + sceneIdx, loopBeats);
     }
 }

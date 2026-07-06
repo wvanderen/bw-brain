@@ -14,7 +14,7 @@
     },
     "type": {
       "type": "string",
-      "enum": ["get.selected_clip", "get.selected_device_chain", "get.project_summary"]
+      "enum": ["get.selected_clip", "get.selected_device_chain", "get.project_summary", "get.launcher_clips"]
     },
     "id": {
       "type": "string",

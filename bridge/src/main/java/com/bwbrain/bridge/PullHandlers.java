@@ -22,6 +22,8 @@ package com.bwbrain.bridge;
 
 import com.bitwig.extension.controller.api.NoteStep;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
+import com.bitwig.extension.controller.api.Track;
+import com.bitwig.extension.controller.api.TrackBank;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,6 +35,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public final class PullHandlers {
 
@@ -124,8 +128,9 @@ public final class PullHandlers {
      * shared Outbox (the writer thread sends them on the same socket).
      */
     public static Thread start(final Socket socket, final Outbox outbox,
-                               final PinnableCursorClip cursorClip, final Observers observers) {
-        final Thread t = new Thread(() -> runLoop(socket, outbox, cursorClip, observers),
+                                final PinnableCursorClip cursorClip, final Observers observers,
+                                final LauncherGridWalker walker) {
+        final Thread t = new Thread(() -> runLoop(socket, outbox, cursorClip, observers, walker),
                 "bw-brain-pull");
         t.setDaemon(true);
         t.start();
@@ -133,13 +138,14 @@ public final class PullHandlers {
     }
 
     private static void runLoop(final Socket socket, final Outbox outbox,
-                                final PinnableCursorClip cursorClip, final Observers observers) {
+                                final PinnableCursorClip cursorClip, final Observers observers,
+                                final LauncherGridWalker walker) {
         try (final Socket s = socket) {
             final BufferedReader in = new BufferedReader(
                     new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
             String line;
             while ((line = in.readLine()) != null) {
-                handle(line, outbox, cursorClip, observers);
+                handle(line, outbox, cursorClip, observers, walker);
             }
         } catch (final Exception e) {
             // socket closed / daemon shutdown — daemon-thread, just exit.
@@ -147,7 +153,8 @@ public final class PullHandlers {
     }
 
     private static void handle(final String rawLine, final Outbox outbox,
-                               final PinnableCursorClip cursorClip, final Observers observers) {
+                               final PinnableCursorClip cursorClip, final Observers observers,
+                               final LauncherGridWalker walker) {
         final JsonNode req;
         try {
             req = MAPPER.readTree(rawLine);
@@ -168,6 +175,12 @@ public final class PullHandlers {
                 // (D-01 / Pitfall 7). The handler NEVER branches on the
                 // semantic-intent metadata field — it stays three-case forever.
                 case "apply.patch" -> outbox.offer(handleApplyPatch(id, req, cursorClip));
+                // Phase 4 Plan 04-01 (D-01) — launcher grid cursor-walk. Additive
+                // to the dispatch switch (sibling to get.selected_clip). The
+                // handler delegates to LauncherGridWalker.walkGrid; the walker
+                // is null in tests (BridgeExtensionReconnectTest) — return the
+                // "internal" error arm so the dispatch stays total.
+                case "get.launcher_clips" -> outbox.offer(handleLauncherGrid(id, cursorClip, observers, walker));
                 default -> outbox.offer(LineJson.responseError(id, "unknown_request"));
             }
         } catch (final Exception e) {
@@ -383,5 +396,120 @@ public final class PullHandlers {
             step.setVelocity(Math.max(0.0, Math.min(1.0, velocity / 127.0)));
             step.setDuration(duration);
         };
+    }
+
+    // ------------------------------------------------------------------------
+    // Phase 4 Plan 04-01 Task 1 — get.launcher_clips cursor-walk handler (D-01).
+    // ------------------------------------------------------------------------
+
+    /**
+     * D-01 launcher-grid enumeration. Delegates to
+     * {@link LauncherGridWalker#walkGrid} with the Bitwig bindings built from
+     * the live {@code cursorClip} + {@code observers.getTrackBank()}.
+     *
+     * <p>Per-cell flow (RESEARCH §Pattern 3):</p>
+     * <ol>
+     *   <li>Read hasContent from {@code trackBank.getItemAt(t)
+     *       .clipLauncherSlotBank().getItemAt(s).hasContent().get()}.</li>
+     *   <li>If true: publish a fresh {@link CountDownLatch} via
+     *       {@link Observers#setWalkerReadyLatch}, call
+     *       {@code slotBank.select(s)}, await the latch (the
+     *       {@code cursorClip.getLoopLength()} observer — wired once in
+     *       {@link Observers#register} — counts it down on the controller
+     *       thread). On timeout (D-22 500ms default), mark empty + advance (a
+     *       missing clip is never fatal — Pitfall 1/4).</li>
+     *   <li>On fire: read loopBeats via {@code cursorClip.getLoopLength().get()},
+     *       then {@code enumerateNotes(cursorClip, loopBeats/GRID_W)} for the
+     *       NoteStep grid (lifted from {@link #handleSelectedClip}).</li>
+     * </ol>
+     *
+     * <p>Null-guarded: if {@code walker == null} (BridgeExtensionReconnectTest
+     * path — no Bitwig host), returns {@link LineJson#responseError} with
+     * {@code "internal"} so the dispatch stays total (Pitfall 8 — never throw
+     * into the void).</p>
+     */
+    private static String handleLauncherGrid(final String id,
+                                              final PinnableCursorClip cursorClip,
+                                              final Observers observers,
+                                              final LauncherGridWalker walker) {
+        if (walker == null || cursorClip == null || observers == null
+                || observers.getTrackBank() == null) {
+            // Test path (no Bitwig host) OR pre-init race — return internal so
+            // the dispatch is total (Pitfall 8). The daemon treats the response
+            // as a transient error + surfaces to the CLI.
+            return LineJson.responseError(id, "internal");
+        }
+        final TrackBank trackBank = observers.getTrackBank();
+
+        // Ready-signal: per-cell CountDownLatch published to Observers via
+        // setWalkerReadyLatch; the loopLength observer (wired once in register)
+        // counts it down on fire. Observers.clearWalkerReadyLatch guards against
+        // a stale fire bleeding into the next cell (the observer itself also
+        // clears the slot after countDown). The cell-scoped holder (pending[0])
+        // keeps a local ref so awaitNext can block on the exact latch arm() set
+        // even if Observers clears its slot during a timeout cleanup race.
+        final CountDownLatch[] pending = new CountDownLatch[1];
+        final LauncherGridWalker.ReadySignal readySignal = new LauncherGridWalker.ReadySignal() {
+            @Override public void arm() {
+                final CountDownLatch l = new CountDownLatch(1);
+                pending[0] = l;
+                observers.setWalkerReadyLatch(l);
+            }
+            @Override public double awaitNext(final long timeoutMs) {
+                final CountDownLatch l = pending[0];
+                pending[0] = null;
+                if (l == null) { return -1.0; }
+                try {
+                    if (!l.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+                        observers.clearWalkerReadyLatch();
+                        return -1.0; // timeout (D-22) — mark empty + advance
+                    }
+                } catch (final InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    observers.clearWalkerReadyLatch();
+                    return -1.0;
+                }
+                // Fire — read the loop length the cursor clip now reports.
+                try {
+                    final double loopBeats = cursorClip.getLoopLength().get();
+                    return loopBeats > 0 ? loopBeats : -1.0;
+                } catch (final Exception e) {
+                    return -1.0;
+                }
+            }
+        };
+        final LauncherGridWalker.SlotSelector selector = (t, s) ->
+                trackBank.getItemAt(t).clipLauncherSlotBank().select(s);
+        final LauncherGridWalker.HasContentReader hasContent = (t, s) -> {
+            try {
+                return trackBank.getItemAt(t).clipLauncherSlotBank()
+                        .getItemAt(s).hasContent().get();
+            } catch (final Exception e) {
+                return false;
+            }
+        };
+        final LauncherGridWalker.NotesReader notes = loopBeats -> {
+            final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;
+            return enumerateNotes(cursorClip, beatsPerColumn);
+        };
+        // V1 trackSid: the raw cursor track name (STATE-04 reconciles downstream;
+        // ClipSid.derive is opaque to trackSid-vs-name — same convention as
+        // Observers.wireCursorClip).
+        final java.util.function.IntFunction<String> trackSidFor = t ->
+                observers.getBankTrackNames().getOrDefault(t, "");
+        final java.util.function.IntFunction<String> trackNameFor = t ->
+                observers.getBankTrackNames().getOrDefault(t, "");
+
+        final LauncherGridWalker.LauncherGridResponse grid = walker.walkGrid(
+                selector, hasContent, notes, readySignal, trackSidFor, trackNameFor);
+
+        // Enrich sceneNames from the observers cache (PULL-ONLY; Pitfall 6 —
+        // no new event type, just the response array).
+        final int sceneCount = observers.getSceneBankSize();
+        for (int s = 0; s < sceneCount; s++) {
+            grid.sceneNames.add(observers.getSceneNames().getOrDefault(s, ""));
+        }
+
+        return LauncherGridWalker.buildLauncherGridResponse(id, grid);
     }
 }
