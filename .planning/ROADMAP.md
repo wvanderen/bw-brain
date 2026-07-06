@@ -163,9 +163,17 @@ Plans:
   4. Track-role classification labels tracks (kick/bass/lead/pad/fx/hats/percussion) with confidence, persisted to `roles.json` (gates automation salience in Phase 5).
   5. Pi `/review` + arrangement pane render a section timeline + energy sparkline for project-level critique.
 
-**Plans**: TBD
+**Plans**: 6 plans
 **UI hint**: yes
 **Research needed**: librosa.segment algorithm adaptation (`agglomerative`, `recurrence_matrix`) to MIDI/composition-state rather than audio; section-detection threshold tuning.
+
+Plans:
+- [ ] 04-01-PLAN.md — Bridge cursor-walk (`get.launcher_clips`) + capabilities-doc probe (BLOCKING human-verify)
+- [ ] 04-02-PLAN.md — Pure primitives (scene-features, self-similarity) + state stores (snapshot, roles) + profile extensions
+- [ ] 04-03-PLAN.md — Section-detector + repetition-report analyzers (the self-similarity matrix pair)
+- [ ] 04-04-PLAN.md — Energy-curve + track-role-classifier analyzers (the composite pair)
+- [ ] 04-05-PLAN.md — M3_ANALYZERS registry + transition-suggest + query-server arrange.* dispatch + bw-arrange multicall CLI + boot/describe wiring
+- [ ] 04-06-PLAN.md — Pi `/review` skill + contract test (UX-03)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
