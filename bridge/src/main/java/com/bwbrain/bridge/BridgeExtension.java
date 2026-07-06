@@ -68,13 +68,19 @@ public final class BridgeExtension extends ControllerExtension {
         // host.createCursorClip returns a plain Clip without the pin surface). The
         // cursor device is created from the cursor track (-> PinnableCursorDevice,
         // which IS-A CursorDevice).
+        // Phase 4 Plan 04-01 Task 2 fix — the third arg to createTrackBank is
+        // numScenes (the per-track ClipLauncherSlotBank size). With numScenes=0,
+        // Track.clipLauncherSlotBank() returned null for every track (live-
+        // observed: 0/128 hasContent cells, all slotBank null). Passing
+        // SCENE_COUNT gives every track a SCENE_COUNT-sized slotBank tied to
+        // the same SceneBank the scene-name observers watch.
         final CursorTrack cursorTrack = host.createCursorTrack(0, 0);
         // gridWidth=64 covers a 4-bar clip at 16th-note resolution; must match
         // PullHandlers.GRID_W. See capabilities doc §2 (M4 live finding).
         final PinnableCursorClip cursorClip = cursorTrack.createLauncherCursorClip(64, 128);
         final CursorDevice cursorDevice = cursorTrack.createCursorDevice(); // deprecated-allow: 0-arg overload (non-deprecated); javadoc deprecates only the 4-arg (String,String,int,CursorDeviceFollowMode) form
         final Transport transport = host.createTransport();
-        final TrackBank trackBank = host.createTrackBank(BANK_SIZE, 0, 0);
+        final TrackBank trackBank = host.createTrackBank(BANK_SIZE, 0, SCENE_COUNT);
         // Phase 4 Plan 04-01 (D-01) — SceneBank for the launcher-grid cursor-walk.
         // VERIFIED non-deprecated per RESEARCH §Bitwig Probe Javadoc scan
         // (ControllerHost.createSceneBank(int) → SceneBank; the deprecated
