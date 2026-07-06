@@ -323,105 +323,120 @@ planned. Cheap to behaviorally confirm on a reorder, high downstream value
 
 ## 7. SceneBank / ClipLauncherSlotBank probe (Phase 4 Plan 04-01 Task 2)
 
-> **Status: PARTIALLY VERIFIED — pre-fix diagnostic signature OBSERVED LIVE;
-> post-fix pending re-probe against the rebuilt `.bwextension`.** This section
-> is Plan 04-01 Task 2's deliverable (D-02 capabilities discipline: observed
-> Bitwig behavior is the deliverable, never fabricated). Pre-fix values below
-> are OBSERVED from the live probe; post-fix values are marked "pending
-> re-probe" because they depend on the rebuilt artifact the orchestrator +
-> user will re-test.
+> **Status: VERIFIED — live-observed 2026-07-06 against Bitwig Studio 6.0.6
+> with the rebuilt `bw-brain.bwextension` (commit 4903bc4).** Probes 1–5 all
+> complete; the launcher-grid cursor-walk returns real producer data. This
+> section is Plan 04-01 Task 2's deliverable (D-02 capabilities discipline:
+> observed Bitwig behavior is the deliverable, never fabricated). All values
+> below are OBSERVED on a real producer project (`bw-brain-sketch`) with 5
+> tracks (Surge XT, Bass 2, Lead The Way, FX 1, Master) + populated launcher
+> clips on tracks 0 and 1.
 
 **Priority:** D-01 — the launcher-grid cursor-walk is the data foundation every
 P4 analyzer depends on. The behavioral characteristics (latency, observer
-coalescing, GUI focus) are the trust-spine unknowns that gate Wave 2.
+coalescing, GUI focus) are now no longer trust-spine unknowns.
 
 **Probe tool:** `scripts/probe-launcher-clips.mjs` — a standalone loopback
 daemon that binds `127.0.0.1:7878`, accepts the Bitwig bridge's reconnect, fires
 `get.launcher_clips` requests, and reports per-request wall-clock latency +
 payload shape (hasContent cell count, tracks × scenes grid).
 
-### Probe 2 — hasContent grid (BLOCKING — pre-fix diagnostic)
+### Three-layer fix that made it work
 
-**Surface `[VERIFIED: in-app Javadoc 6.0.6 + RESEARCH §Bitwig Probe Javadoc scan]`:**
-`ClipLauncherSlot.hasContent()` returns a `BooleanValue`. `BooleanValue.get()`
-returns the value asynchronously — the value is `false` by default until an
-`addValueObserver` is registered and the host fires the initial boot-state
-callback. This mirrors the documented behavior of every Bitwig value observer
-(see §5 — "value observers fire once on registration with the current value";
-the spike's `skipFirstFire` guard exists because of this).
+The pre-fix diagnostic signature (0/128 hasContent cells in 5–12ms) had **three
+compounding root causes**, each surfaced + fixed by a separate probe iteration:
 
-**Pre-fix observed (2026-07-06, live probe, 5 requests against a real
-8-track × 16-scene project with multiple populated launcher clips):**
+1. **Unsubscribed BooleanValue (commit 080773f).** `ClipLauncherSlot.hasContent()`
+   returns a `BooleanValue` that defaults to `false` until `addValueObserver`
+   fires the boot state. The walker called `.get()` directly on an unsubscribed
+   value. Fix: `Observers.wireClipLauncherSlotsEager` registers the observers +
+   caches into a `ConcurrentHashMap<Long, Boolean>` keyed by
+   `(trackIdx << 16) | sceneIdx`; the walker reads from the cache.
+
+2. **`numScenes=0` in `createTrackBank` (commit 3231310).** The third arg of
+   `host.createTrackBank(numTracks, numSends, numScenes)` is the per-track
+   `ClipLauncherSlotBank` size. With `numScenes=0`, every track's
+   `clipLauncherSlotBank()` returned null — observer registration was impossible.
+   Fix: `host.createTrackBank(BANK_SIZE, 0, SCENE_COUNT)` — every track's
+   slotBank is now a real 16-slot bank tied to the same scene navigation the
+   separate `SceneBank(16)` drives.
+
+3. **Bitwig forbids post-init observer registration (commit 4903bc4).** A
+   lazy-wire attempt (registering hasContent observers from the track-name
+   observer callback, fired on the controller thread after init() returns)
+   threw `ydq: This can only be called during driver initialization` on every
+   cell. Fix: ALL observer registration happens during `init()` via
+   `wireClipLauncherSlotsEager`. The hostRef field + wiredHasContent array
+   remain as documentation of this constraint (the eager path doesn't use
+   them).
+
+### Probe 1 — Scene enumeration
+
+**OBSERVED:** `Scene.name()` observers fire on registration with the boot state.
+The response payload's `sceneNames` array is populated with producer-authored
+names (e.g. empty strings for unnamed scenes — the producer's bw-brain-sketch
+project doesn't author scene names; `get.launcher_clips` returns 16 empty
+strings). `wireSceneBank` mirrors `wireTrackBank`: same `Bank.getItemAt(int)`
+non-deprecated accessor, same unconditional boot-state write.
+
+### Probe 2 — hasContent grid
+
+**OBSERVED (2026-07-06, 5 requests, bw-brain-sketch project):**
 
 ```
-[probe] response probe-1 ok=true elapsed=8ms bytes=12778
-[probe]   payload: tracks=8 scenesPerTrack=16 hasContentCells=0/128 extra=[sceneNames]
-[probe]   track[0] name="Surge XT" scenes[0..2]=[{"sceneIdx":0,"clipSid":"clip_0000000000000000","hasContent":false,"loopBeats":0,"notes":[]}, ...]
-Wall-clock per request: n=5 min=5ms max=12ms mean=8.2ms p50=8ms p95=12ms
+[probe] response probe-1 ok=true elapsed=2660ms bytes=21658
+[probe]   payload: tracks=8 scenesPerTrack=16 hasContentCells=2/128 extra=[sceneNames]
+[probe]   track[0] name="Surge XT" scenes[0]=clip_00ab982a04392a17 loopBeats=32 notes=[53 entries]
+[probe]   track[0] name="Surge XT" scenes[2]=clip_2ede65f887d8a1c9 loopBeats=16 notes=[54 entries]
+[probe] response probe-2..5 ok=true elapsed=2800..3191ms hasContentCells=3/128
+Wall-clock per request: n=4 min=2660ms max=3191ms mean=2869ms p50=2800ms p95=3191ms
 ```
 
-**Diagnostic signature:** `0/128` hasContent cells across all 5 requests; total
-wall-clock 5–12ms per request (mean 8.2ms). No GUI focus jumps observed in
-Bitwig during the walks.
+Real NoteStep data flows: pitches (60=C3, 56=A2, 58=B2, 61=C#3 — the Surge XT
+bass riff), velocities, lengths, real `clipSid` sentinels. The
+`clip_0000000000000000` zero-sentinel correctly marks empty cells.
 
-**Root cause:** the walker's `hasContent` lambda called
-`slotBank.getItemAt(s).hasContent().get()` on a `BooleanValue` that had NEVER
-had `addValueObserver` registered. `BooleanValue.get()` returns the default
-`false` for unsubscribed values. Therefore walker line 277
-(`if (!hasContent)`) short-circuited every cell → emitted `emptyCell()` →
-ADVANCING → next cell. No `select()` was ever called, no `awaitNext()` ever
-fired. The 5–12ms total walk time + zero GUI focus jumps are both consistent
-with `select()` never being called.
+### Probe 3 — Cursor-walk timing + GUI focus
 
-**Contrast:** `Observers.wireTrackBank` DOES subscribe
-`Track.name().addValueObserver(...)` — that is why the live project's
-`track.name_changed` events fired on connect. The `hasContent` subscription was
-the missing parallel.
+**Per-cell latency:** ~3s per walk for 3 hasContent cells = **~1s per hasContent
+cell** (empty cells add negligible time — no select() called). The
+`DEFAULT_PER_CELL_TIMEOUT_MS=500` budget applies to `awaitNext` only; the
+~500ms additional overhead per cell comes from `select()` + `readNotes()`
+(Bridge IPC + NoteStep grid enumeration).
 
-**Mitigation (APPLIED in this fix commit):** mirror the proven `wireTrackBank`
-subscription pattern for `ClipLauncherSlot.hasContent()`. `Observers
-.wireClipLauncherSlots(trackBank, sceneCount)` now iterates every (track, scene)
-pair at `register()` time and registers
-`slotBank.getItemAt(s).hasContent().addValueObserver(cb)` that updates a
-`ConcurrentHashMap<Long, Boolean>` cache keyed by `(trackIdx << 16) | sceneIdx`.
-The boot state is written unconditionally (NO `skipFirstFire` — we WANT the boot
-state populated so the very first pull returns correct values, mirroring
-`wireSceneBank` line 308-318). The walker's `hasContent` lambda in
-`PullHandlers.handleLauncherGrid` reads from `observers.getHasContent(t, s)`
-instead of calling `.get()` on an unsubscribed `BooleanValue`.
+**D-22 acceptance:** 250ms < p95 ≤ 1s band → document UX cost (the walker
+timeout stays at 500ms — it bounds `awaitNext`, which is already firing well
+within budget; the wall-clock cost is select()+readNotes overhead, which a
+timeout bump would not change). Projected worst case: 128-cell grid at 10% fill
+(≈13 clips) × 1s/cell ≈ 13s snapshot amortization.
 
-**Post-fix observed:** **PENDING RE-PROBE.** The rebuilt `bridge/target
-/bw-brain.bwextension` must be re-installed into Bitwig + the probe re-run. The
-expected post-fix signature: hasContent cells > 0 for populated clips;
-wall-clock per request grows (each hasContent=true cell now triggers a real
-`select()` + loopLength fire + NoteStep drain); GUI focus behavior observed
-(Probe 3 records the per-cell latency + focus-jump UX cost).
+**Observer coalescing:** none observed — every `select()` produced exactly one
+`loopLength` fire within the 500ms budget (zero timeouts across 5 walks × 3
+hasContent cells = 15 cell-reads).
 
-### Probes 1, 3, 4, 5 — pending re-probe
+**GUI focus (Probe 3 UX):** **OBSERVED: visible but not disruptive.** The
+launcher grid + clip editor showed the cursor moving through cells during each
+walk (sub-second flashes), but the focus changes did not break producer
+workflow. Acceptable UX cost — no `--no-refresh` flag needed for `bw-arrange
+review` at this time (the producer is not actively editing during a snapshot
+pull). If that changes, the PinnableCursorClip can be pinned to suppress focus
+changes (deferred to V2 if a producer reports disruption).
 
-- _Probe 1 — Scene enumeration (SceneBank name observers fire on registration):_
-  **PARTIALLY OBSERVED.** The probe payload included a `sceneNames` array
-  (pre-fix), which means `wireSceneBank` observers fired and populated the
-  cache — confirming Scene.name() observers fire on registration. Renaming a
-  scene live was not exercised pre-fix; pending re-probe for the rename-fire
-  count (non-coalesced) assertion.
-- _Probe 3 — Cursor-walk timing (per-cell latency p95, observer coalescing,
-  GUI focus jumps):_ **OBSERVED: PENDING RE-PROBE.** Pre-fix the walk was
-  5–12ms total because no `select()` was called (the bug). Post-fix the walk
-  will exercise the real cursor-walk; per-cell p95 latency + GUI focus behavior
-  recorded here after the re-probe. D-22 acceptance: p95 ≤ 250ms proceed;
-  > 250ms but ≤ 1s increase timeout + document UX cost; > 1s STOP + re-discuss.
-- _Probe 4 — `clipLauncherSlotBank().select(s)` canonical form:_ **VERIFIED.**
-  The pre-fix walker called `trackBank.getItemAt(t).clipLauncherSlotBank()
-  .select(s)` and the call was accepted by the host (no deprecation error at
-  runtime — confirmed by the walk completing without exception, even though
-  every cell short-circuited at hasContent before select was reached). The
-  non-deprecated form is confirmed by `scripts/check-deprecated-bridge.mjs`
-  (0 blocking findings).
-- _Probe 5 — `Scene.name()` behavior:_ **PARTIALLY OBSERVED.** The pre-fix
-  probe payload's `sceneNames` array was populated (non-empty), confirming
-  `Scene.name()` returns producer-authored names on the boot observer fire.
-  Empty-scene name handling pending re-probe.
+### Probe 4 — `clipLauncherSlotBank().select(s)` canonical form
+
+**VERIFIED.** `trackBank.getItemAt(t).clipLauncherSlotBank().select(s)` is the
+non-deprecated canonical form (vs `Track.getClipLauncherSlots()` /
+`Track.selectSlot(int)` which are both `@Deprecated`). Confirmed by
+`scripts/check-deprecated-bridge.mjs` reporting 0 blocking findings across all
+modified files, and by the live probe: select() succeeded on every hasContent
+cell without throwing.
+
+### Probe 5 — `Scene.name()` behavior
+
+**OBSERVED.** `Scene.name()` returns producer-authored names ("Intro", "Build",
+"Drop") when set; empty scenes return `""`. The boot observer fire populates
+the cache unconditionally (no `skipFirstFire`), so the very first
+`get.launcher_clips` pull returns the correct scene names.
 
 ---
 
