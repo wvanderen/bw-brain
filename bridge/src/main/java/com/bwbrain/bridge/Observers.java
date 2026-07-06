@@ -146,7 +146,7 @@ public final class Observers {
                          final int sceneCount) {
         register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
         wireSceneBank(sceneBank, sceneCount);
-        wireClipLauncherSlots(trackBank, sceneCount);
+        wireClipLauncherSlots(host, trackBank, sceneCount);
         wireWalkerReadySignal(cursorClip);
     }
 
@@ -356,17 +356,19 @@ public final class Observers {
      *       non-deprecated surface as {@code transport.isPlaying()} at line 231).</li>
      * </ol>
      */
-    private void wireClipLauncherSlots(final TrackBank trackBank, final int sceneCount) {
+    private void wireClipLauncherSlots(final ControllerHost host,
+                                       final TrackBank trackBank, final int sceneCount) {
+        host.println("[bw-brain] wireClipLauncherSlots: start bankSize=" + bankSize + " sceneCount=" + sceneCount);
+        int registered = 0;
+        int nullBanks = 0;
         for (int t = 0; t < bankSize; t++) {
             final int trackIdx = t;
             final Track track = trackBank.getItemAt(t);
             final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
             if (slotBank == null) {
-                // Master / FX / Return / Group tracks do not expose a clip
-                // launcher slot bank — pre-populate every scene with false so
-                // the walker reads a coherent all-empty row instead of throwing
-                // NPE on slotBank.getItemAt. Mirrors the pre-init default the
-                // cache already holds, made explicit for readability.
+                nullBanks++;
+                host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
+                        + ": clipLauncherSlotBank()=null (Master/FX/Group — skipping)");
                 for (int s = 0; s < sceneCount; s++) {
                     hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
                 }
@@ -374,14 +376,32 @@ public final class Observers {
             }
             for (int s = 0; s < sceneCount; s++) {
                 final int sceneIdx = s;
-                // Initialize to false so a pre-boot pull returns false (matching
-                // the unsubscribed default) rather than null — mirrors
-                // wireSceneBank's `sceneNames.put(idx, "")`.
                 hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
-                slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
-                        (BooleanValueChangedCallback) (boolean has) ->
-                                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has));
+                try {
+                    slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
+                            (BooleanValueChangedCallback) (boolean has) -> {
+                                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
+                                host.println("[bw-brain]   hasContent fired t=" + trackIdx
+                                        + " s=" + sceneIdx + " has=" + has);
+                            });
+                    registered++;
+                } catch (final Throwable e) {
+                    host.println("[bw-brain]   hasContent observer registration FAILED t="
+                            + trackIdx + " s=" + sceneIdx + ": " + e);
+                }
             }
+            host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
+                    + ": registered " + sceneCount + " hasContent observers");
+        }
+        host.println("[bw-brain] wireClipLauncherSlots: done registered=" + registered
+                + " nullBanks=" + nullBanks);
+    }
+
+    private static String trackNameSafe(final TrackBank trackBank, final int t) {
+        try {
+            return String.valueOf(trackBank.getItemAt(t).name().get());
+        } catch (final Throwable e) {
+            return "<" + e.getClass().getSimpleName() + ">";
         }
     }
 
