@@ -159,6 +159,14 @@ public final class Observers {
                          final int sceneCount) {
         register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
         wireSceneBank(sceneBank, sceneCount);
+        // Phase 4 Plan 04-01 Task 2 — EAGER hasContent observer wiring.
+        // Bitwig forbids observer registration outside init() ("ydq: This can
+        // only be called during driver initialization" — live-observed when
+        // we attempted lazy wiring from the track-name observer callback). So
+        // all hasContent observers MUST be registered here, during init().
+        // Requires createTrackBank(BANK_SIZE, 0, SCENE_COUNT) — with numScenes=0
+        // every track's clipLauncherSlotBank() returns null.
+        wireClipLauncherSlotsEager(host, trackBank, sceneCount);
         wireWalkerReadySignal(cursorClip);
     }
 
@@ -286,17 +294,6 @@ public final class Observers {
             final int slot = i;
             final AtomicBoolean skip = new AtomicBoolean(true);
             t.name().addValueObserver((StringValueChangedCallback) (String name) -> {
-                // Phase 4 Plan 04-01 Task 2 fix — lazily wire this track's
-                // hasContent observers on first name fire. The track proxy is
-                // realized by then (clipLauncherSlotBank() returns non-null).
-                // Idempotent via wiredHasContent[slot]. This MUST run before the
-                // skipFirstFire check below — the boot fire is exactly the
-                // signal that the track is alive, even though we don't emit a
-                // track.name_changed event for it.
-                if (!wiredHasContent[slot]) {
-                    wiredHasContent[slot] = true;
-                    wireHasContentForTrack(slot);
-                }
                 if (skip.getAndSet(false)) { return; }
                 bankTrackNames.put(slot, name);
                 final Map<String, Object> payload = mapOf("slot", slot);
@@ -341,65 +338,59 @@ public final class Observers {
     }
 
     /**
-     * Phase 4 Plan 04-01 Task 2 fix — wire {@code ClipLauncherSlot.hasContent()}
-     * observers for one track's scenes. Called LAZILY from the track-name
-     * observer's first fire (Bitwig returns null from
-     * {@code track.clipLauncherSlotBank()} during {@code init()}; the bank is
-     * realized by the time the name observer fires on the controller thread).
+     * Phase 4 Plan 04-01 Task 2 fix — EAGERLY wire
+     * {@code ClipLauncherSlot.hasContent()} observers for every (track, scene)
+     * during {@code init()}. Bitwig forbids observer registration outside
+     * init() ("ydq: This can only be called during driver initialization" —
+     * live-observed when we attempted lazy wiring from the track-name observer
+     * callback). All observers MUST be registered here.
+     *
+     * <p>REQUIRES {@code createTrackBank(BANK_SIZE, 0, SCENE_COUNT)} — with
+     * {@code numScenes=0} every track's {@code clipLauncherSlotBank()} returns
+     * null and the per-slot {@code hasContent()} call throws NPE.</p>
      *
      * <p>PULL-ONLY (Pitfall 6 — NEVER offers an event line; the 5-event
      * protocol enum stays unchanged).</p>
      */
-    private void wireHasContentForTrack(final int trackIdx) {
-        if (hostRef != null) {
-            hostRef.println("[bw-brain] wireHasContentForTrack[" + trackIdx + "] start");
-        }
-        if (trackBankRef == null) {
-            if (hostRef != null) hostRef.println("[bw-brain]   trackBankRef null — aborting");
-            return;
-        }
-        final Track track = trackBankRef.getItemAt(trackIdx);
-        final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
-        if (slotBank == null) {
-            // Track still unrealized OR Master/FX/Group with no launcher.
-            // Pre-populate every scene with false so the walker reads a
-            // coherent all-empty row instead of NPE'ing.
-            if (hostRef != null) {
-                hostRef.println("[bw-brain]   track[" + trackIdx + "] name="
-                        + trackNameSafe(trackBankRef, trackIdx)
-                        + ": clipLauncherSlotBank()=null (still unrealized OR Master/FX/Group)");
-            }
-            for (int s = 0; s < sceneBankSize; s++) {
-                hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
-            }
-            return;
-        }
+    private void wireClipLauncherSlotsEager(final ControllerHost host,
+                                            final TrackBank trackBank, final int sceneCount) {
+        host.println("[bw-brain] wireClipLauncherSlotsEager: start bankSize=" + bankSize + " sceneCount=" + sceneCount);
         int registered = 0;
-        for (int s = 0; s < sceneBankSize; s++) {
-            final int sceneIdx = s;
-            hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
-            try {
-                slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
-                        (BooleanValueChangedCallback) (boolean has) -> {
-                            hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
-                            if (hostRef != null) {
-                                hostRef.println("[bw-brain]   hasContent fired t="
-                                        + trackIdx + " s=" + sceneIdx + " has=" + has);
-                            }
-                        });
-                registered++;
-            } catch (final Throwable e) {
-                if (hostRef != null) {
-                    hostRef.println("[bw-brain]   hasContent observer registration FAILED t="
+        int nullBanks = 0;
+        for (int t = 0; t < bankSize; t++) {
+            final int trackIdx = t;
+            final Track track = trackBank.getItemAt(t);
+            final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
+            if (slotBank == null) {
+                nullBanks++;
+                host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
+                        + ": clipLauncherSlotBank()=null (numScenes arg of createTrackBank must be > 0)");
+                for (int s = 0; s < sceneCount; s++) {
+                    hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
+                }
+                continue;
+            }
+            for (int s = 0; s < sceneCount; s++) {
+                final int sceneIdx = s;
+                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
+                try {
+                    slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
+                            (BooleanValueChangedCallback) (boolean has) -> {
+                                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
+                                host.println("[bw-brain]   hasContent fired t=" + trackIdx
+                                        + " s=" + sceneIdx + " has=" + has);
+                            });
+                    registered++;
+                } catch (final Throwable e) {
+                    host.println("[bw-brain]   hasContent observer registration FAILED t="
                             + trackIdx + " s=" + sceneIdx + ": " + e);
                 }
             }
+            host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
+                    + ": registered " + sceneCount + " hasContent observers");
         }
-        if (hostRef != null) {
-            hostRef.println("[bw-brain]   track[" + trackIdx + "] name="
-                    + trackNameSafe(trackBankRef, trackIdx)
-                    + ": registered " + registered + "/" + sceneBankSize + " hasContent observers");
-        }
+        host.println("[bw-brain] wireClipLauncherSlotsEager: done registered=" + registered
+                + " nullBanks=" + nullBanks);
     }
 
     private static String trackNameSafe(final TrackBank trackBank, final int t) {
