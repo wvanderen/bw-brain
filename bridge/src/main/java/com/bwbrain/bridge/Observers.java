@@ -88,6 +88,17 @@ public final class Observers {
     // A plain boolean[][] would diverge from the established cache pattern AND
     // lack a happens-before relationship for element writes across threads.
     private final Map<Long, Boolean> hasContentCache = new ConcurrentHashMap<>();
+    // Phase 4 Plan 04-01 Task 2 fix — per-track "hasContent observers wired"
+    // flag. Bitwig's Track proxies returned by trackBank.getItemAt(int) during
+    // init() return null from clipLauncherSlotBank() (the bank is not yet
+    // realized). The name observer fires LATER on the controller thread once
+    // the track is populated; that's the safe moment to subscribe hasContent.
+    // Idempotent guard so multiple name fires (boot + rename) wire only once.
+    // Initialized in the ctor (bankSize is a ctor param).
+    private final boolean[] wiredHasContent;
+    // Phase 4 Plan 04-01 Task 2 diagnostic — host reference for println in
+    // lazy-wiring callbacks. Set in register(); null in tests.
+    private ControllerHost hostRef;
     // Phase 4 Plan 04-01 — trackBank reference retained so the pull-handler can
     // build the LauncherGridWalker's SlotSelector/HasContentReader bindings
     // (trackBank.getItemAt(t).clipLauncherSlotBank()...). Set in register();
@@ -108,6 +119,7 @@ public final class Observers {
     public Observers(final Outbox outbox, final int bankSize) {
         this.outbox = outbox;
         this.bankSize = bankSize;
+        this.wiredHasContent = new boolean[bankSize];
     }
 
     /** Wire all 5 observer groups. Idempotent (call once from BridgeExtension.init). */
@@ -117,6 +129,7 @@ public final class Observers {
                          final CursorDevice cursorDevice,
                          final Transport transport,
                          final TrackBank trackBank) {
+        this.hostRef = host;
         wireCursorTrack(cursorTrack);
         wireCursorClip(cursorClip);
         wireCursorDevice(cursorDevice);
@@ -146,7 +159,6 @@ public final class Observers {
                          final int sceneCount) {
         register(host, cursorTrack, cursorClip, cursorDevice, transport, trackBank);
         wireSceneBank(sceneBank, sceneCount);
-        wireClipLauncherSlots(host, trackBank, sceneCount);
         wireWalkerReadySignal(cursorClip);
     }
 
@@ -274,6 +286,17 @@ public final class Observers {
             final int slot = i;
             final AtomicBoolean skip = new AtomicBoolean(true);
             t.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+                // Phase 4 Plan 04-01 Task 2 fix — lazily wire this track's
+                // hasContent observers on first name fire. The track proxy is
+                // realized by then (clipLauncherSlotBank() returns non-null).
+                // Idempotent via wiredHasContent[slot]. This MUST run before the
+                // skipFirstFire check below — the boot fire is exactly the
+                // signal that the track is alive, even though we don't emit a
+                // track.name_changed event for it.
+                if (!wiredHasContent[slot]) {
+                    wiredHasContent[slot] = true;
+                    wireHasContentForTrack(slot);
+                }
                 if (skip.getAndSet(false)) { return; }
                 bankTrackNames.put(slot, name);
                 final Map<String, Object> payload = mapOf("slot", slot);
@@ -319,82 +342,64 @@ public final class Observers {
 
     /**
      * Phase 4 Plan 04-01 Task 2 fix — wire {@code ClipLauncherSlot.hasContent()}
-     * observers for every (track, scene) in the grid. PULL-ONLY (Pitfall 6 —
-     * NEVER offers an event line; the 5-event protocol enum stays unchanged).
+     * observers for one track's scenes. Called LAZILY from the track-name
+     * observer's first fire (Bitwig returns null from
+     * {@code track.clipLauncherSlotBank()} during {@code init()}; the bank is
+     * realized by the time the name observer fires on the controller thread).
      *
-     * <p><b>Why this exists.</b> {@code ClipLauncherSlot.hasContent()} returns a
-     * {@code BooleanValue} that defaults to {@code false} until an observer is
-     * registered. The pre-fix walker read {@code slot.hasContent().get()}
-     * directly on an unsubscribed value, so every cell returned {@code false} →
-     * the walker short-circuited every cell as empty, called NO {@code select()},
-     * and finished in milliseconds. The live probe signature (Plan 04-01 Task 2)
-     * was {@code 0/128} hasContent cells in 5–12ms across 5 requests — the
-     * diagnostic of an unsubscribed observer. Post-fix, this method registers
-     * the observer at {@code register()} time so the cache holds the real boot
-     * state by the time the first {@code get.launcher_clips} pull arrives.</p>
-     *
-     * <p><b>Mirrors {@link #wireSceneBank}</b> (line 290-300): same
-     * {@code Bank.getItemAt(int)} non-deprecated accessor chain, same
-     * unconditional boot-state write (NO {@code skipFirstFire} — we WANT the
-     * boot state populated so the very first pull is correct, unlike the 5
-     * push observer groups which skip the boot fire to keep the daemon's first
-     * received line a REAL change). The cache is a {@link ConcurrentHashMap}
-     * keyed by {@code (trackIdx << 16) | sceneIdx} — matches the
-     * {@link #bankTrackNames}/{@link #sceneNames} style exactly.</p>
-     *
-     * <p>Accessor chain (all non-deprecated, per RESEARCH §Bitwig Probe Javadoc
-     * scan + {@code scripts/check-deprecated-bridge.mjs} gate):</p>
-     * <ol>
-     *   <li>{@code trackBank.getItemAt(t)} → {@link Track} (terminal
-     *       non-deprecated Bank accessor; the int-arg AND 0-arg TrackBank
-     *       indexers are BOTH @Deprecated — see {@link #wireTrackBank}).</li>
-     *       <li>{@code track.clipLauncherSlotBank()} → {@link ClipLauncherSlotBank}
-     *       (NOT {@code Track#getClipLauncherSlots()} which is @Deprecated).</li>
-     *   <li>{@code slotBank.getItemAt(s)} → {@code ClipLauncherSlot}
-     *       (terminal non-deprecated Bank accessor).</li>
-     *   <li>{@code slot.hasContent()} → {@code BooleanValue} (the SAME
-     *       non-deprecated surface as {@code transport.isPlaying()} at line 231).</li>
-     * </ol>
+     * <p>PULL-ONLY (Pitfall 6 — NEVER offers an event line; the 5-event
+     * protocol enum stays unchanged).</p>
      */
-    private void wireClipLauncherSlots(final ControllerHost host,
-                                       final TrackBank trackBank, final int sceneCount) {
-        host.println("[bw-brain] wireClipLauncherSlots: start bankSize=" + bankSize + " sceneCount=" + sceneCount);
-        int registered = 0;
-        int nullBanks = 0;
-        for (int t = 0; t < bankSize; t++) {
-            final int trackIdx = t;
-            final Track track = trackBank.getItemAt(t);
-            final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
-            if (slotBank == null) {
-                nullBanks++;
-                host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
-                        + ": clipLauncherSlotBank()=null (Master/FX/Group — skipping)");
-                for (int s = 0; s < sceneCount; s++) {
-                    hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
-                }
-                continue;
+    private void wireHasContentForTrack(final int trackIdx) {
+        if (hostRef != null) {
+            hostRef.println("[bw-brain] wireHasContentForTrack[" + trackIdx + "] start");
+        }
+        if (trackBankRef == null) {
+            if (hostRef != null) hostRef.println("[bw-brain]   trackBankRef null — aborting");
+            return;
+        }
+        final Track track = trackBankRef.getItemAt(trackIdx);
+        final ClipLauncherSlotBank slotBank = track.clipLauncherSlotBank();
+        if (slotBank == null) {
+            // Track still unrealized OR Master/FX/Group with no launcher.
+            // Pre-populate every scene with false so the walker reads a
+            // coherent all-empty row instead of NPE'ing.
+            if (hostRef != null) {
+                hostRef.println("[bw-brain]   track[" + trackIdx + "] name="
+                        + trackNameSafe(trackBankRef, trackIdx)
+                        + ": clipLauncherSlotBank()=null (still unrealized OR Master/FX/Group)");
             }
-            for (int s = 0; s < sceneCount; s++) {
-                final int sceneIdx = s;
-                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
-                try {
-                    slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
-                            (BooleanValueChangedCallback) (boolean has) -> {
-                                hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
-                                host.println("[bw-brain]   hasContent fired t=" + trackIdx
-                                        + " s=" + sceneIdx + " has=" + has);
-                            });
-                    registered++;
-                } catch (final Throwable e) {
-                    host.println("[bw-brain]   hasContent observer registration FAILED t="
+            for (int s = 0; s < sceneBankSize; s++) {
+                hasContentCache.put(hasContentKey(trackIdx, s), Boolean.FALSE);
+            }
+            return;
+        }
+        int registered = 0;
+        for (int s = 0; s < sceneBankSize; s++) {
+            final int sceneIdx = s;
+            hasContentCache.put(hasContentKey(trackIdx, sceneIdx), Boolean.FALSE);
+            try {
+                slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
+                        (BooleanValueChangedCallback) (boolean has) -> {
+                            hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
+                            if (hostRef != null) {
+                                hostRef.println("[bw-brain]   hasContent fired t="
+                                        + trackIdx + " s=" + sceneIdx + " has=" + has);
+                            }
+                        });
+                registered++;
+            } catch (final Throwable e) {
+                if (hostRef != null) {
+                    hostRef.println("[bw-brain]   hasContent observer registration FAILED t="
                             + trackIdx + " s=" + sceneIdx + ": " + e);
                 }
             }
-            host.println("[bw-brain]   track[" + t + "] name=" + trackNameSafe(trackBank, t)
-                    + ": registered " + sceneCount + " hasContent observers");
         }
-        host.println("[bw-brain] wireClipLauncherSlots: done registered=" + registered
-                + " nullBanks=" + nullBanks);
+        if (hostRef != null) {
+            hostRef.println("[bw-brain]   track[" + trackIdx + "] name="
+                    + trackNameSafe(trackBankRef, trackIdx)
+                    + ": registered " + registered + "/" + sceneBankSize + " hasContent observers");
+        }
     }
 
     private static String trackNameSafe(final TrackBank trackBank, final int t) {
