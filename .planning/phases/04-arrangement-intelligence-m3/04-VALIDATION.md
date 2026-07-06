@@ -1,9 +1,9 @@
 ---
 phase: 4
 slug: arrangement-intelligence-m3
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-06
 ---
 
@@ -38,33 +38,36 @@ created: 2026-07-06
 
 ## Per-Task Verification Map
 
-> Planner fills the Task ID / Plan / Wave columns when PLAN.md files land.
-> Requirement + Test Type + Command rows are pre-seeded from RESEARCH.md.
+> Plan/Wave assignments reflect the actual `requirements` frontmatter in 04-01..06-PLAN.md.
+> Requirement coverage: ARRANGE-01/02 → Plans 01,02,03,05; ARRANGE-03/05 → Plans 01,02,04,05; ARRANGE-04 → Plans 01,05; UX-03 → Plans 05,06.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | 01 | 1 | ARRANGE-01 | — | refuse-below-threshold sections | unit + property | `npm test -- --run daemon/src/transforms/section-detector.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | ARRANGE-01 | — | runAll drops < 0.5 confidence | unit (extend) | `npm test -- --run daemon/src/state/analyzer-registry.test.ts` | ✅ extend | ⬜ pending |
-| TBD | 01 | 1 | ARRANGE-02 | — | repetition clusters + singleton filter | unit + property | `npm test -- --run daemon/src/transforms/repetition-report.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | ARRANGE-03 | — | energy normalization against peak | unit + property | `npm test -- --run daemon/src/transforms/energy-curve.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | ARRANGE-04 | — | advisory-only shape (no patch fields) | unit | `npm test -- --run daemon/src/transforms/transition-suggest.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | ARRANGE-05 | — | role classification + below-threshold→unknown | unit + property | `npm test -- --run daemon/src/transforms/track-role-classifier.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 04 | 4 | UX-03 | — | /review skill contract (shells to CLI, no wire) | contract | `npm test -- --run ../pi-pack/skills/review/skill.test.ts` | ❌ W4 | ⬜ pending |
-| TBD | 01 | 1 | D-01 | — | get.launcher_clips response Ajv-valid | unit | `npm test -- --run daemon/src/state/arrangement-snapshot.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | D-03 | — | snapshot atomicity (parallel writes) | property (existing) | `npm test -- --run daemon/src/store/atomic-write.test.ts` | ✅ covered | ⬜ pending |
-| TBD | 01 | 1 | D-09 | — | roles.json round-trip save→load→equal | unit | `npm test -- --run daemon/src/state/roles-store.test.ts` | ❌ W1 | ⬜ pending |
-| TBD | 01 | 1 | INV-P4-1 | — | additive-protocol (no new event types) | unit (grep) | `npm test -- --run daemon/src/protocol/reader.test.ts` | ✅ extend | ⬜ pending |
-| TBD | 01 | 1 | INV-P4-2 | — | no deprecated Bitwig API calls | process | `node scripts/check-deprecated-bridge.mjs` | ✅ existing | ⬜ pending |
-| TBD | 01 | 1 | INV-P4-3 | — | cursor-walk completeness (every hasContent cell) | unit (Java) | `mvn -q -pl bridge test -Dtest=LauncherGridWalkerTest` | ❌ W1 Java | ⬜ pending |
+| 01-T1/T2 | 01 | 1 | ARRANGE-01..05 | — | cursor-walk probe (BLOCKING human-verify) | unit (Java) + human | `mvn -q -pl bridge test -Dtest=LauncherGridWalkerTest` + in-app probe | ❌ W1 | ⬜ pending |
+| 02-T1 | 02 | 2 | ARRANGE-01/02/03/05 | — | scene-features + self-similarity primitives | unit + property | `npm test -- --run daemon/src/transforms/scene-features.test.ts daemon/src/transforms/self-similarity.test.ts` | ❌ W2 | ⬜ pending |
+| 02-T2 | 02 | 2 | ARRANGE-03/05 | — | arrangement-snapshot + roles-store atomic round-trip | unit | `npm test -- --run daemon/src/state/arrangement-snapshot.test.ts daemon/src/state/roles-store.test.ts` | ❌ W2 | ⬜ pending |
+| 02-T3 | 02 | 2 | ARRANGE-01/03/05 | — | profile schema extension (energyWeights/sectionLabels/roleTemplates) | unit | `npm test -- --run daemon/src/profiles/profile-loader.test.ts` | ❌ W2 | ⬜ pending |
+| 03-T1 | 03 | 3 | ARRANGE-01 | — | section-detector refuse-below-threshold | unit + property | `npm test -- --run daemon/src/transforms/section-detector.test.ts` | ❌ W3 | ⬜ pending |
+| 03-T2 | 03 | 3 | ARRANGE-02 | — | repetition-report clusters disjoint + singleton filter | unit + property | `npm test -- --run daemon/src/transforms/repetition-report.test.ts` | ❌ W3 | ⬜ pending |
+| 04-T1 | 04 | 3 | ARRANGE-03 | — | energy-curve TRUE per-bar composite + normalization | unit + property | `npm test -- --run daemon/src/transforms/energy-curve.test.ts` | ❌ W3 | ⬜ pending |
+| 04-T2 | 04 | 3 | ARRANGE-05 | — | track-role-classifier below-threshold→unknown + roles.json shape | unit + property | `npm test -- --run daemon/src/transforms/track-role-classifier.test.ts` | ❌ W3 | ⬜ pending |
+| 05-T1 | 05 | 4 | ARRANGE-01..05 | — | M3_ANALYZERS registry + runAll drops < 0.5 | unit (extend) | `npm test -- --run daemon/src/state/analyzer-registry.test.ts` | ✅ extend | ⬜ pending |
+| 05-T2 | 05 | 4 | ARRANGE-04 | — | transition-suggest advisory-only (no patch imports) | unit | `npm test -- --run daemon/src/transforms/transition-suggest.test.ts` | ❌ W4 | ⬜ pending |
+| 05-T3 | 05 | 4 | ARRANGE-01..05, UX-03 | — | query-server arrange.* dispatch + bw-arrange multicall + current-section | unit + smoke | `npm test -- --run daemon/src/query/query-server.test.ts daemon/src/cli/commands/arrange.test.ts` | ❌ W4 | ⬜ pending |
+| 06-T1 | 06 | 5 | UX-03 | — | Pi /review skill contract (shells to CLI, no wire, assumptions[]) | contract | `npm test -- --run ../pi-pack/skills/review/skill.test.ts` | ❌ W5 | ⬜ pending |
+| INV-P4-1 | 05 | 4 | D-01 | — | additive-protocol (no new event types) | unit (grep) | `npm test -- --run daemon/src/protocol/reader.test.ts` | ✅ extend | ⬜ pending |
+| INV-P4-2 | 01 | 1 | D-01 | — | no deprecated Bitwig API calls | process | `node scripts/check-deprecated-bridge.mjs` | ✅ existing | ⬜ pending |
+| INV-P4-3 | 01 | 1 | D-01 | — | cursor-walk completeness (every hasContent cell) | unit (Java) | `mvn -q -pl bridge test -Dtest=LauncherGridWalkerTest` | ❌ W1 Java | ⬜ pending |
+| D-03 | 02 | 2 | D-03 | — | snapshot atomicity (parallel writes) | property (existing) | `npm test -- --run daemon/src/store/atomic-write.test.ts` | ✅ covered | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ---
 
-## Wave 0 Requirements
+## Wave 2 Stubs/Tests (foundation the later-wave analyzers import)
 
 > No framework install needed — vitest/fast-check/JUnit 5 are all present.
-> The files below are the Wave-1 stubs/tests that must exist before later-wave tasks can sample feedback.
+> These are the Wave-2 pure primitives + stores + profile data that Wave 3 analyzers import. Created by Plan 02 (Wave 2).
 
 - [ ] `daemon/src/transforms/scene-features.ts` — per-scene feature vector (input to D-04/D-06/D-05)
 - [ ] `daemon/src/transforms/self-similarity.ts` — cosine affinity matrix (shared by D-04 + D-06)
@@ -108,11 +111,11 @@ created: 2026-07-06
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 2 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 2 covers all MISSING references (primitives + stores + profiles before analyzers import them)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-07-06 (post plan-checker revision — B-1 typo fixed, S-1 map corrected, S-2 true per-bar energy, S-3 dead reference dropped)
