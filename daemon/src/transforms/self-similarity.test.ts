@@ -148,12 +148,13 @@ describe("selfSimilarityMatrix — square symmetric matrix", () => {
   });
 
   it("property: matrix is symmetric + diagonal=1.0 + all entries ∈ [0,1] for N=1..50", () => {
+    // Use fc.integer + scale to avoid fc.float's 32-bit-float constraint quirk.
     const noteArb = fc.record({
       pitch: fc.integer({ min: 36, max: 84 }),
-      start: fc.float({ min: 0, max: 8, noNaN: true }),
-      length: fc.float({ min: 0.1, max: 2, noNaN: true }),
+      start: fc.integer({ min: 0, max: 800 }).map((t) => t / 100), // 0.00..8.00 beats
+      length: fc.integer({ min: 10, max: 200 }).map((t) => t / 100), // 0.10..2.00 beats
       velocity: fc.integer({ min: 40, max: 120 }),
-    }).map((n) => note(n.pitch, Number(n.start.toFixed(4)), Number(n.length.toFixed(4)), n.velocity));
+    }).map((n) => note(n.pitch, n.start, n.length, n.velocity));
 
     fc.assert(
       fc.property(

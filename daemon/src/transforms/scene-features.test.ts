@@ -155,12 +155,13 @@ describe("sceneFeatureVector — empty / edge guards (no NaN, no crash)", () => 
 
 describe("sceneFeatureVector — fast-check properties (invariants)", () => {
   // A bounded-note generator that stays in MIDI range + reasonable beats.
+  // Use fc.integer + scale to avoid fc.float's 32-bit-float constraint quirk.
   const noteArb = fc.record({
     pitch: fc.integer({ min: 0, max: 127 }),
-    start: fc.float({ min: 0, max: 32, noNaN: true }),
-    length: fc.float({ min: 0.05, max: 4, noNaN: true }),
+    start: fc.integer({ min: 0, max: 3200 }).map((t) => t / 100), // 0.00..32.00 beats
+    length: fc.integer({ min: 5, max: 400 }).map((t) => t / 100), // 0.05..4.00 beats
     velocity: fc.integer({ min: 1, max: 127 }),
-  }).map((n) => note(n.pitch, Number(n.start.toFixed(4)), Number(n.length.toFixed(4)), n.velocity));
+  }).map((n) => note(n.pitch, n.start, n.length, n.velocity));
 
   const columnArb = fc.array(noteArb, { minLength: 1, maxLength: 12 }).map((notes) => ({
     sceneIdx: 0,
