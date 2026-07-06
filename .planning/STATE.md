@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 03.1
-current_phase_name: gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
+current_phase: 4
+current_phase_name: M3
 status: executing
 stopped_at: Completed 03.1-06-PLAN.md (CLI D-06 surface — wrong_clip_targeted gap closed)
-last_updated: "2026-07-05T23:25:54.969Z"
-last_activity: 2026-07-05
-last_activity_desc: Phase 03.1 execution started
+last_updated: "2026-07-06T01:28:11.931Z"
+last_activity: 2026-07-06
+last_activity_desc: Phase 03.1 complete, transitioned to Phase 4
 progress:
   total_phases: 6
   completed_phases: 4
@@ -24,22 +24,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 03.1 — gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto
+**Current focus:** Phase 4 — Arrangement Intelligence (M3)
 
 ## Current Position
 
-Phase: 03.1 (gap-closure-clip-identity-scope-apply-pre-flight-bridge-auto) — EXECUTING
-Plan: 3 of 5
-Status: Ready to execute
-Last activity: 2026-07-05 — Phase 03.1 execution started
+Phase: 4 — Arrangement Intelligence (M3)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-06 — Phase 03.1 complete (UAT re-verify 7/7 pass, VERIFICATION 28/28), transitioned to Phase 4
 
-Progress: [█████████░] 90% — 18/20 plans complete; 03.1 plan 02 (clipSid) shipped; plans 03 (apply pre-flight) + 04 (skill-prompt realignment) remain before end-of-phase UAT
+Progress: [████████████████████] 22/22 plans (100% of known plans; Phase 4 unplanned — discuss/plan next)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 19 (3 in Phase 1 + 8 in Phase 2)
+- Total plans completed: 25 (3 in Phase 1 + 8 in Phase 2)
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -53,6 +53,7 @@ Progress: [█████████░] 90% — 18/20 plans complete; 03.1 pl
 | 4. Arrangement Intelligence (M3) | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
+| 03.1 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -129,8 +130,9 @@ None yet.
 
 - *(Phase 1 blockers all resolved — spike goal achieved.)* Bitwig loopback TCP access: CONFIRMED live (Java `.bwextension`, captured `selection.changed` round-trip). JDK 21: installed via Homebrew. In-app scripting guide / Javadoc 6.0.6: consulted; capability surface recorded in `docs/bitwig-capabilities.md`. JS-vs-Java tension: resolved — JS `host` has no networking, Java `.bwextension` is the mandatory transport.
 - *(Phase 2 — resolved 2026-06-29 UAT):* STATE-04 fingerprint-mapping implemented + verified live (reload-reconcile smoke passed). The deferred behavioral probes (BRIDGE-02 5th event clip.name_changed, SC#3 reload-reconcile, Pi /analyze runtime) all PASSED in the end-of-phase UAT — 5/5 bridge events now live, /analyze produces grounded output + assumptions[] + stateFreshness surfacing.
-- [Phase 3 — to watch]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5.
-- Phase 03 UAT pending: M1–M5 manual checkpoints (Plan 03-05 Task 2) require live Bitwig 6.0.6 + human ears + Pi. M2/M3/M4/M5 BLOCKING; M1 non-blocking. docs/bitwig-capabilities.md §1/§2 PENDING slots marked. Until these pass, Phase 3 is NOT complete (status: ready_for_verification / pending-uat). If M4 finds NoteStep.start grid-locked, flag to planner — bridge write path changes.
+- [Phase 3 — RESOLVED 2026-07-06]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5. Trust-spine verified end-to-end in Phase 03.1 UAT (D-04/D-05 wrong-clip-targeting gates fire before bridge round-trip; D-06 surface reaches the CLI via DaemonReplyError + printResultOrDisconnect — Plan 06).
+- [Phase 03.1 — RESOLVED 2026-07-06]: Phase 03 UAT pending items (M1–M5 manual checkpoints) — closed by Phase 03.1 work + the 2026-07-06 end-of-phase UAT (Tests 3/4/5 all pass; VERIFICATION 28/28; 03.1 6/6 plans complete). docs/bitwig-capabilities.md §1/§2 PENDING slots can now be updated with the live-verified clipSid behavior.
+- [Phase 4 — to watch]: M3 arrangement intelligence will exercise project-level analysis (sections, repetition, energy). The bridge's launcher-cursor-clip limitation (BridgeExtension.java:67 — `createLauncherCursorClip`) makes producer-driven selection changes brittle for UAT (arranger timeline + scene clicks do NOT fire `clip.name_changed`). Candidate future-phase work: arranger cursor clip OR test-driver CLI. See `03.1-UAT.md §Observations`.
 
 ### Roadmap Evolution
 
@@ -146,6 +148,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-05T23:25:54.962Z
-Stopped at: Completed 03.1-06-PLAN.md (CLI D-06 surface — wrong_clip_targeted gap closed)
+Last session: 2026-07-06T01:28:11Z
+Stopped at: Phase 03.1 complete (UAT 7/7, VERIFICATION 28/28), transitioned to Phase 4 — ready to discuss
 Resume file: None
