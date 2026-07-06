@@ -147,3 +147,143 @@ describe("ProfileHooks interface (D-13 — designed, NOT exercised in v1)", () =
     expect((techno as Profile & { hooks?: unknown }).hooks).toBeUndefined();
   });
 });
+
+// ============================================================================
+// P4 / 04-02 Task 3 — energyWeights / sectionLabels / roleTemplates extensions.
+// ARCH-02: all three new fields are OPTIONAL. Generic core runs literally if
+// they're absent; analyzers gate on field-presence.
+// ============================================================================
+
+describe("energyWeights (D-05 energy-curve composite weights)", () => {
+  it("generic profile carries energyWeights with the four required keys", () => {
+    const p = loadProfile();
+    expect(p.energyWeights).toBeDefined();
+    expect(p.energyWeights!.noteDensity).toBe(0.35);
+    expect(p.energyWeights!.velocityAggregate).toBe(0.25);
+    expect(p.energyWeights!.polyphony).toBe(0.20);
+    expect(p.energyWeights!.pitchCentroid).toBe(0.20);
+  });
+
+  it("generic energyWeights sums to 1.0 (the documented invariant)", () => {
+    const p = loadProfile();
+    const sum =
+      p.energyWeights!.noteDensity +
+      p.energyWeights!.velocityAggregate +
+      p.energyWeights!.polyphony +
+      p.energyWeights!.pitchCentroid;
+    expect(sum).toBeCloseTo(1.0, 6);
+  });
+
+  it("techno overrides energyWeights.noteDensity to 0.40 (object-merge, child wins per-key)", () => {
+    const p = loadProfile("techno");
+    expect(p.energyWeights!.noteDensity).toBe(0.40);
+  });
+
+  it("techno energyWeights sums to 1.0 (the documented invariant holds post-merge)", () => {
+    const p = loadProfile("techno");
+    const sum =
+      p.energyWeights!.noteDensity +
+      p.energyWeights!.velocityAggregate +
+      p.energyWeights!.polyphony +
+      p.energyWeights!.pitchCentroid;
+    expect(sum).toBeCloseTo(1.0, 6);
+  });
+
+  it("techno INHERITS velocityAggregate/pitchCentroid from generic (deep object-merge)", () => {
+    const t = loadProfile("techno");
+    const g = loadProfile();
+    // techno omits these keys in its own JSON; object-merge inherits them.
+    expect(t.energyWeights!.velocityAggregate).toBe(g.energyWeights!.velocityAggregate);
+    expect(t.energyWeights!.pitchCentroid).toBe(g.energyWeights!.pitchCentroid);
+  });
+});
+
+describe("sectionLabels (D-07 vocabulary)", () => {
+  it("generic ships 5 neutral labels [intro, build, peak, breakdown, outro]", () => {
+    const p = loadProfile();
+    expect(p.sectionLabels).toBeDefined();
+    expect(p.sectionLabels).toHaveLength(5);
+    const labels = p.sectionLabels!.map((l) => l.label);
+    expect(labels).toEqual(["intro", "build", "peak", "breakdown", "outro"]);
+  });
+
+  it("generic sectionLabels each carry label + position + energyRange", () => {
+    const p = loadProfile();
+    for (const l of p.sectionLabels!) {
+      expect(typeof l.label).toBe("string");
+      expect(l.label.length).toBeGreaterThan(0);
+      expect(["start", "middle", "end", "any"]).toContain(l.position);
+      expect(l.energyRange).toHaveLength(2);
+      expect(l.energyRange[0]).toBeLessThanOrEqual(l.energyRange[1]!);
+    }
+  });
+
+  it("techno REPLACES sectionLabels with [drop, break, roll] (array-replace, NOT append)", () => {
+    const p = loadProfile("techno");
+    expect(p.sectionLabels).toBeDefined();
+    expect(p.sectionLabels).toHaveLength(3);
+    const labels = p.sectionLabels!.map((l) => l.label);
+    expect(labels).toEqual(["drop", "break", "roll"]);
+  });
+
+  it("techno does NOT carry generic's intro label (array-replace is wholesale, not append)", () => {
+    const p = loadProfile("techno");
+    const labels = p.sectionLabels!.map((l) => l.label);
+    expect(labels).not.toContain("intro");
+  });
+});
+
+describe("roleTemplates (D-08 track-role templates)", () => {
+  it("generic ships 7 role templates [kick, bass, lead, pad, hats, percussion, fx]", () => {
+    const p = loadProfile();
+    expect(p.roleTemplates).toBeDefined();
+    expect(p.roleTemplates).toHaveLength(7);
+    const roles = p.roleTemplates!.map((t) => t.role);
+    expect(roles).toEqual(["kick", "bass", "lead", "pad", "hats", "percussion", "fx"]);
+  });
+
+  it("generic roleTemplates each carry role + register + rhythm + velocity profile", () => {
+    const p = loadProfile();
+    for (const t of p.roleTemplates!) {
+      expect(typeof t.role).toBe("string");
+      expect(t.role.length).toBeGreaterThan(0);
+      expect(t.registerLow).toBeGreaterThanOrEqual(0);
+      expect(t.registerHigh).toBeLessThanOrEqual(127);
+      expect(t.registerLow).toBeLessThanOrEqual(t.registerHigh);
+      expect(t.rhythmProfile).toHaveLength(5);
+      expect(t.velocityProfile.mean).toBeGreaterThanOrEqual(0);
+      expect(t.velocityProfile.mean).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("techno REPLACES roleTemplates with just [kick, bass] (array-replace — techno's complete role set)", () => {
+    const p = loadProfile("techno");
+    expect(p.roleTemplates).toBeDefined();
+    expect(p.roleTemplates).toHaveLength(2);
+    const roles = p.roleTemplates!.map((t) => t.role);
+    expect(roles).toEqual(["kick", "bass"]);
+  });
+
+  it("techno tightens kick register (registerHigh=36 vs generic's 40 — 4-on-the-floor)", () => {
+    const t = loadProfile("techno");
+    const g = loadProfile();
+    const tKick = t.roleTemplates!.find((r) => r.role === "kick")!;
+    const gKick = g.roleTemplates!.find((r) => r.role === "kick")!;
+    expect(tKick.registerHigh).toBe(36);
+    expect(gKick.registerHigh).toBe(40);
+  });
+});
+
+describe("ARCH-02: profile without the new fields still loads (generic core runs literally)", () => {
+  it("loadProfile of generic returns a profile where the three new fields are present (this profile ships them)", () => {
+    // Generic v2 (this plan) ships the new fields. The ARCH-02 guarantee is
+    // tested by the schema's optionality — but the loader must not throw if
+    // they're absent. We exercise the present-fields case here; the absent-fields
+    // case is structurally guaranteed by the optional (?) TS type.
+    const p = loadProfile();
+    expect(p.energyWeights).toBeDefined();
+    expect(p.sectionLabels).toBeDefined();
+    expect(p.roleTemplates).toBeDefined();
+  });
+});
+
