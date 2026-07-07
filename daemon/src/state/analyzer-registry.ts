@@ -26,6 +26,14 @@ import type { Profile } from "../gen/profile.js";
 // motif-signature.ts imports TYPE-ONLY from this module, so runtime import
 // direction is one-way (registry -> motif-signature) — no cycle.
 import { MotifSignatureAnalyzer } from "../transforms/motif-signature.js";
+// M3 (Plan 04-05): the four P4 analyzers register alongside M2. Each imports
+// TYPE-ONLY back from this module (the Analyzer interface), so the runtime
+// import direction stays one-way (registry -> transforms) — no cycle, mirroring
+// the M2 precedent above.
+import { SectionDetector } from "../transforms/section-detector.js";
+import { RepetitionReport } from "../transforms/repetition-report.js";
+import { EnergyCurve } from "../transforms/energy-curve.js";
+import { TrackRoleClassifier } from "../transforms/track-role-classifier.js";
 
 /** The Plan-01-generated raw-state contract (re-aliased from 02-03a's reconcile.ts). */
 export type RawState = ProjectState;
@@ -187,3 +195,22 @@ export const M1_ANALYZERS: readonly Analyzer[] = [IntentAnalyzer];
  * analyzer (MIDI-01) is the FIRST addition to the framework.
  */
 export const M2_ANALYZERS: readonly Analyzer[] = [...M1_ANALYZERS, MotifSignatureAnalyzer];
+
+/**
+ * M3's complete analyzer set: M2 (IntentAnalyzer + MotifSignatureAnalyzer)
+ * plus the four P4 arrangement analyzers — SectionDetector (ARRANGE-01),
+ * RepetitionReport (ARRANGE-02), EnergyCurve (ARRANGE-03), TrackRoleClassifier
+ * (ARRANGE-05). All four inherit the runAll gate (CONFIDENCE_THRESHOLD = 0.5)
+ * for free — below-threshold outputs are dropped, never guessed.
+ *
+ * Transition suggestions (ARRANGE-04 / D-10) are ADVISORY and live in
+ * transition-suggest.ts (consumed by the query-server arrange.review handler);
+ * they are NOT an Analyzer (they produce observations, not DerivedFields).
+ */
+export const M3_ANALYZERS: readonly Analyzer[] = [
+  ...M2_ANALYZERS,
+  SectionDetector,
+  RepetitionReport,
+  EnergyCurve,
+  TrackRoleClassifier,
+];
