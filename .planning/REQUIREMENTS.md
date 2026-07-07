@@ -65,7 +65,7 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 ### UX & Architecture (cross-cutting, M1–M4)
 
 - [x] **UX-01**: Pi `/analyze` skill reads selection/section/intent and produces critique + 2–4 next actions (M1)
-- [ ] **UX-02**: Pi `/vary`, `/apply` skills drive the edit pipeline and a diff pane renders patch diffs (M2)
+- [x] **UX-02**: Pi `/vary`, `/apply` skills drive the edit pipeline and a diff pane renders patch diffs (M2)
 - [ ] **UX-03**: Pi `/review` skill + arrangement pane render section timeline + energy sparkline (M3)
 - [ ] **UX-04**: Pi `/device` skill + device pane render chain summary + macro opportunities (M4)
 - [x] **UX-05**: State pane renders selected track/clip/device + section label (M1)

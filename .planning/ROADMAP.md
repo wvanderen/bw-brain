@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Schema & IPC Spike** - Prove Bitwig TCP access, freeze the JSON-Lines contract, document the verified API surface before any production bridge work (completed 2026-06-26)
 - [x] **Phase 2: Read-Only Context Foundation (M1)** - Bridge mirror + daemon normalization + read CLI + memory bootstrap + Pi /analyze — the assistant reliably describes selected context (completed 2026-06-27)
 - [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply (all 5 plans executed; BLOCKING end-of-phase UAT M1–M5 pending human — status: verifying)
-- [ ] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only)
+- [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
 
 ## Phase Details
@@ -163,17 +163,18 @@ Plans:
   4. Track-role classification labels tracks (kick/bass/lead/pad/fx/hats/percussion) with confidence, persisted to `roles.json` (gates automation salience in Phase 5).
   5. Pi `/review` + arrangement pane render a section timeline + energy sparkline for project-level critique.
 
-**Plans**: 6 plans
+**Plans**: 6/6 plans complete
 **UI hint**: yes
 **Research needed**: librosa.segment algorithm adaptation (`agglomerative`, `recurrence_matrix`) to MIDI/composition-state rather than audio; section-detection threshold tuning.
 
 Plans:
-- [ ] 04-01-PLAN.md — Bridge cursor-walk (`get.launcher_clips`) + capabilities-doc probe (BLOCKING human-verify)
-- [ ] 04-02-PLAN.md — Pure primitives (scene-features, self-similarity) + state stores (snapshot, roles) + profile extensions
-- [ ] 04-03-PLAN.md — Section-detector + repetition-report analyzers (the self-similarity matrix pair)
-- [ ] 04-04-PLAN.md — Energy-curve + track-role-classifier analyzers (the composite pair)
-- [ ] 04-05-PLAN.md — M3_ANALYZERS registry + transition-suggest + query-server arrange.* dispatch + bw-arrange multicall CLI + boot/describe wiring
-- [ ] 04-06-PLAN.md — Pi `/review` skill + contract test (UX-03)
+
+- [x] 04-01-PLAN.md — Bridge cursor-walk (`get.launcher_clips`) + capabilities-doc probe (BLOCKING human-verify)
+- [x] 04-02-PLAN.md — Pure primitives (scene-features, self-similarity) + state stores (snapshot, roles) + profile extensions
+- [x] 04-03-PLAN.md — Section-detector + repetition-report analyzers (the self-similarity matrix pair)
+- [x] 04-04-PLAN.md — Energy-curve + track-role-classifier analyzers (the composite pair)
+- [x] 04-05-PLAN.md — M3_ANALYZERS registry + transition-suggest + query-server arrange.* dispatch + bw-arrange multicall CLI + boot/describe wiring
+- [x] 04-06-PLAN.md — Pi `/review` skill + contract test (UX-03)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
@@ -204,5 +205,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Schema & IPC Spike | 3/3 | Complete    | 2026-06-26 |
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
 | 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
-| 4. Arrangement Intelligence (M3) | 0/TBD | Not started | - |
+| 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
