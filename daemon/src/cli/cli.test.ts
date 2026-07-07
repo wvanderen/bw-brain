@@ -249,7 +249,7 @@ describe("CLI contract --explain pretty-prints (CLI-01)", () => {
   });
 });
 
-describe("CLI contract — 2 stubs (CLI-01, D-05; bw-edit went live in M2 Plan 03-02)", () => {
+describe("CLI contract — 1 stub + 2 live multicalls (CLI-01, D-05; bw-edit/bw-arrange went live)", () => {
   it("bw-edit with no subcommand prints help (live multicall — was a stub pre-M2)", async () => {
     // bw-edit replaced its M1 stub with live preview/apply/revert subcommands
     // (Plan 03-02 Task 2). With no subcommand, commander prints help to stderr
@@ -263,12 +263,16 @@ describe("CLI contract — 2 stubs (CLI-01, D-05; bw-edit went live in M2 Plan 0
     expect(helpText).toContain("apply");
   });
 
-  it("bw-arrange → not_implemented JSON, availableFrom M3, exit 0", async () => {
+  it("bw-arrange with no subcommand prints help (live multicall — was a stub pre-M3)", async () => {
+    // bw-arrange replaced its M1 stub with live arrangement subcommands
+    // (Plan 04-05 Task 3). With no subcommand, commander prints help to stderr
+    // + exits 1 (its standard "missing command" behavior).
     const r = await runCli(join(COMMANDS, "arrange.ts"), [], {});
-    expect(r.code).toBe(0);
-    const out = JSON.parse(r.stdout);
-    expect(out.ok).toBe(false);
-    expect(out.availableFrom).toBe("M3");
+    expect(r.code).toBe(1); // commander's missing-subcommand exit code
+    const helpText = r.stdout + r.stderr;
+    expect(helpText).toContain("sections");
+    expect(helpText).toContain("review");
+    expect(helpText).toContain("refresh");
   });
 
   it("bw-automation → not_implemented JSON, availableFrom M4, exit 0", async () => {
