@@ -23,7 +23,8 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
 
   it("the real schema's op enum is the expected allowlisted set", () => {
     // Sanity: the enum we're gating is the one we think it is. Phase 3 extends
-    // the M1 read-only 6 with the daemon-mediated edit + MIDI transform ops.
+    // the M1 read-only 6 with the daemon-mediated edit + MIDI transform ops;
+    // Phase 4 adds arrange.* (read from the durable snapshot + arrange.refresh).
     const ops = querySchema.properties?.op?.enum;
     expect(ops).toEqual([
       "focus.export",
@@ -39,6 +40,12 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
       "midi.counterline",
       "midi.voice_leading_fix",
       "midi.humanize",
+      "arrange.sections",
+      "arrange.repetition_report",
+      "arrange.energy_curve",
+      "arrange.review",
+      "arrange.current_section",
+      "arrange.refresh",
     ]);
   });
 

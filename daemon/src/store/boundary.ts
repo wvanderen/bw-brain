@@ -50,6 +50,16 @@ const ALLOWED_QUERY_OPS: ReadonlySet<string> = new Set([
   "midi.counterline",
   "midi.voice_leading_fix",
   "midi.humanize",
+  // Phase 4 — arrangement intelligence (ARRANGE-01..05, UX-03). Read from the
+  // durable arrangement snapshot; arrange.refresh re-pulls the grid + re-runs
+  // analyzers. No ephemeral writes — the snapshot + roles.json are atomic
+  // daemon-mediated durable writes (same trust-spine as edit.apply).
+  "arrange.sections",
+  "arrange.repetition_report",
+  "arrange.energy_curve",
+  "arrange.review",
+  "arrange.current_section",
+  "arrange.refresh",
 ]);
 
 /**

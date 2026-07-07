@@ -23,6 +23,7 @@
 import type { ProjectIntent } from "../gen/intent.js";
 import type { Assumption } from "./analyzer-registry.js";
 import type { RawState } from "./reconcile.js";
+import type { ArrangementSnapshot } from "./arrangement-snapshot.js";
 
 /** SC#3 freshness — the daemon's view of how recent the bridge state is. */
 export type Freshness = "live" | "stale" | "disconnected";
@@ -159,6 +160,31 @@ function refuse(reason: string, assumptions: Assumption[]): Description {
 }
 
 /**
+ * Phase 4 Plan 04-05 — look up the section label covering a given scene from
+ * the arrangement snapshot's derived.sections. Returns the label, or null when
+ * the snapshot is absent / has no derived sections / no section covers the scene.
+ *
+ * PITFALL 7 hard rule: this NEVER fabricates a label. The lookup returns null
+ * on any absence; the caller falls back to SECTION_RESERVED. Only sections that
+ * cleared runAll's CONFIDENCE_THRESHOLD appear in derived.sections (the registry
+ * drops sub-0.5 outputs), so any label here is threshold-gated.
+ */
+function lookupSectionLabel(
+  snapshot: ArrangementSnapshot | null,
+  sceneIdx: number | undefined,
+): string | null {
+  if (snapshot === null || typeof sceneIdx !== "number") return null;
+  const sections = snapshot.derived?.sections;
+  if (!Array.isArray(sections) || sections.length === 0) return null;
+  for (const s of sections) {
+    if (sceneIdx >= s.startScene && sceneIdx <= s.endScene) {
+      return s.label;
+    }
+  }
+  return null;
+}
+
+/**
  * Produce the literal grounded description (D-10). PURE: never mutates inputs,
  * never does I/O, never throws. Refuses to describe when freshness != "live"
  * (SC#3 surfacing at the describe layer).
@@ -168,10 +194,17 @@ function refuse(reason: string, assumptions: Assumption[]): Description {
  * levels, or automation salience — those analyzers do not exist until
  * Phases 3-5. describe.test.ts asserts this via a negative match.
  *
- * @param state      - the RawState (null if the bridge has not produced a snapshot yet).
- * @param intent     - the user-authored ProjectIntent (null if .bw-brain/intent.json
- *                     is absent — D-09: NO inference, NO default synthesized).
- * @param freshness  - SC#3 freshness; "live" required to describe.
+ * Phase 4 exception: the section slot MAY be populated from the arrangement
+ * snapshot's derived.sections (Plan 04-05), but ONLY when a section cleared
+ * runAll's threshold gate (the registry drops sub-0.5 outputs — any label in
+ * derived.sections is threshold-gated, not guessed).
+ *
+ * @param state              - the RawState (null if the bridge has not produced a snapshot yet).
+ * @param intent             - the user-authored ProjectIntent (null if .bw-brain/intent.json
+ *                             is absent — D-09: NO inference, NO default synthesized).
+ * @param freshness          - SC#3 freshness; "live" required to describe.
+ * @param arrangementSnapshot - OPTIONAL Phase 4: the arrangement snapshot whose
+ *                             derived.sections populates the section slot.
  * @returns the Description (state block + whatThisIs + nextActions + assumptions).
  *
  * @example
@@ -182,6 +215,7 @@ export function describe(
   state: RawState | null,
   intent: ProjectIntent | null,
   freshness: Freshness,
+  arrangementSnapshot: ArrangementSnapshot | null = null,
 ): Description {
   // SC#3 surfacing at the describe layer (D-10 hard rule): refuse when not live.
   if (freshness !== "live") {
@@ -203,12 +237,18 @@ export function describe(
   const deviceName = nameForSid(state.devices, sel.deviceSid);
   const transport = transportString(state);
 
+  // Phase 4 Plan 04-05: the section slot reads from the arrangement snapshot's
+  // derived.sections (populated by SectionDetector via runAll). PITFALL 7 hard
+  // rule: lookupSectionLabel returns null on ANY absence — no fabricated label.
+  const sceneIdx = (sel as { sceneIdx?: number }).sceneIdx;
+  const sectionLabel = lookupSectionLabel(arrangementSnapshot, sceneIdx);
+
   const stateBlock: DescriptionState = {
     track: trackName,
     clip: clipName,
     device: deviceName,
     transport,
-    section: SECTION_RESERVED, // D-11: reserved em-dash — never a fabricated label.
+    section: sectionLabel ?? SECTION_RESERVED, // D-11: reserved em-dash when no section covers the scene.
   };
 
   // PITFALL 7 (D-10): whatThisIs is grounded ONLY in selection + transport +

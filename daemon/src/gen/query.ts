@@ -17,7 +17,7 @@ export interface CliQuery {
    */
   type: "query";
   /**
-   * The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize. Stubs (bw-arrange/bw-automation) do NOT get ops here — they emit not_implemented results without ever querying the daemon.
+   * The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize + Phase 4 arrange.* (ARRANGE-01..05, UX-03): arrange.sections/repetition_report/energy_curve/review/current_section/refresh. Stubs (bw-automation) do NOT get ops here — they emit not_implemented results without ever querying the daemon.
    */
   op:
     | "focus.export"
@@ -32,7 +32,13 @@ export interface CliQuery {
     | "midi.vary"
     | "midi.counterline"
     | "midi.voice_leading_fix"
-    | "midi.humanize";
+    | "midi.humanize"
+    | "arrange.sections"
+    | "arrange.repetition_report"
+    | "arrange.energy_curve"
+    | "arrange.review"
+    | "arrange.current_section"
+    | "arrange.refresh";
   /**
    * Op-specific arguments. Open at the schema level; op-specific shapes (e.g. project.region {start,end}) are enforced by the daemon handler. Tightened per-op in Phase 3 if patterns stabilize.
    */

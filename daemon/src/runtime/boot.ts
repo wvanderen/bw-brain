@@ -53,6 +53,8 @@ import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory } from "../patch/patch-history.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
+// Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
+import { saveArrangementSnapshot } from "../state/arrangement-snapshot.js";
 
 /** The daemon's protocol version. Matches bridge LineJson.VERSION (LineJson.java:25). */
 export const OUR_VERSION = "1.0";
@@ -68,6 +70,18 @@ export const DEFAULT_STATE_CACHE_PATH: string = join(dirname(DEFAULT_SOCKET), "s
  * root, so <cwd>/.bw-brain/intent.json is the project-local intent slot).
  */
 export const DEFAULT_INTENT_PATH: string = join(process.cwd(), ".bw-brain", "intent.json");
+
+/**
+ * Phase 4 Plan 04-05 — path to .bw-brain/arrangement-snapshot.json (D-03). The
+ * durable mirror of the launcher grid + derived analysis fields.
+ */
+export const DEFAULT_ARRANGEMENT_SNAPSHOT_PATH: string = join(process.cwd(), ".bw-brain", "arrangement-snapshot.json");
+
+/**
+ * Phase 4 Plan 04-05 — path to .bw-brain/roles.json (ARRANGE-05 durable store).
+ * arrange.refresh persists track-role classifications here.
+ */
+export const DEFAULT_ROLES_PATH: string = join(process.cwd(), ".bw-brain", "roles.json");
 
 /** M1 LIMITATION (Minor 3 fix): the bridge does not pull project metadata. */
 const DEFAULT_PROJECT = { name: "", tempo: 120, timeSignature: "4/4" } as const;
@@ -92,6 +106,10 @@ export interface BootOptions {
   stateCachePath?: string;
   /** Intent path (default {@link DEFAULT_INTENT_PATH}). */
   intentPath?: string;
+  /** Phase 4: arrangement-snapshot path (default {@link DEFAULT_ARRANGEMENT_SNAPSHOT_PATH}). */
+  arrangementSnapshotPath?: string;
+  /** Phase 4: roles.json path (default {@link DEFAULT_ROLES_PATH}). */
+  rolesPath?: string;
 }
 
 /** Handle returned by boot() so callers (smoke test, harness) can shut down. */
@@ -115,6 +133,8 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   const tcpPort = opts.tcpPort ?? DEFAULT_TCP_PORT;
   const stateCachePath = opts.stateCachePath ?? DEFAULT_STATE_CACHE_PATH;
   const intentPath = opts.intentPath ?? DEFAULT_INTENT_PATH;
+  const arrangementSnapshotPath = opts.arrangementSnapshotPath ?? DEFAULT_ARRANGEMENT_SNAPSHOT_PATH;
+  const rolesPath = opts.rolesPath ?? DEFAULT_ROLES_PATH;
 
   // --- a. Stale-socket probe (RESEARCH.md Pattern 3 "cleaned on daemon exit"
   //     precedent; dbus/ssh-agent convention). Distinguishes live (connect ->
@@ -222,6 +242,35 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
         console.error("[boot] get.selected_clip clipSid reconcile failed:", (e as Error).message);
       }
 
+      // Phase 4 Plan 04-05 (D-19): best-effort launcher-grid pull on (re)connect.
+      // Saves the raw grid to arrangement-snapshot.json (derived fields populate
+      // lazily on `bw-arrange refresh` running the M3 analyzers). Failure does
+      // NOT block daemon startup — the snapshot populates on demand.
+      try {
+        const gridResp = (await correlator.send("get.launcher_clips")) as {
+          tracks?: Array<{ scenes?: unknown[] }>;
+          sceneNames?: string[];
+        };
+        if (Array.isArray(gridResp.tracks) && gridResp.tracks.length > 0) {
+          const tracks = gridResp.tracks as Array<{
+            trackSid: string;
+            name: string;
+            scenes: Array<{ sceneIdx: number; clipSid: string; hasContent: boolean; loopBeats: number; notes: Array<{ key: string; pitch: number; start: number; length: number; velocity: number }> }>;
+          }>;
+          const sceneCount = tracks.reduce((mx, t) => Math.max(mx, t.scenes?.length ?? 0), 0);
+          await saveArrangementSnapshot(arrangementSnapshotPath, {
+            version: "1.0",
+            pulledAt: new Date().toISOString(),
+            profile: intent?.projectIntent.profile ?? "generic",
+            sceneCount,
+            trackCount: tracks.length,
+            grid: { tracks, sceneNames: gridResp.sceneNames ?? [] },
+          });
+        }
+      } catch (e) {
+        console.error("[boot] get.launcher_clips pull failed:", (e as Error).message);
+      }
+
       schedulePersist(lastState);
     } catch (e) {
       console.error("[boot] get.project_summary pull failed:", (e as Error).message);
@@ -315,6 +364,10 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     candidateStore,
     patchHistory,
     applyPatchOverBridge,
+    // Phase 4 Plan 04-05 — arrangement intelligence deps.
+    pullLauncherGrid: () => correlator.send("get.launcher_clips"),
+    arrangementSnapshotPath,
+    rolesPath,
   });
 
   // --- j. Signal handlers + shutdown. ----------------------------------
