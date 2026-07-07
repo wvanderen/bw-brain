@@ -14,6 +14,7 @@ import {
   AnalyzerRegistry,
   M1_ANALYZERS,
   M2_ANALYZERS,
+  M3_ANALYZERS,
   IntentAnalyzer,
   CONFIDENCE_THRESHOLD,
   type Analyzer,
@@ -202,5 +203,47 @@ describe("AnalyzerRegistry.runAll", () => {
     const snapshot = JSON.parse(JSON.stringify(raw));
     reg.runAll(raw, { intent: fixtureIntent(), now: 1_000 });
     expect(raw).toEqual(snapshot);
+  });
+
+  // -------------------------------------------------------------------------
+  // P4 / 04-05 — M3_ANALYZERS registration + the drop test extended to M3.
+  // -------------------------------------------------------------------------
+
+  it("M3_ANALYZERS includes M2_ANALYZERS plus the four P4 analyzers", () => {
+    // M3 spreads M2 (so IntentAnalyzer + MotifSignatureAnalyzer are present),
+    // then adds the four P4 analyzers by their stable ids.
+    const m2Ids = M2_ANALYZERS.map((a) => a.id);
+    for (const id of m2Ids) {
+      expect(M3_ANALYZERS.map((a) => a.id)).toContain(id);
+    }
+    expect(M3_ANALYZERS.map((a) => a.id)).toContain("sections");
+    expect(M3_ANALYZERS.map((a) => a.id)).toContain("repetition");
+    expect(M3_ANALYZERS.map((a) => a.id)).toContain("energyCurve");
+    expect(M3_ANALYZERS.map((a) => a.id)).toContain("trackRoles");
+    // M3 is strictly larger than M2 (the four analyzers are additions, not replacements).
+    expect(M3_ANALYZERS.length).toBe(M2_ANALYZERS.length + 4);
+  });
+
+  it("DROPS an M3-analyzer field with confidence 0.4 (the threshold applies to P4 for free)", () => {
+    const reg = new AnalyzerRegistry();
+    // A fake M3-style analyzer emitting a below-threshold "sections" field.
+    const flaky: Analyzer = {
+      id: "flaky-m3-sections",
+      consumes: [],
+      produces: ["sections"],
+      analyze(): DerivedField[] {
+        return [
+          {
+            field: "sections",
+            value: ["drop"],
+            confidence: 0.4, // BELOW 0.5 — must be dropped
+            assumptions: [{ claim: "weak signal", confidence: 0.4, source: "default" }],
+          },
+        ];
+      },
+    };
+    reg.register(flaky);
+    const out = reg.runAll(fixtureRaw(), { intent: null, now: 1_000 });
+    expect(out).toHaveLength(0);
   });
 });
