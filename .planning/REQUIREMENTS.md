@@ -5,10 +5,10 @@
 
 ## Phase 04.1 Gate Requirements
 
-- [ ] **GATE-01**: Reproducible isolated CLAP capability toolchain with CMake preflight/recovery, immutable native dependency pins, and a deterministic validator under `clap/build-capability`.
+- [x] **GATE-01**: Reproducible isolated CLAP capability toolchain with CMake preflight/recovery, immutable native dependency pins, and a deterministic validator under `clap/build-capability`.
 - [ ] **GATE-02**: Automated and live Bitwig/CLAP host proof for pass-through, MIDI offsets, GUI lifecycle, state copy/reopen, parameter/device-panel behavior, and optional track-info.
 - [ ] **GATE-03**: Read-only Controller API proof for definitive project/Save As and selected-device metadata without changing controller TCP or mutation authority.
-- [ ] **GATE-04**: Exact Pi package audit/approval or rejection plus dated Q1–Q4 evidence recorded under `## Open Questions (RESOLVED)` for Phase 04.2 planning.
+- [x] **GATE-04**: Exact Pi package audit/approval or rejection plus dated Q1–Q4 evidence recorded under `## Open Questions (RESOLVED)` for Phase 04.2 planning.
 
 ## Phase 04.2 Product Requirements
 

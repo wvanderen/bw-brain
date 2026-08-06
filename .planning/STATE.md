@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 04.1
 current_phase_name: CLAP Capability & Host Evidence Gate
 status: planned
-stopped_at: Phase 04.1 capability gate planned; Phase 04.2 blocked pending evidence
-last_updated: "2026-08-06T22:10:46.369Z"
+stopped_at: Completed 04.1-01-PLAN.md
+last_updated: "2026-08-06T22:17:40.312Z"
 last_activity: 2026-08-06
 last_activity_desc: Phase 04.1 planning complete
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 31
-  completed_plans: 28
-  percent: 90
+  total_plans: 32
+  completed_plans: 29
+  percent: 63
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 04.1 — CLAP Capability & Host Evidence Gate
-Plan: 0 of 3
+Plan: 1 of 3
 Status: Planned; ready to execute gate plans
 Last activity: 2026-08-06 — Phase 04.1 planning complete
 
@@ -76,6 +76,7 @@ Progress: [██████████████████░░] 28/31 p
 | Phase 03.1 P03 | 13 min | 3 tasks | 4 files |
 | Phase 03.1 P05 | 5min | 2 tasks | 2 files |
 | Phase 03.1 P06 | 4 min | 2 tasks | 3 files |
+| Phase 04.1 P01 | 6min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 03.1 P03: D-04 apply pre-flight gate refuses wrong_clip_targeted when candidate.previewClipSid ≠ state.selection.clipSid BEFORE the bridge round-trip — M4 UAT critical blocker mechanically closed. D-05 revert gate symmetric. Pitfall 8 honored (single safeSendErr with optional details arg).
 - [Phase ?]: Phase 03.1 P03: Pre-fix migration policy symmetric across apply + revert — legacy candidates (previewClipSid undefined) and legacy journal entries (clipSid undefined) proceed with surfaced assumptions ('cursor clip unverified'), preserving recovery paths. Refusing would remove the recovery path with no alternative (Bitwig native undo is unreliable per docs/bitwig-capabilities.md §1).
 - [Phase ?]: Phase 03.1 P06: D-06 surface gap closed at CLI layer — DaemonReplyError preserves full ok:false envelope; printResultOrDisconnect surfaces it verbatim; plain-Error asymmetry for genuine-unreachable keeps SC#3 honest. Daemon unchanged; siblings adopt automatically. UAT Tests [4,5] closed.
+- [Phase 04.1]: Capability builds use clap/build-capability exclusively; clap/build remains absent and reserved for later product work. — Prevents evidence and production caches from leaking across the phase boundary.
+- [Phase 04.1]: Pi SDK candidate 0.84.0 remains SUS pending human approval despite registry signatures and trusted-publisher provenance. — Automated supply-chain evidence does not authorize installation before the explicit package gate.
 
 ### Pending Todos
 
@@ -153,6 +156,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-06T21:26:22.974Z
-Stopped at: Phase 04.1 planned; 0/3 gate plans complete; ready to execute
-Resume file: .planning/phases/04.1-hybrid-clap-integration-foundation-add-a-thin-clap-companion/04.1-CONTEXT.md
+Last session: 2026-08-06T22:17:40.305Z
+Stopped at: Completed 04.1-01-PLAN.md
+Resume file: None
