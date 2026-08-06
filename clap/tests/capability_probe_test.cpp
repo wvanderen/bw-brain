@@ -1,4 +1,5 @@
 #include "CapabilityProbeProcessor.h"
+#include "CapabilityProbeEditor.h"
 
 #include <array>
 #include <cassert>
@@ -7,6 +8,9 @@
 
 using bwbrain::capability::CapabilityProbeProcessor;
 using bwbrain::capability::MidiObservation;
+using bwbrain::capability::CapabilityProbeEditor;
+using bwbrain::capability::EditorEvent;
+using bwbrain::capability::ParameterCategory;
 
 template <typename Sample>
 void provesBitIdenticalPassThrough() {
@@ -42,4 +46,26 @@ int main() {
   assert(!absent.available);
   assert(absent.name.empty());
   assert(absent.channelCount == 0);
+
+  CapabilityProbeEditor editor;
+  assert(editor.create("cocoa"));
+  assert(editor.show());
+  assert(editor.resize(640, 360));
+  assert(editor.hide());
+  editor.destroy();
+  const std::vector<EditorEvent> expectedLifecycle{
+      EditorEvent::Created, EditorEvent::Shown, EditorEvent::Resized,
+      EditorEvent::Hidden, EditorEvent::Destroyed};
+  assert(editor.events() == expectedLifecycle);
+  assert(editor.lastWidth() == 640);
+  assert(editor.lastHeight() == 360);
+
+  const auto parameters = CapabilityProbeProcessor::parameterCandidates();
+  assert(parameters.size() == 3);
+  assert(parameters[0].category == ParameterCategory::ReadOnlyStatus);
+  assert(parameters[0].readOnly && !parameters[0].automatable);
+  assert(parameters[1].category == ParameterCategory::MomentaryAction);
+  assert(!parameters[1].readOnly && !parameters[1].automatable);
+  assert(parameters[2].category == ParameterCategory::AutomatableMusical);
+  assert(!parameters[2].readOnly && parameters[2].automatable);
 }
