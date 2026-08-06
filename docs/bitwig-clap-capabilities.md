@@ -1,0 +1,21 @@
+# Bitwig CLAP Capability Evidence
+
+This ledger records Phase 04.1 evidence only. It does not approve a production architecture or resolve Q1–Q4 without the later live and human gates.
+
+## Toolchain and native dependency lock
+
+**Reviewed:** 2026-08-06  
+**Build isolation:** capability work configures only in `clap/build-capability`; `clap/build` is reserved for future product work and must remain absent.
+
+| Dependency | Immutable commit | Upstream | License | Disposition |
+|---|---|---|---|---|
+| CLAP 1.2.4 | `00113aabdccf69c2e27ac269c35b369770e8fa73` | `https://github.com/free-audio/clap.git` | MIT | Reviewed capability dependency |
+| JUCE 8.0.15 | `91ad83ae34a81e0833b1a2b0866f54846370ae53` | `https://github.com/juce-framework/JUCE.git` | AGPLv3 or commercial | Candidate framework; product licensing decision remains deferred |
+| clap-juce-extensions | `c1a5ad025f95d01e03267857fa8276ebeed16500` | `https://github.com/free-audio/clap-juce-extensions.git` | MIT | Unofficial adapter; capability evidence required |
+| clap-validator 0.4.1 | `152b9823e992d782c5c1fd33bca0295478b919aa` | `https://github.com/free-audio/clap-validator.git` | MIT | Approved evidence tool only |
+
+The preflight records Apple clang, CMake, and Cargo versions. The validator is built from the pinned source with Cargo's lockfile and copied to `clap/build-capability/tools/clap-validator/clap-validator`; no PATH-installed validator is used.
+
+## Pi SDK package audit
+
+Pending registry evidence. The package remains uninstalled and its verdict is **SUS pending human approval**.

@@ -1,0 +1,3 @@
+# Native capability/product build trees are reproducible local output.
+/build-capability/
+/build/
