@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
+current_phase: 04.1
+current_phase_name: NOT PLANNED
 status: completed
-stopped_at: Phase 4 planning complete (6 plans, 5 waves; plan-checker revised; ready to execute)
-last_updated: "2026-07-07T01:19:59.904Z"
+stopped_at: Phase 04.1 context gathered
+last_updated: "2026-08-06T21:26:22.980Z"
 last_activity: 2026-07-07
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 5
   total_plans: 28
   completed_plans: 28
-  percent: 83
-current_phase_name: arrangement-intelligence-m3
+  percent: 71
 ---
 
 # Project State
@@ -23,11 +23,11 @@ current_phase_name: arrangement-intelligence-m3
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04 — arrangement-intelligence-m3
+**Current focus:** Phase 04.1 — hybrid CLAP integration foundation
 
 ## Current Position
 
-Phase: 04 — COMPLETE
+Phase: 04.1 — NOT PLANNED
 Plan: 6 of 6
 Status: Phase 04 complete
 Last activity: 2026-07-07
@@ -136,6 +136,7 @@ None yet.
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Gap closure: clip-identity scope, apply pre-flight, bridge auto-reconnect, skill-prompt stale update (URGENT)
+- Phase 04.1 inserted after Phase 4: Hybrid CLAP Integration Foundation — thin CLAP companion for in-Bitwig UI and real-time MIDI/audio; controller/daemon/CLI trust spine and external Pi remain authoritative (URGENT)
 
 ## Deferred Items
 
@@ -147,6 +148,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-06T14:38:15.476Z
-Stopped at: Phase 4 planning complete (6 plans, 5 waves; plan-checker revised; ready to execute)
-Resume file: .planning/phases/04-arrangement-intelligence-m3/04-01-PLAN.md
+Last session: 2026-08-06T21:26:22.974Z
+Stopped at: Phase 04.1 context gathered
+Resume file: .planning/phases/04.1-hybrid-clap-integration-foundation-add-a-thin-clap-companion/04.1-CONTEXT.md
