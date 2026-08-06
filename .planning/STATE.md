@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04.1
 current_phase_name: CLAP Capability & Host Evidence Gate
-status: planned
-stopped_at: Completed 04.1-01-PLAN.md
+status: in_progress
+stopped_at: Completed 04.1-02-PLAN.md
 last_updated: "2026-08-06T22:27:26.312Z"
 last_activity: 2026-08-06
-last_activity_desc: Phase 04.1 planning complete
+last_activity_desc: Plan 04.1-02 capability probe complete
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 32
   completed_plans: 30
-  percent: 63
+  percent: 94
 ---
 
 # Project State
@@ -30,16 +30,16 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 Phase: 04.1 — CLAP Capability & Host Evidence Gate
 Plan: 2 of 3
-Status: Planned; ready to execute gate plans
-Last activity: 2026-08-06 — Phase 04.1 planning complete
+Status: In progress; Plan 03 live Bitwig evidence remains
+Last activity: 2026-08-06 — Plan 04.1-02 capability probe complete
 
-Progress: [██████████████████░░] 28/31 plans complete (Phase 04.1: 0/3, planned and ready to execute)
+Progress: [███████████████████░] 30/32 plans complete (Phase 04.1: 2/3)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 28
+- Total plans completed: 30
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -52,7 +52,7 @@ Progress: [██████████████████░░] 28/31 p
 | 3. Reversible MIDI Patching (M2) | 5/5 | — | — |
 | 03.1 Gap Closure | 6/6 | — | — |
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
-| 04.1 CLAP Capability & Host Evidence Gate | 0/3 | — | — |
+| 04.1 CLAP Capability & Host Evidence Gate | 2/3 | 24 min | 12 min |
 | 04.2 Hybrid CLAP Companion Product | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
@@ -161,5 +161,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-08-06T22:27:06.720Z
-Stopped at: Completed 04.1-01-PLAN.md
+Stopped at: Completed 04.1-02-PLAN.md
 Resume file: None
