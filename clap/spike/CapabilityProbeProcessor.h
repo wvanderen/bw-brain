@@ -8,6 +8,15 @@
 
 namespace bwbrain::capability {
 
+enum class ParameterCategory { ReadOnlyStatus, MomentaryAction, AutomatableMusical };
+struct ParameterCandidate {
+  std::uint32_t id{};
+  std::string_view name;
+  ParameterCategory category{};
+  bool readOnly{};
+  bool automatable{};
+};
+
 struct MidiObservation {
   std::uint32_t sampleOffset{};
   std::uint8_t status{};
@@ -29,6 +38,7 @@ struct TrackInfoObservation {
 
 class CapabilityProbeProcessor {
  public:
+  [[nodiscard]] static const std::vector<ParameterCandidate>& parameterCandidates();
   template <typename Sample>
   void passThrough(const Sample* input, Sample* output, std::size_t count) const {
     if (input == output) return;

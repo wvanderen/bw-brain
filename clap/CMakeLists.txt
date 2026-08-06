@@ -14,6 +14,7 @@ enable_testing()
 
 add_library(bw_brain_capability_core STATIC
   spike/CapabilityProbeProcessor.cpp
+  spike/CapabilityProbeEditor.cpp
 )
 target_include_directories(bw_brain_capability_core PUBLIC
   ${CMAKE_CURRENT_LIST_DIR}/spike

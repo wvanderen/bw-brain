@@ -16,6 +16,21 @@ This ledger records Phase 04.1 evidence only. It does not approve a production a
 
 The preflight records Apple clang, CMake, and Cargo versions. The validator is built from the pinned source with Cargo's lockfile and copied to `clap/build-capability/tools/clap-validator/clap-validator`; no PATH-installed validator is used.
 
+## GATE-02 automated capability evidence
+
+**Status:** automated proof complete; every result below is **pending live Bitwig confirmation**. This throwaway probe does not select a Phase 04.2 product branch.
+
+| Surface | Automated observation | Live status |
+|---|---|---|
+| Audio | Mono/stereo helper paths preserve float and double samples bit-for-bit; the bundle advertises stereo 32/64-bit in-place and out-of-place pass-through | pending live |
+| MIDI | Note and MIDI events are forwarded with their original CLAP event header, including the sample offset | pending live |
+| State | Deterministic state round-trips; loading copied state demonstrates that persisted identity alone cannot distinguish reopen from duplication | pending live |
+| Track info | Host track-info is queried when offered; absence is recorded explicitly rather than inferred from a track name | pending live |
+| Editor lifecycle | The probe records create → show → resize → hide → destroy and advertises a resizable embedded Cocoa surface | pending live |
+| Parameter categories | Three compact candidates are distinguishable by flags: read-only connection status, non-automatable momentary Analyze action, and automatable Generated Mix | pending live |
+
+The capability-only CTest and pinned `clap-validator` both pass from `clap/build-capability`. The production cache `clap/build` remains absent. The editor is lifecycle instrumentation, not product UI; parameter names and flags are candidates for host evaluation, not a Q3 fallback decision.
+
 ## Pi SDK package audit
 
 **Audited:** 2026-08-06  

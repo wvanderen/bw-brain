@@ -5,6 +5,15 @@
 
 namespace bwbrain::capability {
 
+const std::vector<ParameterCandidate>& CapabilityProbeProcessor::parameterCandidates() {
+  static const std::vector<ParameterCandidate> candidates{
+      {100, "Connection Status", ParameterCategory::ReadOnlyStatus, true, false},
+      {101, "Analyze", ParameterCategory::MomentaryAction, false, false},
+      {102, "Generated Mix", ParameterCategory::AutomatableMusical, false, true},
+  };
+  return candidates;
+}
+
 std::vector<MidiObservation> CapabilityProbeProcessor::observeMidi(
     const std::vector<MidiObservation>& events) const {
   return events;
