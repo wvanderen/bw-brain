@@ -3,6 +3,32 @@
 **Defined:** 2026-06-25
 **Core Value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
 
+## Phase 04.1 Gate Requirements
+
+- [ ] **GATE-01**: Reproducible isolated CLAP capability toolchain with CMake preflight/recovery, immutable native dependency pins, and a deterministic validator under `clap/build-capability`.
+- [ ] **GATE-02**: Automated and live Bitwig/CLAP host proof for pass-through, MIDI offsets, GUI lifecycle, state copy/reopen, parameter/device-panel behavior, and optional track-info.
+- [ ] **GATE-03**: Read-only Controller API proof for definitive project/Save As and selected-device metadata without changing controller TCP or mutation authority.
+- [ ] **GATE-04**: Exact Pi package audit/approval or rejection plus dated Q1–Q4 evidence recorded under `## Open Questions (RESOLVED)` for Phase 04.2 planning.
+
+## Phase 04.2 Product Requirements
+
+- [ ] **D-01**: Provide a focused in-Bitwig musical decision workspace with conversation, context, connection state, and proposal review.
+- [ ] **D-02**: Use a compact context strip, central conversation pane, and proposal drawer shown only for inspectable material.
+- [ ] **D-03**: Expose connection/session status, Analyze, Stop, proposal pending, and automatable musical controls in Bitwig's device panel.
+- [ ] **D-04**: Start quietly with connection and identity only; do not automatically analyze, prompt Pi, or generate suggestions.
+- [ ] **D-05**: Permit continuous lightweight local feature extraction while initiating reasoning only on explicit user request.
+- [ ] **D-06**: Allow bounded aggregates and note events to leave the plug-in; never transmit or persist raw audio.
+- [ ] **D-07**: Play only bounded live MIDI that the user has inspected and explicitly armed.
+- [ ] **D-08**: Preserve original audio/MIDI on disconnect and safely stop generated material with required note-offs.
+- [ ] **D-09**: Maintain one daemon-owned Pi session per Bitwig project with multiple track-scoped instance contexts.
+- [ ] **D-10**: Use persistent instance identity plus controller/daemon correlation and one-time confirmation; names are never authoritative.
+- [ ] **D-11**: Target the focused instance explicitly and display its project, track, and instance scope.
+- [ ] **D-12**: Resume reopened projects, rekey duplicated instances, and fork Save As session history safely.
+- [ ] **D-13**: Collect approval in the CLAP UI while existing-state mutation uses the controller and current candidate/pre-flight/journal path.
+- [ ] **D-14**: Arm exact approved live MIDI and launch it at the configured next beat/bar boundary with a visible countdown.
+- [ ] **D-15**: Make approval one-shot and exact-revision/project/instance/clip scoped; invalidate it on content or target change.
+- [ ] **D-16**: Make global Stop cancel generated behavior and disarm instances without altering original signal or reverting journaled edits.
+
 ## v1 Requirements
 
 Requirements for initial release across all 4 milestones (M1 read-only context → M2 reversible patching → M3 arrangement intelligence → M4 automation/devices). Each maps to roadmap phases (phase assignment finalized during roadmap creation).
@@ -110,6 +136,26 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 
 | Requirement | Milestone | Phase | Status |
 |-------------|-----------|-------|--------|
+| GATE-01 | Gate | Phase 04.1 | Pending |
+| GATE-02 | Gate | Phase 04.1 | Pending |
+| GATE-03 | Gate | Phase 04.1 | Pending |
+| GATE-04 | Gate | Phase 04.1 | Pending |
+| D-01 | CLAP Product | Phase 04.2 | Pending |
+| D-02 | CLAP Product | Phase 04.2 | Pending |
+| D-03 | CLAP Product | Phase 04.2 | Pending |
+| D-04 | CLAP Product | Phase 04.2 | Pending |
+| D-05 | CLAP Product | Phase 04.2 | Pending |
+| D-06 | CLAP Product | Phase 04.2 | Pending |
+| D-07 | CLAP Product | Phase 04.2 | Pending |
+| D-08 | CLAP Product | Phase 04.2 | Pending |
+| D-09 | CLAP Product | Phase 04.2 | Pending |
+| D-10 | CLAP Product | Phase 04.2 | Pending |
+| D-11 | CLAP Product | Phase 04.2 | Pending |
+| D-12 | CLAP Product | Phase 04.2 | Pending |
+| D-13 | CLAP Product | Phase 04.2 | Pending |
+| D-14 | CLAP Product | Phase 04.2 | Pending |
+| D-15 | CLAP Product | Phase 04.2 | Pending |
+| D-16 | CLAP Product | Phase 04.2 | Pending |
 | BRIDGE-01 | M1 | Phase 2 | Pending |
 | BRIDGE-02 | M1 | Phase 2 | Pending |
 | BRIDGE-03 | M1 | Phase 2 | Pending |
@@ -155,8 +201,11 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 
 **Coverage:**
 
-- v1 requirements: 42 total
-- Mapped to phases: 42
+- existing v1 milestone requirements: 42
+- Phase 04.1 gate requirements: 4
+- Phase 04.2 product requirements: 16
+- Total requirements: 62
+- Mapped to phases: 62
 - Unmapped: 0 ✓
 - Orphaned/duplicated: 0 ✓
 
@@ -166,8 +215,10 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 - Phase 2 (Read-Only Context Foundation / M1): 15 — BRIDGE ×3, STATE ×4, CLI ×3, MEM ×2, UX-01, UX-05, UX-06
 - Phase 3 (Reversible MIDI Patching / M2): 14 — EDIT ×6, MIDI ×5, UX-02, ARCH-01, ARCH-02
 - Phase 4 (Arrangement Intelligence / M3): 6 — ARRANGE ×5, UX-03
+- Phase 04.1 (CLAP Capability & Host Evidence Gate): 4 — GATE-01 through GATE-04
+- Phase 04.2 (Hybrid CLAP Companion Product): 16 — D-01 through D-16
 - Phase 5 (Automation & Device Workflows / M4): 5 — AUTO ×4, UX-04
 
 ---
 *Requirements defined: 2026-06-25*
-*Last updated: 2026-06-26 after roadmap creation (phase assignments finalized)*
+*Last updated: 2026-08-06 after Phase 04.1/04.2 split and traceability update*

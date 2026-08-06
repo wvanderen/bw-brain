@@ -17,6 +17,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Read-Only Context Foundation (M1)** - Bridge mirror + daemon normalization + read CLI + memory bootstrap + Pi /analyze — the assistant reliably describes selected context (completed 2026-06-27)
 - [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply (all 5 plans executed; BLOCKING end-of-phase UAT M1–M5 pending human — status: verifying)
 - [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
+- [ ] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Isolated toolchain and approved host/controller/package evidence resolving Q1–Q4
+- [ ] **Phase 04.2: Hybrid CLAP Companion Product** - Blocked/unplanned until Phase 04.1 completes; owns D-01–D-16
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
 
 ## Phase Details
@@ -176,6 +178,40 @@ Plans:
 - [x] 04-05-PLAN.md — M3_ANALYZERS registry + transition-suggest + query-server arrange.* dispatch + bw-arrange multicall CLI + boot/describe wiring
 - [x] 04-06-PLAN.md — Pi `/review` skill + contract test (UX-03)
 
+### Phase 04.1: CLAP Capability & Host Evidence Gate (INSERTED)
+
+**Goal:** Produce reproducible toolchain, dependency, CLAP/Bitwig host, Controller API, and Pi package evidence that resolves Q1–Q4 without implementing the companion product.
+**Requirements**: GATE-01, GATE-02, GATE-03, GATE-04
+**Depends on:** Phase 4
+**Success Criteria:**
+
+  1. CMake and immutable native dependencies configure in `clap/build-capability`; the pinned validator runs from its deterministic build path.
+  2. A throwaway validator-clean bundle records automated and live Bitwig behavior for pass-through, MIDI offsets, GUI, state, parameters, and optional track-info.
+  3. A read-only Controller API probe records definitive project/Save As and selected-device metadata availability without changing controller TCP or mutation authority.
+  4. The exact Pi package is inspected without installation, human-approved or rejected, and Q1–Q4 are recorded under `## Open Questions (RESOLVED)` with dated evidence.
+
+**Plans:** 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04.1-01-PLAN.md — Isolated capability toolchain, immutable dependencies, deterministic validator, and non-installing Pi audit
+- [ ] 04.1-02-PLAN.md — Throwaway CLAP host/adapter capability probe in the isolated build
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04.1-03-PLAN.md — Read-only Controller API proof, live Bitwig/package evidence, and Q1–Q4 resolution
+
+### Phase 04.2: Hybrid CLAP Companion Product (INSERTED)
+
+**Goal:** Deliver the thin CLAP companion specified by locked decisions D-01–D-16: an in-Bitwig focused workspace, aggregate-only real-time context, exact approved live-MIDI playback, confirmed multi-instance/project sessions, and controller/journal-preserving approval flows.
+**Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16
+**Depends on:** Phase 04.1
+**Status:** Blocked / unplanned until Phase 04.1 completes with resolved Q1–Q4 evidence
+**Plans:** TBD — run `$gsd-plan-phase 04.2` after Phase 04.1 completion
+
+Planning input: `.planning/phases/04.2-hybrid-clap-companion-product/04.2-CONTEXT.md` and `DOWNSTREAM-PLAN-NOTES.md`. No executable Phase 04.2 plans exist yet.
+
 ### Phase 5: Automation & Device Workflows (M4)
 
 **Goal**: The assistant helps with sound design and movement — automation inspection, macro/XY exposure proposals, and bounded automation generation across native Bitwig and third-party (VST/AU) device chains.
@@ -197,7 +233,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 → 5
 (Phase 4 may partially overlap Phase 3 — see its Depends-on note — but the default ordering is sequential.)
 
 | Phase | Plans Complete | Status | Completed |
@@ -206,4 +242,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
 | 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
+| 04.1. CLAP Capability & Host Evidence Gate | 0/3 | Planned | - |
+| 04.2. Hybrid CLAP Companion Product | 0/TBD | Blocked pending 04.1 | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

@@ -3,17 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 04.1
-current_phase_name: NOT PLANNED
-status: completed
-stopped_at: Phase 04.1 context gathered
-last_updated: "2026-08-06T21:26:22.980Z"
-last_activity: 2026-07-07
+current_phase_name: CLAP Capability & Host Evidence Gate
+status: planned
+stopped_at: Phase 04.1 capability gate planned; Phase 04.2 blocked pending evidence
+last_updated: "2026-08-06T22:10:46.369Z"
+last_activity: 2026-08-06
+last_activity_desc: Phase 04.1 planning complete
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 5
-  total_plans: 28
+  total_plans: 31
   completed_plans: 28
-  percent: 71
+  percent: 90
 ---
 
 # Project State
@@ -23,22 +24,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.1 — hybrid CLAP integration foundation
+**Current focus:** Phase 04.1 — CLAP capability and host evidence gate. Phase 04.2 owns the companion product and is blocked until Q1–Q4 resolve.
 
 ## Current Position
 
-Phase: 04.1 — NOT PLANNED
-Plan: 6 of 6
-Status: Phase 04 complete
-Last activity: 2026-07-07
+Phase: 04.1 — CLAP Capability & Host Evidence Gate
+Plan: 0 of 3
+Status: Planned; ready to execute gate plans
+Last activity: 2026-08-06 — Phase 04.1 planning complete
 
-Progress: [████████████████████] 22/22 plans (100% of known plans; Phase 4 unplanned — discuss/plan next)
+Progress: [██████████████████░░] 28/31 plans complete (Phase 04.1: 0/3, planned and ready to execute)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 25 (3 in Phase 1 + 8 in Phase 2)
+- Total plans completed: 28
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -48,8 +49,11 @@ Progress: [████████████████████] 22/22 p
 |-------|-------|-------|----------|
 | 1. Schema & IPC Spike | 3/3 | ~38 min | 13 min |
 | 2. Read-Only Context Foundation (M1) | 8/8 | ~70+ min | ~9 min/plan |
-| 3. Reversible MIDI Patching (M2) | 0/TBD | — | — |
-| 4. Arrangement Intelligence (M3) | 0/TBD | — | — |
+| 3. Reversible MIDI Patching (M2) | 5/5 | — | — |
+| 03.1 Gap Closure | 6/6 | — | — |
+| 4. Arrangement Intelligence (M3) | 6/6 | — | — |
+| 04.1 CLAP Capability & Host Evidence Gate | 0/3 | — | — |
+| 04.2 Hybrid CLAP Companion Product | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
 | 03.1 | 6 | - | - |
@@ -137,6 +141,7 @@ None yet.
 
 - Phase 03.1 inserted after Phase 3: Gap closure: clip-identity scope, apply pre-flight, bridge auto-reconnect, skill-prompt stale update (URGENT)
 - Phase 04.1 inserted after Phase 4: Hybrid CLAP Integration Foundation — thin CLAP companion for in-Bitwig UI and real-time MIDI/audio; controller/daemon/CLI trust spine and external Pi remain authoritative (URGENT)
+- Phase 04.1 narrowed to the CLAP capability/host evidence gate; Phase 04.2 inserted as the blocked Hybrid CLAP Companion Product owner for D-01–D-16.
 
 ## Deferred Items
 
@@ -149,5 +154,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-08-06T21:26:22.974Z
-Stopped at: Phase 04.1 context gathered
+Stopped at: Phase 04.1 planned; 0/3 gate plans complete; ready to execute
 Resume file: .planning/phases/04.1-hybrid-clap-integration-foundation-add-a-thin-clap-companion/04.1-CONTEXT.md
