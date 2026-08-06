@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -66,6 +67,14 @@ public final class PullHandlers {
     public record PageView(String name, List<RemoteView> remotes) {}
 
     public record TrackView(int slot, String name) {}
+
+    /**
+     * Snapshot inputs for the Phase 04.1 controller capability request.
+     * Only values already observed by the existing read-only controller
+     * surface belong here; absent project/document identity is represented in
+     * the response explicitly rather than guessed from a track or device name.
+     */
+    public record ClapCapabilityView(String selectedDeviceName, boolean selectedDeviceObserved) {}
 
     // --- pure-logic response builders (exercised by PullHandlersTest) ---
 
@@ -120,6 +129,49 @@ public final class PullHandlers {
         return LineJson.response(id, true, Map.of("tracks", tracksPayload));
     }
 
+    /** Build the read-only Controller API evidence response for the CLAP gate. */
+    static String buildClapCapabilityResponse(final String id, final ClapCapabilityView view) {
+        final boolean nameAvailable = view.selectedDeviceObserved()
+                && view.selectedDeviceName() != null
+                && !view.selectedDeviceName().isBlank();
+
+        final Map<String, Object> projectDocument = new LinkedHashMap<>();
+        // extension-api:21 Project exposes isModified(), but neither Project nor
+        // DocumentState exposes a document name, path, stable ID, or Save As
+        // event. Null + availability flags make that absence machine-readable.
+        projectDocument.put("name", null);
+        projectDocument.put("nameAvailable", false);
+        projectDocument.put("path", null);
+        projectDocument.put("pathAvailable", false);
+        projectDocument.put("stableId", null);
+        projectDocument.put("stableIdAvailable", false);
+        projectDocument.put("saveAsObservable", false);
+
+        final Map<String, Object> selectedDevice = new LinkedHashMap<>();
+        selectedDevice.put("name", nameAvailable ? view.selectedDeviceName() : null);
+        selectedDevice.put("nameAvailable", nameAvailable);
+        selectedDevice.put("selected", nameAvailable);
+
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("apiSurface", "controller-api:21");
+        payload.put("projectDocument", projectDocument);
+        payload.put("selectedDevice", selectedDevice);
+        return LineJson.response(id, true, payload);
+    }
+
+    /**
+     * Narrow dispatch seam proving the capability probe recognizes exactly one
+     * read-only request. Mutation-shaped messages are never handled here and
+     * remain owned by the pre-existing top-level apply.patch path.
+     */
+    static Optional<String> dispatchClapCapabilityRequest(final String type, final String id,
+                                                           final ClapCapabilityView view) {
+        if (!"get.clap_capabilities".equals(type)) {
+            return Optional.empty();
+        }
+        return Optional.of(buildClapCapabilityResponse(id, view));
+    }
+
     // --- dispatch thread ---
 
     /**
@@ -171,6 +223,9 @@ public final class PullHandlers {
                 case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip, observers));
                 case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id));
                 case "get.project_summary" -> outbox.offer(handleProjectSummary(id, observers));
+                case "get.clap_capabilities" -> outbox.offer(dispatchClapCapabilityRequest(type, id,
+                        new ClapCapabilityView(observers.getCursorDeviceName(),
+                                !observers.getCursorDeviceName().isBlank())).orElseThrow());
                 // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
                 // (D-01 / Pitfall 7). The handler NEVER branches on the
                 // semantic-intent metadata field — it stays three-case forever.

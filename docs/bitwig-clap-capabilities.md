@@ -31,6 +31,22 @@ The preflight records Apple clang, CMake, and Cargo versions. The validator is b
 
 The capability-only CTest and pinned `clap-validator` both pass from `clap/build-capability`. The production cache `clap/build` remains absent. The editor is lifecycle instrumentation, not product UI; parameter names and flags are candidates for host evaluation, not a Q3 fallback decision.
 
+## GATE-03 automated Controller API evidence
+
+**Recorded:** 2026-08-06
+**Status:** automated API-surface proof complete; runtime values remain **pending live Bitwig confirmation**.
+
+The existing controller TCP now accepts one additive read-only request, `get.clap_capabilities`. It reports only the already-observed selected-device name and explicit availability flags. The installed `extension-api:21` exposes `Project.isModified()`, but neither `Project` nor `DocumentState` exposes a definitive document name, filesystem path, stable document ID, or Save As event. The response therefore records those identity fields as `null` with `*Available: false` and records `saveAsObservable: false`; it never derives project identity from a track, device, or display name.
+
+The capability dispatcher recognizes only `get.clap_capabilities`. Mutation-shaped requests such as `apply.patch` and `set.project` are not dispatchable through it. The pre-existing top-level `apply.patch` handler and loopback TCP are unchanged; no instance-link or CLAP mutation authority was added.
+
+| Surface | Automated observation | Live status |
+|---|---|---|
+| Project/document identity | No definitive name, path, or stable ID in the installed controller API | pending live |
+| Save As | No definitive Save As event or path transition in the installed controller API | pending live |
+| Selected device | Existing observer cache can report the selected device name, with absence explicit | pending live |
+| Authority | Probe-only dispatcher rejects mutation request types; existing `apply.patch` tests remain unchanged | automated |
+
 ## Pi SDK package audit
 
 **Audited:** 2026-08-06  
