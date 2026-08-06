@@ -31,6 +31,17 @@ set_target_properties(bw-brain-capability PROPERTIES
   SUFFIX ".clap"
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
+if(APPLE)
+  set_target_properties(bw-brain-capability PROPERTIES
+    BUNDLE TRUE
+    BUNDLE_EXTENSION clap
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.bwbrain.capability-probe
+    MACOSX_BUNDLE_BUNDLE_NAME bw-brain-capability
+    MACOSX_BUNDLE_BUNDLE_VERSION "0"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "0.0.0"
+    MACOSX_BUNDLE_INFO_PLIST "${clap_SOURCE_DIR}/src/plugins.plist.in"
+  )
+endif()
 
 add_executable(capability_probe_test tests/capability_probe_test.cpp)
 target_link_libraries(capability_probe_test PRIVATE bw_brain_capability_core)
