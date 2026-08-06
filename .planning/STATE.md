@@ -6,14 +6,14 @@ current_phase: 04.1
 current_phase_name: CLAP Capability & Host Evidence Gate
 status: planned
 stopped_at: Completed 04.1-01-PLAN.md
-last_updated: "2026-08-06T22:17:40.312Z"
+last_updated: "2026-08-06T22:27:26.312Z"
 last_activity: 2026-08-06
 last_activity_desc: Phase 04.1 planning complete
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 32
-  completed_plans: 29
+  completed_plans: 30
   percent: 63
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 04.1 — CLAP Capability & Host Evidence Gate
-Plan: 1 of 3
+Plan: 2 of 3
 Status: Planned; ready to execute gate plans
 Last activity: 2026-08-06 — Phase 04.1 planning complete
 
@@ -77,6 +77,7 @@ Progress: [██████████████████░░] 28/31 p
 | Phase 03.1 P05 | 5min | 2 tasks | 2 files |
 | Phase 03.1 P06 | 4 min | 2 tasks | 3 files |
 | Phase 04.1 P01 | 6min | 2 tasks | 6 files |
+| Phase 04.1 P02 | 18min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 03.1 P06: D-06 surface gap closed at CLI layer — DaemonReplyError preserves full ok:false envelope; printResultOrDisconnect surfaces it verbatim; plain-Error asymmetry for genuine-unreachable keeps SC#3 honest. Daemon unchanged; siblings adopt automatically. UAT Tests [4,5] closed.
 - [Phase 04.1]: Capability builds use clap/build-capability exclusively; clap/build remains absent and reserved for later product work. — Prevents evidence and production caches from leaking across the phase boundary.
 - [Phase 04.1]: Pi SDK candidate 0.84.0 remains SUS pending human approval despite registry signatures and trusted-publisher provenance. — Automated supply-chain evidence does not authorize installation before the explicit package gate.
+- [Phase 04.1]: Bare throwaway CLAP capability probe; JUCE and adapter product architecture remain deferred. — Preserves the evidence/product boundary.
+- [Phase 04.1]: Copied persisted identity demonstrates duplication ambiguity, not production identity. — Live lease and rekey design remains Phase 04.2 work.
+- [Phase 04.1]: Editor and parameter evidence remains pending live Bitwig proof; no Q3 fallback selected. — Plan 03 owns host evidence and branch selection.
 
 ### Pending Todos
 
@@ -156,6 +160,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-06T22:17:40.305Z
+Last session: 2026-08-06T22:27:06.720Z
 Stopped at: Completed 04.1-01-PLAN.md
 Resume file: None

@@ -190,13 +190,13 @@ Plans:
   3. A read-only Controller API probe records definitive project/Save As and selected-device metadata availability without changing controller TCP or mutation authority.
   4. The exact Pi package is inspected without installation, human-approved or rejected, and Q1–Q4 are recorded under `## Open Questions (RESOLVED)` with dated evidence.
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 04.1-01-PLAN.md — Isolated capability toolchain, immutable dependencies, deterministic validator, and non-installing Pi audit
-- [ ] 04.1-02-PLAN.md — Throwaway CLAP host/adapter capability probe in the isolated build
+- [x] 04.1-02-PLAN.md — Throwaway CLAP host/adapter capability probe in the isolated build
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -242,6 +242,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 2. Read-Only Context Foundation (M1) | 8/8 | Complete    | 2026-06-29 |
 | 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
-| 04.1. CLAP Capability & Host Evidence Gate | 1/3 | In Progress|  |
+| 04.1. CLAP Capability & Host Evidence Gate | 2/3 | In Progress|  |
 | 04.2. Hybrid CLAP Companion Product | 0/TBD | Blocked pending 04.1 | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
