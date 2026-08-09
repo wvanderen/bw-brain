@@ -134,7 +134,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- 1 pending — see `.planning/todos/pending/2026-08-09-design-first-class-bitwig-grid-integration.md`.
 
 ### Blockers/Concerns
 
