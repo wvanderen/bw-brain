@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04.1
-current_phase_name: CLAP Capability & Host Evidence Gate
-status: in_progress
-stopped_at: Completed 04.1-03-PLAN.md
-last_updated: "2026-08-10T22:23:48.328Z"
+current_phase: 04.2
+current_phase_name: Hybrid CLAP Companion Product
+status: ready_for_planning
+stopped_at: Completed 04.1-04-PLAN.md
+last_updated: "2026-08-10T22:41:55.265Z"
 last_activity: 2026-08-10
-last_activity_desc: Plan 04.1-03 evidence gate complete; Phase 04.2 planning unblocked
+last_activity_desc: Plan 04.1-04 live MIDI offset gap closure complete; Phase 04.2 planning is next
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 32
-  completed_plans: 31
-  percent: 75
+  total_plans: 33
+  completed_plans: 32
+  percent: 97
 ---
 
 # Project State
@@ -28,18 +28,18 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 
 ## Current Position
 
-Phase: 04.1 — CLAP Capability & Host Evidence Gate
-Plan: 3 of 3
-Status: Complete; Phase 04.2 planning is the next action
-Last activity: 2026-08-10 — Plan 04.1-03 evidence gate complete
+Phase: 04.2 — Hybrid CLAP Companion Product
+Plan: 0 of TBD
+Status: Unblocked / unplanned; `$gsd-plan-phase 04.2` is the next action
+Last activity: 2026-08-10 — Plan 04.1-04 live MIDI offset gap closure complete
 
-Progress: [███████████████████░] 31/32 plans complete (Phase 04.1: 3/3)
+Progress: [███████████████████░] 32/33 plans complete (Phase 04.1: 4/4)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 31
+- Total plans completed: 32
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -52,7 +52,7 @@ Progress: [███████████████████░] 31/32 p
 | 3. Reversible MIDI Patching (M2) | 5/5 | — | — |
 | 03.1 Gap Closure | 6/6 | — | — |
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
-| 04.1 CLAP Capability & Host Evidence Gate | 3/3 | 4 days elapsed across gated sessions | — |
+| 04.1 CLAP Capability & Host Evidence Gate | 4/4 | 4 days elapsed across gated sessions | — |
 | 04.2 Hybrid CLAP Companion Product | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
@@ -79,6 +79,7 @@ Progress: [███████████████████░] 31/32 p
 | Phase 04.1 P01 | 6min | 2 tasks | 6 files |
 | Phase 04.1 P02 | 18min | 2 tasks | 8 files |
 | Phase 04.1 P03 | 4d | 2 tasks | 10 files |
+| Phase 04.1 P04 | 20 min + human verification | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,8 @@ Recent decisions affecting current work:
 - [Phase 04.1]: Q2 uses explicit session.fork confirmation with no display-name heuristic. — Controller API 21 exposes no definitive document identity or Save As event.
 - [Phase 04.1]: Q3 keeps status/actions in hosted UI and automation only on musical controls. — Bitwig omitted non-automatable Analyze from the device panel while Generated Mix accepted fractional values.
 - [Phase 04.1]: Q4 approves exactly @earendil-works/pi-coding-agent@0.84.0 under the recorded audit scope without gate-time installation. — The user explicitly approved the audited package version and layout.
+- [Phase 04.1]: GATE-02 accepted direct Bitwig 6.0.11 together-mode proof: received=32, forwarded=32, count=616, result SAME. — Direct non-zero host evidence replaces inference from transparent forwarding.
+- [Phase 04.1]: Phase 04.2 is unblocked for planning but remains unplanned and unimplemented. — Phase 04.1 closes evidence gates only and preserves the product boundary.
 
 ### Pending Todos
 
@@ -165,6 +168,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-10T22:23:48.321Z
-Stopped at: Completed 04.1-03-PLAN.md
+Last session: 2026-08-10T22:41:29.099Z
+Stopped at: Completed 04.1-04-PLAN.md
 Resume file: None
