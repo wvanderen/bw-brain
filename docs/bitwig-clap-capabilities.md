@@ -18,12 +18,12 @@ The preflight records Apple clang, CMake, and Cargo versions. The validator is b
 
 ## GATE-02 automated capability evidence
 
-**Status:** automated proof complete; every result below is **pending live Bitwig confirmation**. This throwaway probe does not select a Phase 04.2 product branch.
+**Status:** automated proof and live Bitwig confirmation complete. This throwaway probe does not select a Phase 04.2 product branch.
 
 | Surface | Automated observation | Live status |
 |---|---|---|
 | Audio | Mono/stereo helper paths preserve float and double samples bit-for-bit; the bundle advertises stereo 32/64-bit in-place and out-of-place pass-through | **Observed 2026-08-10:** transparent in Bitwig |
-| MIDI | Note and MIDI events are forwarded with their original CLAP event header, including the sample offset | **Observed 2026-08-10:** transparent in Bitwig; sample-offset fidelity still needs a dedicated live measurement |
+| MIDI | Note and MIDI events are forwarded with their original CLAP event header, including the sample offset; native tests cover non-zero, zero, and failed-push measurement semantics | **Observed 2026-08-10 in Bitwig 6.0.11, hosting mode `together`:** live MIDI clip playback produced `received=32, forwarded=32, count=616`, result `SAME` with successful push |
 | State | Deterministic state round-trips; loading copied state demonstrates that persisted identity alone cannot distinguish reopen from duplication | **Observed 2026-08-10:** parameter state persists |
 | Track info | Host track-info is queried when offered; absence is recorded explicitly rather than inferred from a track name | pending live |
 | Editor lifecycle | The probe records create → show → resize → hide → destroy and advertises a resizable embedded Cocoa surface | **Confirmed 2026-08-10 after probe correction:** visible Cocoa child view embeds successfully and remains correct through resize and reopen |
@@ -36,6 +36,10 @@ The capability-only CTest and pinned `clap-validator` both pass from `clap/build
 The capability plug-in loaded successfully after reinstalling the bridge extension and restarting Bitwig. The daemon and bridge were connected, but this throwaway probe contains no daemon client: its `Connection Status` value is initialized to zero and is not a connectivity measurement. The initial probe accepted Bitwig's Cocoa parent without attaching an `NSView`; commit `d5936a7` corrected the capability-only view lifecycle and parameter metadata. The live retest confirmed visible embedding, resize/reopen behavior, and fractional Generated Mix values.
 
 These results favor the Q3 fallback in which genuinely automatable musical controls use ordinary continuous CLAP parameters, while status and actions live in the hosted plug-in UI. A read-only status parameter can appear in Bitwig's device panel, but a non-automatable momentary Analyze parameter is not surfaced there.
+
+### Live MIDI sample-offset observation — 2026-08-10
+
+In Bitwig 6.0.11 using hosting mode `together`, the rebuilt capability probe was driven by live MIDI clip playback while its embedded editor displayed the audio-thread atomic measurement. The concrete observation was `received=32, forwarded=32, count=616`, with `Result: SAME (push succeeded)`. The non-zero host-supplied offset and identical successfully forwarded offset directly satisfy D-GATE-02; zero-only transparency was not used as evidence.
 
 ## GATE-03 automated Controller API evidence
 
