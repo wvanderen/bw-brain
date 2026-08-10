@@ -4,6 +4,7 @@
 #include <clap/clap.h>
 #include <clap/ext/audio-ports.h>
 #include <clap/ext/gui.h>
+#include <clap/ext/log.h>
 #include <clap/ext/note-ports.h>
 #include <clap/ext/params.h>
 #include <clap/ext/state.h>
@@ -61,6 +62,8 @@ ProbePlugin* self(const clap_plugin_t* plugin) {
 bool pluginInit(const clap_plugin_t* plugin) {
   auto* instance = self(plugin);
   if (instance->host && instance->host->get_extension) {
+    const auto* hostLog = static_cast<const clap_host_log_t*>(
+        instance->host->get_extension(instance->host, CLAP_EXT_LOG));
     instance->hostParams = static_cast<const clap_host_params_t*>(
         instance->host->get_extension(instance->host, CLAP_EXT_PARAMS));
     const auto* track = static_cast<const clap_host_track_info_t*>(
@@ -70,9 +73,23 @@ bool pluginInit(const clap_plugin_t* plugin) {
       if (track->get(instance->host, &info)) {
         const TrackInfoInput input{info.name, static_cast<uint32_t>(info.audio_channel_count)};
         (void)instance->processor.observeTrackInfo(&input);
+        if (hostLog && hostLog->log) {
+          char message[512]{};
+          std::snprintf(message, sizeof(message),
+                        "[bw-brain capability] track-info present name=\"%s\" channels=%u",
+                        info.name, static_cast<unsigned>(info.audio_channel_count));
+          hostLog->log(instance->host, CLAP_LOG_INFO, message);
+        }
+      } else if (hostLog && hostLog->log) {
+        hostLog->log(instance->host, CLAP_LOG_INFO,
+                     "[bw-brain capability] track-info absent (host get returned false)");
       }
     } else {
       (void)instance->processor.observeTrackInfo(nullptr);
+      if (hostLog && hostLog->log) {
+        hostLog->log(instance->host, CLAP_LOG_INFO,
+                     "[bw-brain capability] track-info absent (extension unavailable)");
+      }
     }
   }
   return true;

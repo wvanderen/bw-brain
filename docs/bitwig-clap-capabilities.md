@@ -86,8 +86,8 @@ Registry and tarball metadata agree on `clean`, `build`, `build:binary`, `copy-a
 
 ### Q1 — Track context
 
-- **Observed:** Pending. The capability plug-in queried `clap.track-info` when offered, but the current throwaway probe did not persist or display the live observation. Audio/MIDI transparency does not prove whether Bitwig supplied track-info.
-- **Selected:** Pending one instrumented live observation. If present, track-info is hint-only; if absent, linking is controller-confirmation-only.
+- **Observed:** Pending. Audio/MIDI transparency does not prove whether Bitwig supplied track-info. The corrected probe now emits one read-only Bitwig host-log line beginning `[bw-brain capability] track-info` and records either present values or the exact absence reason.
+- **Selected:** Pending one reload/log observation. If present, track-info is hint-only; if absent, linking is controller-confirmation-only.
 
 ### Q2 — Project identity and Save As
 
