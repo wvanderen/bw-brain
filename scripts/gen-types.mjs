@@ -37,7 +37,9 @@ const SCHEMA_DIRS = [
   join(REPO_ROOT, "schemas", "protocol"),
   join(REPO_ROOT, "schemas"),
   join(REPO_ROOT, "schemas", "cli-query"),
+  join(REPO_ROOT, "schemas", "clap"),
 ];
+const CLAP_SCHEMA_DIR = join(REPO_ROOT, "schemas", "clap");
 const OUT_DIR = join(REPO_ROOT, "daemon", "src", "gen");
 
 // json-schema-to-typescript lives in daemon/node_modules (it's a daemon devDep).
@@ -212,12 +214,13 @@ async function main() {
       throw new Error(`${name}: missing $id (required by SC#3)`);
     }
     byId.set(schema.$id, schema);
-    loaded.push({ fname: name, schema });
+    loaded.push({ dir, fname: name, schema });
   }
 
   // Pass 2: dereference + compile each.
   await mkdir(OUT_DIR, { recursive: true });
-  for (const { fname, schema } of loaded) {
+  const clapTypes = [];
+  for (const { dir, fname, schema } of loaded) {
     const dereffed = derefNode(
       JSON.parse(JSON.stringify(schema)),
       byId,
@@ -235,8 +238,16 @@ async function main() {
       additionalProperties: false,
     });
     const outName = basename(fname, ".schema.json") + ".ts";
-    await writeFile(join(OUT_DIR, outName), ts);
-    console.log(`✓ ${outName}`);
+    if (dir === CLAP_SCHEMA_DIR) {
+      clapTypes.push(ts);
+    } else {
+      await writeFile(join(OUT_DIR, outName), ts);
+      console.log(`✓ ${outName}`);
+    }
+  }
+  if (clapTypes.length > 0) {
+    await writeFile(join(OUT_DIR, "clap.ts"), clapTypes.join("\n"));
+    console.log("✓ clap.ts");
   }
 }
 

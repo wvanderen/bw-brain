@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/clap/identity.schema.json",
+  "title": "ClapIdentityMessage",
+  "oneOf": [
+    { "$ref": "#/$defs/LinkRequest" }, { "$ref": "#/$defs/LinkConfirm" },
+    { "$ref": "#/$defs/FocusSet" }, { "$ref": "#/$defs/Fork" }
+  ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "Hint": { "type": "string", "maxLength": 256 },
+    "Scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projectId", "instanceId"],
+      "properties": { "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "clipSid": { "$ref": "#/$defs/Id" } }
+    },
+    "LinkRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "nonce", "instanceId", "hints"],
+      "properties": { "type": { "const": "identity.link.request" }, "nonce": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "hints": { "type": "object", "additionalProperties": false, "properties": { "trackName": { "$ref": "#/$defs/Hint" }, "deviceName": { "$ref": "#/$defs/Hint" } } } }
+    },
+    "LinkConfirm": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "nonce", "scope", "confirmed"],
+      "properties": { "type": { "const": "identity.link.confirm" }, "nonce": { "$ref": "#/$defs/Id" }, "scope": { "$ref": "#/$defs/Scope" }, "confirmed": { "const": true } }
+    },
+    "FocusSet": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "scope"],
+      "properties": { "type": { "const": "focus.set" }, "scope": { "$ref": "#/$defs/Scope" } }
+    },
+    "Fork": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "sourceProjectId", "newProjectId", "confirmed"],
+      "properties": { "type": { "const": "session.fork" }, "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" }, "confirmed": { "const": true } }
+    }
+  }
+}

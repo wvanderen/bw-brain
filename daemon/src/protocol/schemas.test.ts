@@ -714,4 +714,26 @@ describe("CLAP companion bounded protocol fixtures", () => {
       expect(validate({ ...valid.value, unknown: true })).toBe(false);
     }
   });
+
+  it("rejects unknown discriminants and every limit+1 boundary class", () => {
+    const peer = clapAjv.getSchema(clapPeerSchema.$id)!;
+    const telemetry = clapAjv.getSchema(clapTelemetrySchema.$id)!;
+    const proposal = clapAjv.getSchema(clapProposalSchema.$id)!;
+    const phrase = clapAjv.getSchema(clapPhraseSchema.$id)!;
+    const hello = clapGolden.valid[0]!.value;
+    const snapshot = clapGolden.valid[2]!.value;
+    const published = clapGolden.valid[3]!.value;
+    const armed = clapGolden.valid[4]!.value;
+
+    expect(peer({ ...hello, type: "clap.unknown" })).toBe(false);
+    expect(peer({ ...hello, instanceId: "i".repeat(65) })).toBe(false);
+    expect(peer({ ...hello, limits: { ...hello.limits, maxLineBytes: 65537 } })).toBe(false);
+    expect(peer({ ...hello, limits: { ...hello.limits, maxQueueBytes: 262145 } })).toBe(false);
+    expect(peer({ ...hello, capabilities: [...(hello.capabilities ?? []), "c16"] })).toBe(false);
+    expect(telemetry({ type: "conversation.chunk", requestId: "r", sequence: 0, text: "x".repeat(513) })).toBe(false);
+    const recentNotes = snapshot.recentNotes ?? [];
+    expect(telemetry({ ...snapshot, recentNotes: [...recentNotes, recentNotes[0]] })).toBe(false);
+    expect(proposal({ ...published, rationale: "x".repeat(513) })).toBe(false);
+    expect(phrase({ ...armed, lengthBeats: 65 })).toBe(false);
+  });
 });

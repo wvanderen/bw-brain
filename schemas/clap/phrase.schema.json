@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/clap/phrase.schema.json",
+  "title": "ClapPhraseMessage",
+  "oneOf": [ { "$ref": "#/$defs/Arm" }, { "$ref": "#/$defs/Disarm" }, { "$ref": "#/$defs/Status" } ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "Note": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ordinal", "startBeats", "durationBeats", "port", "channel", "key", "velocity", "noteId"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 15 }, "startBeats": { "type": "number", "minimum": 0, "maximum": 64 },
+        "durationBeats": { "type": "number", "exclusiveMinimum": 0, "maximum": 64 }, "port": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "channel": { "type": "integer", "minimum": 0, "maximum": 15 }, "key": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "velocity": { "type": "number", "minimum": 0, "maximum": 1 }, "noteId": { "type": "integer", "minimum": -1, "maximum": 2147483647 }
+      }
+    },
+    "Scope": { "type": "object", "additionalProperties": false, "required": ["projectId", "instanceId", "clipSid"], "properties": { "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "clipSid": { "$ref": "#/$defs/Id" } } },
+    "Arm": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "armToken", "proposalId", "revision", "phraseId", "scope", "launch", "lengthBeats", "notes"],
+      "properties": {
+        "type": { "const": "phrase.arm" }, "armToken": { "$ref": "#/$defs/Id" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "phraseId": { "$ref": "#/$defs/Id" }, "scope": { "$ref": "#/$defs/Scope" }, "launch": { "enum": ["next_beat", "next_bar"] },
+        "lengthBeats": { "type": "number", "exclusiveMinimum": 0, "maximum": 64 }, "notes": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/Note" } }
+      }
+    },
+    "Disarm": { "type": "object", "additionalProperties": false, "required": ["type", "phraseId", "reason"], "properties": { "type": { "const": "phrase.disarm" }, "phraseId": { "$ref": "#/$defs/Id" }, "reason": { "enum": ["user", "stop", "disconnect", "rekey", "fork", "output_failure"] } } },
+    "Status": { "type": "object", "additionalProperties": false, "required": ["type", "phraseId", "status"], "properties": { "type": { "const": "phrase.status" }, "phraseId": { "$ref": "#/$defs/Id" }, "status": { "enum": ["armed", "waiting_for_transport", "playing", "complete", "disarmed", "cleanup_pending"] }, "samplesUntilLaunch": { "type": "integer", "minimum": 0, "maximum": 2147483647 } } }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/clap/peer.schema.json",
+  "title": "ClapPeerMessage",
+  "oneOf": [
+    { "$ref": "#/$defs/Hello" },
+    { "$ref": "#/$defs/Accept" },
+    { "$ref": "#/$defs/Rekey" },
+    { "$ref": "#/$defs/Health" },
+    { "$ref": "#/$defs/Stop" }
+  ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "Hello": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "protocol", "instanceId", "capabilities", "limits"],
+      "properties": {
+        "type": { "const": "clap.hello" },
+        "protocol": { "const": "1.0" },
+        "instanceId": { "$ref": "#/$defs/Id" },
+        "capabilities": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[a-z0-9._-]+$" } },
+        "limits": {
+          "type": "object", "additionalProperties": false,
+          "required": ["maxLineBytes", "maxQueueMessages", "maxQueueBytes"],
+          "properties": {
+            "maxLineBytes": { "type": "integer", "minimum": 1, "maximum": 65536 },
+            "maxQueueMessages": { "type": "integer", "minimum": 1, "maximum": 32 },
+            "maxQueueBytes": { "type": "integer", "minimum": 1, "maximum": 262144 }
+          }
+        }
+      }
+    },
+    "Accept": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "connectionId", "instanceId"],
+      "properties": { "type": { "const": "clap.accept" }, "connectionId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" } }
+    },
+    "Rekey": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "oldInstanceId", "newInstanceId", "reason"],
+      "properties": { "type": { "const": "instance.rekey" }, "oldInstanceId": { "$ref": "#/$defs/Id" }, "newInstanceId": { "$ref": "#/$defs/Id" }, "reason": { "const": "simultaneous_claim" } }
+    },
+    "Health": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "sequence", "droppedSnapshots"],
+      "properties": { "type": { "const": "peer.health" }, "sequence": { "type": "integer", "minimum": 0, "maximum": 4294967295 }, "droppedSnapshots": { "type": "integer", "minimum": 0, "maximum": 4294967295 } }
+    },
+    "Stop": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "projectId", "reason"],
+      "properties": { "type": { "const": "stop" }, "projectId": { "$ref": "#/$defs/Id" }, "reason": { "enum": ["user", "disconnect", "shutdown"] } }
+    }
+  }
+}

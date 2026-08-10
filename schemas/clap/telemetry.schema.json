@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bw-brain.local/schemas/clap/telemetry.schema.json",
+  "title": "ClapTelemetryMessage",
+  "oneOf": [ { "$ref": "#/$defs/Snapshot" }, { "$ref": "#/$defs/AnalysisRequest" }, { "$ref": "#/$defs/ConversationChunk" }, { "$ref": "#/$defs/AnalysisComplete" } ],
+  "$defs": {
+    "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "Note": {
+      "type": "object", "additionalProperties": false,
+      "required": ["offset", "port", "channel", "key", "velocity", "kind"],
+      "properties": {
+        "offset": { "type": "integer", "minimum": 0, "maximum": 1048575 }, "port": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "channel": { "type": "integer", "minimum": 0, "maximum": 15 }, "key": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "velocity": { "type": "number", "minimum": 0, "maximum": 1 }, "kind": { "enum": ["on", "off"] }
+      }
+    },
+    "Snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "projectId", "instanceId", "sequence", "aggregate", "recentNotes", "droppedSnapshots"],
+      "properties": {
+        "type": { "const": "telemetry.snapshot" }, "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" },
+        "sequence": { "type": "integer", "minimum": 0, "maximum": 4294967295 }, "droppedSnapshots": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "aggregate": {
+          "type": "object", "additionalProperties": false,
+          "required": ["rms", "peak", "noteDensity", "pitchClass", "velocityBins", "rhythmBins", "transport"],
+          "properties": {
+            "rms": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+            "peak": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "number", "minimum": 0, "maximum": 1 } },
+            "noteDensity": { "type": "number", "minimum": 0, "maximum": 1024 },
+            "pitchClass": { "type": "array", "minItems": 12, "maxItems": 12, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } },
+            "velocityBins": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } },
+            "rhythmBins": { "type": "array", "minItems": 16, "maxItems": 16, "items": { "type": "integer", "minimum": 0, "maximum": 65535 } },
+            "transport": { "type": "object", "additionalProperties": false, "required": ["playing", "tempo", "numerator", "denominator"], "properties": { "playing": { "type": "boolean" }, "tempo": { "type": "number", "minimum": 1, "maximum": 999 }, "numerator": { "type": "integer", "minimum": 1, "maximum": 32 }, "denominator": { "enum": [1, 2, 4, 8, 16, 32] } } }
+          }
+        },
+        "recentNotes": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/Note" } }
+      }
+    },
+    "AnalysisRequest": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "projectId", "instanceId"], "properties": { "type": { "const": "analysis.request" }, "requestId": { "$ref": "#/$defs/Id" }, "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" } } },
+    "ConversationChunk": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "sequence", "text"], "properties": { "type": { "const": "conversation.chunk" }, "requestId": { "$ref": "#/$defs/Id" }, "sequence": { "type": "integer", "minimum": 0, "maximum": 65535 }, "text": { "type": "string", "maxLength": 512 } } },
+    "AnalysisComplete": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "status"], "properties": { "type": { "const": "analysis.complete" }, "requestId": { "$ref": "#/$defs/Id" }, "status": { "enum": ["ok", "aborted", "error"] }, "error": { "type": "string", "maxLength": 256 } } }
+  }
+}

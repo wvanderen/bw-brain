@@ -1,0 +1,91 @@
+{
+  "valid": [
+    {
+      "name": "peer hello maximum capabilities and transport bounds",
+      "schema": "https://bw-brain.local/schemas/clap/peer.schema.json",
+      "value": {
+        "type": "clap.hello", "protocol": "1.0", "instanceId": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+        "capabilities": ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "c13", "c14", "c15"],
+        "limits": { "maxLineBytes": 65536, "maxQueueMessages": 32, "maxQueueBytes": 262144 }
+      }
+    },
+    {
+      "name": "identity focus exact project instance and clip scope",
+      "schema": "https://bw-brain.local/schemas/clap/identity.schema.json",
+      "value": { "type": "focus.set", "scope": { "projectId": "project:1", "instanceId": "instance:1", "clipSid": "clip:1" } }
+    },
+    {
+      "name": "telemetry maximum aggregate arrays and recent note count",
+      "schema": "https://bw-brain.local/schemas/clap/telemetry.schema.json",
+      "value": {
+        "type": "telemetry.snapshot", "projectId": "project:1", "instanceId": "instance:1", "sequence": 4294967295, "droppedSnapshots": 4294967295,
+        "aggregate": {
+          "rms": [1, 1], "peak": [1, 1], "noteDensity": 1024,
+          "pitchClass": [65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535],
+          "velocityBins": [65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535],
+          "rhythmBins": [65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535, 65535],
+          "transport": { "playing": true, "tempo": 999, "numerator": 32, "denominator": 32 }
+        },
+        "recentNotes": [
+          { "offset": 1048575, "port": 255, "channel": 15, "key": 127, "velocity": 1, "kind": "on" },
+          { "offset": 1, "port": 0, "channel": 0, "key": 0, "velocity": 0, "kind": "off" },
+          { "offset": 2, "port": 0, "channel": 0, "key": 1, "velocity": 0.1, "kind": "on" },
+          { "offset": 3, "port": 0, "channel": 0, "key": 2, "velocity": 0.2, "kind": "on" },
+          { "offset": 4, "port": 0, "channel": 0, "key": 3, "velocity": 0.3, "kind": "on" },
+          { "offset": 5, "port": 0, "channel": 0, "key": 4, "velocity": 0.4, "kind": "on" },
+          { "offset": 6, "port": 0, "channel": 0, "key": 5, "velocity": 0.5, "kind": "on" },
+          { "offset": 7, "port": 0, "channel": 0, "key": 6, "velocity": 0.6, "kind": "on" },
+          { "offset": 8, "port": 0, "channel": 0, "key": 7, "velocity": 0.7, "kind": "on" },
+          { "offset": 9, "port": 0, "channel": 0, "key": 8, "velocity": 0.8, "kind": "on" },
+          { "offset": 10, "port": 0, "channel": 0, "key": 9, "velocity": 0.9, "kind": "on" },
+          { "offset": 11, "port": 0, "channel": 0, "key": 10, "velocity": 1, "kind": "on" },
+          { "offset": 12, "port": 0, "channel": 0, "key": 11, "velocity": 1, "kind": "on" },
+          { "offset": 13, "port": 0, "channel": 0, "key": 12, "velocity": 1, "kind": "on" },
+          { "offset": 14, "port": 0, "channel": 0, "key": 13, "velocity": 1, "kind": "on" },
+          { "offset": 15, "port": 0, "channel": 0, "key": 14, "velocity": 1, "kind": "on" }
+        ]
+      }
+    },
+    {
+      "name": "proposal maximum revision and exact scoped phrase material",
+      "schema": "https://bw-brain.local/schemas/clap/proposal.schema.json",
+      "value": { "type": "proposal.publish", "proposalId": "proposal:1", "revision": 4294967295, "kind": "live_midi", "scope": { "projectId": "project:1", "instanceId": "instance:1", "clipSid": "clip:1" }, "rationale": "bounded exact phrase", "assumptions": ["a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8"], "material": { "phraseId": "phrase:1" } }
+    },
+    {
+      "name": "phrase maximum note count duration and one-shot exact scope",
+      "schema": "https://bw-brain.local/schemas/clap/phrase.schema.json",
+      "value": {
+        "type": "phrase.arm", "armToken": "token:1", "proposalId": "proposal:1", "revision": 4294967295, "phraseId": "phrase:1",
+        "scope": { "projectId": "project:1", "instanceId": "instance:1", "clipSid": "clip:1" }, "launch": "next_bar", "lengthBeats": 64,
+        "notes": [
+          { "ordinal": 0, "startBeats": 0, "durationBeats": 64, "port": 255, "channel": 15, "key": 127, "velocity": 1, "noteId": 2147483647 },
+          { "ordinal": 1, "startBeats": 1, "durationBeats": 1, "port": 0, "channel": 0, "key": 1, "velocity": 0.1, "noteId": 1 },
+          { "ordinal": 2, "startBeats": 2, "durationBeats": 1, "port": 0, "channel": 0, "key": 2, "velocity": 0.2, "noteId": 2 },
+          { "ordinal": 3, "startBeats": 3, "durationBeats": 1, "port": 0, "channel": 0, "key": 3, "velocity": 0.3, "noteId": 3 },
+          { "ordinal": 4, "startBeats": 4, "durationBeats": 1, "port": 0, "channel": 0, "key": 4, "velocity": 0.4, "noteId": 4 },
+          { "ordinal": 5, "startBeats": 5, "durationBeats": 1, "port": 0, "channel": 0, "key": 5, "velocity": 0.5, "noteId": 5 },
+          { "ordinal": 6, "startBeats": 6, "durationBeats": 1, "port": 0, "channel": 0, "key": 6, "velocity": 0.6, "noteId": 6 },
+          { "ordinal": 7, "startBeats": 7, "durationBeats": 1, "port": 0, "channel": 0, "key": 7, "velocity": 0.7, "noteId": 7 },
+          { "ordinal": 8, "startBeats": 8, "durationBeats": 1, "port": 0, "channel": 0, "key": 8, "velocity": 0.8, "noteId": 8 },
+          { "ordinal": 9, "startBeats": 9, "durationBeats": 1, "port": 0, "channel": 0, "key": 9, "velocity": 0.9, "noteId": 9 },
+          { "ordinal": 10, "startBeats": 10, "durationBeats": 1, "port": 0, "channel": 0, "key": 10, "velocity": 1, "noteId": 10 },
+          { "ordinal": 11, "startBeats": 11, "durationBeats": 1, "port": 0, "channel": 0, "key": 11, "velocity": 1, "noteId": 11 },
+          { "ordinal": 12, "startBeats": 12, "durationBeats": 1, "port": 0, "channel": 0, "key": 12, "velocity": 1, "noteId": 12 },
+          { "ordinal": 13, "startBeats": 13, "durationBeats": 1, "port": 0, "channel": 0, "key": 13, "velocity": 1, "noteId": 13 },
+          { "ordinal": 14, "startBeats": 14, "durationBeats": 1, "port": 0, "channel": 0, "key": 14, "velocity": 1, "noteId": 14 },
+          { "ordinal": 15, "startBeats": 15, "durationBeats": 1, "port": 0, "channel": 0, "key": 15, "velocity": 1, "noteId": 15 }
+        ]
+      }
+    }
+  ],
+  "invalid": [
+    { "name": "unknown peer discriminant", "schema": "https://bw-brain.local/schemas/clap/peer.schema.json", "value": { "type": "clap.unknown" } },
+    { "name": "peer queue count limit plus one", "schema": "https://bw-brain.local/schemas/clap/peer.schema.json", "value": { "type": "clap.hello", "protocol": "1.0", "instanceId": "i", "capabilities": [], "limits": { "maxLineBytes": 65536, "maxQueueMessages": 33, "maxQueueBytes": 262144 } } },
+    { "name": "identity unknown authority field", "schema": "https://bw-brain.local/schemas/clap/identity.schema.json", "value": { "type": "focus.set", "scope": { "projectId": "p", "instanceId": "i" }, "trackNameAuthority": true } },
+    { "name": "telemetry raw PCM disclosure", "schema": "https://bw-brain.local/schemas/clap/telemetry.schema.json", "value": { "type": "telemetry.snapshot", "projectId": "p", "instanceId": "i", "sequence": 1, "droppedSnapshots": 0, "aggregate": { "rms": [0], "peak": [0], "noteDensity": 0, "pitchClass": [0,0,0,0,0,0,0,0,0,0,0,0], "velocityBins": [0,0,0,0,0,0,0,0], "rhythmBins": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], "transport": { "playing": false, "tempo": 120, "numerator": 4, "denominator": 4 }, "pcm": [0.1] }, "recentNotes": [] } },
+    { "name": "proposal assumptions count limit plus one", "schema": "https://bw-brain.local/schemas/clap/proposal.schema.json", "value": { "type": "proposal.publish", "proposalId": "p", "revision": 1, "kind": "existing_edit", "scope": { "projectId": "p", "instanceId": "i" }, "rationale": "r", "assumptions": ["1","2","3","4","5","6","7","8","9"], "material": { "patchId": "patch:1" } } },
+    { "name": "phrase note count limit plus one", "schema": "https://bw-brain.local/schemas/clap/phrase.schema.json", "value": { "type": "phrase.arm", "armToken": "t", "proposalId": "p", "revision": 1, "phraseId": "f", "scope": { "projectId": "p", "instanceId": "i", "clipSid": "c" }, "launch": "next_beat", "lengthBeats": 1, "notes": [
+      {"ordinal":0,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":0},{"ordinal":1,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":1},{"ordinal":2,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":2},{"ordinal":3,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":3},{"ordinal":4,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":4},{"ordinal":5,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":5},{"ordinal":6,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":6},{"ordinal":7,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":7},{"ordinal":8,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":8},{"ordinal":9,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":9},{"ordinal":10,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":10},{"ordinal":11,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":11},{"ordinal":12,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":12},{"ordinal":13,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":13},{"ordinal":14,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":14},{"ordinal":15,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":15},{"ordinal":15,"startBeats":0,"durationBeats":1,"port":0,"channel":0,"key":60,"velocity":1,"noteId":16}
+    ] } }
+  ]
+}
