@@ -81,3 +81,25 @@ Registry and tarball metadata agree on `clean`, `build`, `build:binary`, `copy-a
 ### Verdict
 
 **SUS pending human approval.** The exact candidate is now inspectable and has registry signatures plus trusted-publisher provenance, but this automated audit does not authorize installation. `daemon/package.json` and its lockfile remain unchanged; Plan 02 must retain its blocking package approval gate.
+
+## Q1–Q4 gate outcomes
+
+### Q1 — Track context
+
+- **Observed:** Pending. The capability plug-in queried `clap.track-info` when offered, but the current throwaway probe did not persist or display the live observation. Audio/MIDI transparency does not prove whether Bitwig supplied track-info.
+- **Selected:** Pending one instrumented live observation. If present, track-info is hint-only; if absent, linking is controller-confirmation-only.
+
+### Q2 — Project identity and Save As
+
+- **Observed 2026-08-10:** The installed Controller API 21 exposes `Project.isModified()` but no definitive project/document name, filesystem path, stable document ID, or Save As event. The read-only `get.clap_capabilities` response therefore returns explicit unavailable fields and `saveAsObservable: false`; no display-name heuristic is used.
+- **Selected:** Use explicit `session.fork` confirmation for Save As/project copies. Do not infer a fork from project, track, device, or window names.
+
+### Q3 — Compact status and actions
+
+- **Observed 2026-08-10:** Connection Status appears in Bitwig's device panel but is only a capability placeholder. The non-automatable Analyze parameter is absent from that panel. The corrected embedded Cocoa editor survives resize/reopen, and Generated Mix accepts fractional values.
+- **Selected:** Put truthful read-only status and momentary non-recording actions in the hosted plug-in UI. Expose only musical controls such as Generated Mix as conventional automatable parameters.
+
+### Q4 — Pi SDK package
+
+- **Observed:** The exact `@earendil-works/pi-coding-agent@0.84.0` registry/tarball/publisher/dependency/script evidence is recorded above; no package was installed and no lifecycle script executed.
+- **Selected:** Pending explicit human approval or rejection of this exact version and layout.
