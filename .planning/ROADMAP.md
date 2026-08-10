@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Read-Only Context Foundation (M1)** - Bridge mirror + daemon normalization + read CLI + memory bootstrap + Pi /analyze — the assistant reliably describes selected context (completed 2026-06-27)
 - [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply (all 5 plans executed; BLOCKING end-of-phase UAT M1–M5 pending human — status: verifying)
 - [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
-- [x] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Isolated toolchain and approved host/controller/package evidence resolving Q1–Q4 (completed 2026-08-10)
+- [ ] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Gap closure in progress for direct live MIDI sample-offset evidence and final gate traceability
 - [ ] **Phase 04.2: Hybrid CLAP Companion Product** - Blocked/unplanned until Phase 04.1 completes; owns D-01–D-16
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
 
@@ -190,7 +190,7 @@ Plans:
   3. A read-only Controller API probe records definitive project/Save As and selected-device metadata availability without changing controller TCP or mutation authority.
   4. The exact Pi package is inspected without installation, human-approved or rejected, and Q1–Q4 are recorded under `## Open Questions (RESOLVED)` with dated evidence.
 
-**Plans:** 3/3 plans complete
+**Plans:** 3/4 plans complete
 
 Plans:
 **Wave 1**
@@ -201,6 +201,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 04.1-03-PLAN.md — Read-only Controller API proof, live Bitwig/package evidence, and Q1–Q4 resolution
+
+**Wave 3** *(verification gap closure; blocked on Wave 2 completion)*
+
+- [ ] 04.1-04-PLAN.md — Real-time-safe live MIDI offset measurement and final gate/roadmap reconciliation
 
 ### Phase 04.2: Hybrid CLAP Companion Product (INSERTED)
 
