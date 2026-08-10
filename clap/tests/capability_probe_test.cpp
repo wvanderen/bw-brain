@@ -8,6 +8,8 @@
 
 using bwbrain::capability::CapabilityProbeProcessor;
 using bwbrain::capability::MidiObservation;
+using bwbrain::capability::MidiOffsetMeasurement;
+using bwbrain::capability::MidiOffsetSnapshot;
 using bwbrain::capability::CapabilityProbeEditor;
 using bwbrain::capability::EditorEvent;
 using bwbrain::capability::ParameterCategory;
@@ -32,6 +34,29 @@ int main() {
   CapabilityProbeProcessor processor;
   const std::vector<MidiObservation> midi{{0, 0x90, 60, 100}, {31, 0x80, 60, 0}};
   assert(processor.observeMidi(midi) == midi);
+
+  MidiOffsetMeasurement offsetMeasurement;
+  MidiOffsetSnapshot offsetSnapshot{};
+  offsetMeasurement.publish(31, true);
+  assert(offsetMeasurement.read(offsetSnapshot));
+  assert(offsetSnapshot.receivedOffset == 31);
+  assert(offsetSnapshot.forwardedOffset == 31);
+  assert(offsetSnapshot.pushSucceeded);
+  assert(offsetSnapshot.observationCount == 1);
+
+  offsetMeasurement.publish(0, true);
+  assert(offsetMeasurement.read(offsetSnapshot));
+  assert(offsetSnapshot.receivedOffset == 0);
+  assert(offsetSnapshot.forwardedOffset == 0);
+  assert(offsetSnapshot.pushSucceeded);
+  assert(offsetSnapshot.observationCount == 2);
+
+  offsetMeasurement.publish(47, false);
+  assert(offsetMeasurement.read(offsetSnapshot));
+  assert(offsetSnapshot.receivedOffset == 47);
+  assert(offsetSnapshot.forwardedOffset == 0);
+  assert(!offsetSnapshot.pushSucceeded);
+  assert(offsetSnapshot.observationCount == 3);
 
   processor.setInstanceIdentity("capability-copy-seed");
   const auto state = processor.saveState();
