@@ -22,14 +22,20 @@ The preflight records Apple clang, CMake, and Cargo versions. The validator is b
 
 | Surface | Automated observation | Live status |
 |---|---|---|
-| Audio | Mono/stereo helper paths preserve float and double samples bit-for-bit; the bundle advertises stereo 32/64-bit in-place and out-of-place pass-through | pending live |
-| MIDI | Note and MIDI events are forwarded with their original CLAP event header, including the sample offset | pending live |
-| State | Deterministic state round-trips; loading copied state demonstrates that persisted identity alone cannot distinguish reopen from duplication | pending live |
+| Audio | Mono/stereo helper paths preserve float and double samples bit-for-bit; the bundle advertises stereo 32/64-bit in-place and out-of-place pass-through | **Observed 2026-08-10:** transparent in Bitwig |
+| MIDI | Note and MIDI events are forwarded with their original CLAP event header, including the sample offset | **Observed 2026-08-10:** transparent in Bitwig; sample-offset fidelity still needs a dedicated live measurement |
+| State | Deterministic state round-trips; loading copied state demonstrates that persisted identity alone cannot distinguish reopen from duplication | **Observed 2026-08-10:** parameter state persists |
 | Track info | Host track-info is queried when offered; absence is recorded explicitly rather than inferred from a track name | pending live |
-| Editor lifecycle | The probe records create → show → resize → hide → destroy and advertises a resizable embedded Cocoa surface | pending live |
-| Parameter categories | Three compact candidates are distinguishable by flags: read-only connection status, non-automatable momentary Analyze action, and automatable Generated Mix | pending live |
+| Editor lifecycle | The probe records create → show → resize → hide → destroy and advertises a resizable embedded Cocoa surface | **Observed 2026-08-10:** Bitwig opens the editor window, but it is blank because the probe does not create/attach a native Cocoa view; visible hosted rendering is not yet proven |
+| Parameter categories | Three compact candidates are distinguishable by flags: read-only connection status, non-automatable momentary Analyze action, and automatable Generated Mix | **Observed 2026-08-10:** device panel displays Connection Status as `0.000` and Generated Mix; Analyze is absent. Generated Mix is exposed as stepped and therefore only selects `0` or `1` |
 
 The capability-only CTest and pinned `clap-validator` both pass from `clap/build-capability`. The production cache `clap/build` remains absent. The editor is lifecycle instrumentation, not product UI; parameter names and flags are candidates for host evaluation, not a Q3 fallback decision.
+
+### Live observation — 2026-08-10
+
+The capability plug-in loaded successfully after reinstalling the bridge extension and restarting Bitwig. The daemon and bridge were connected, but this throwaway probe contains no daemon client: its `Connection Status` value is initialized to zero and is not a connectivity measurement. The empty editor likewise reflects a probe limitation: `gui.set_parent` accepts Bitwig's Cocoa parent but does not create or attach an `NSView`.
+
+These results provisionally favor a Q3 fallback in which only genuinely automatable musical controls use ordinary CLAP parameters. Status and actions require either host-supported non-parameter presentation proven by a corrected visual probe, or explicit UI-only controls; a stepped flag is inappropriate for a continuous Generated Mix control.
 
 ## GATE-03 automated Controller API evidence
 
