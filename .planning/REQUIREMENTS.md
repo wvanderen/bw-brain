@@ -19,7 +19,7 @@
 - [ ] **D-05**: Permit continuous lightweight local feature extraction while initiating reasoning only on explicit user request.
 - [x] **D-06**: Allow bounded aggregates and note events to leave the plug-in; never transmit or persist raw audio.
 - [x] **D-07**: Play only bounded live MIDI that the user has inspected and explicitly armed.
-- [ ] **D-08**: Preserve original audio/MIDI on disconnect and safely stop generated material with required note-offs.
+- [x] **D-08**: Preserve original audio/MIDI on disconnect and safely stop generated material with required note-offs.
 - [ ] **D-09**: Maintain one daemon-owned Pi session per Bitwig project with multiple track-scoped instance contexts.
 - [x] **D-10**: Use persistent instance identity plus controller/daemon correlation and one-time confirmation; names are never authoritative.
 - [ ] **D-11**: Target the focused instance explicitly and display its project, track, and instance scope.

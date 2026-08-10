@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
 status: executing
-stopped_at: Completed 04.2-01-PLAN.md
-last_updated: "2026-08-10T23:41:23.209Z"
+stopped_at: Completed 04.2-02-PLAN.md
+last_updated: "2026-08-10T23:57:52.407Z"
 last_activity: 2026-08-10
-last_activity_desc: Plan 04.2-01 product build and bounded contract foundation complete
+last_activity_desc: Plan 04.2-02 isolated targeted CLAP peer routing complete
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 44
-  completed_plans: 33
-  percent: 75
+  completed_plans: 34
+  percent: 77
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (1/11 plans complete)
+**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (2/11 plans complete)
 
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 1 of 11
-Status: In Progress
-Last activity: 2026-08-10 — Plan 04.2-01 product build and bounded contract foundation complete
+Plan: 2 of 11
+Status: Ready to execute
+Last activity: 2026-08-10 — Plan 04.2-02 isolated targeted CLAP peer routing complete
 
-Progress: [████████░░] 33/44 plans complete (Phase 04.2: 1/11)
+Progress: [████████░░] 34/44 plans complete (Phase 04.2: 2/11)
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Progress: [████████░░] 33/44 plans complete (Phase 04.2: 1/1
 | Phase 04.1 P03 | 4d | 2 tasks | 10 files |
 | Phase 04.1 P04 | 20 min + human verification | 2 tasks | 8 files |
 | Phase 04.2 P01 | 15min | 2 tasks | 18 files |
+| Phase 04.2 P02 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,9 @@ Recent decisions affecting current work:
 - [Phase 04.2 P01]: Product uses clap/build while capability evidence remains isolated in clap/build-capability. — Prevents production and evidence caches or targets from contaminating each other.
 - [Phase 04.2 P01]: JUCE release packaging stays gated on explicit AGPLv3 or commercial license selection. — The product build does not silently choose release licensing terms.
 - [Phase 04.2 P01]: Five bounded CLAP schemas generate one deterministic daemon/src/gen/clap.ts surface. — Later native and daemon slices consume one closed contract foundation.
+- [Phase 04.2]: CLAP peers use a dedicated literal-loopback endpoint with targeted connectionId sends only; controller TcpServerTransport remains unchanged.
+- [Phase 04.2]: Only schema-valid handshakes enter the accepted registry; peer-advertised capacities may narrow but never widen daemon bounds.
+- [Phase 04.2]: Queue pressure on commands closes/refuses the peer rather than silently dropping identity, approval, Stop, arm, or phrase traffic.
 
 ### Pending Todos
 
@@ -172,6 +176,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-10T23:41:02.190Z
-Stopped at: Completed 04.2-01-PLAN.md
+Last session: 2026-08-10T23:57:52.401Z
+Stopped at: Completed 04.2-02-PLAN.md
 Resume file: None
