@@ -2,10 +2,29 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface BWCapabilityProbeView : NSView
+@interface BWCapabilityProbeView : NSView {
+  const bwbrain::capability::MidiOffsetMeasurement* measurement_;
+  NSTimer* refreshTimer_;
+}
+- (instancetype)initWithFrame:(NSRect)frame
+                  measurement:(const bwbrain::capability::MidiOffsetMeasurement*)measurement;
+- (void)stopRefreshing;
 @end
 
 @implementation BWCapabilityProbeView
+- (instancetype)initWithFrame:(NSRect)frame
+                  measurement:(const bwbrain::capability::MidiOffsetMeasurement*)measurement {
+  self = [super initWithFrame:frame];
+  if (self) {
+    measurement_ = measurement;
+    refreshTimer_ = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self
+        selector:@selector(refreshMeasurement:) userInfo:nil repeats:YES];
+  }
+  return self;
+}
+- (void)refreshMeasurement:(NSTimer*)timer { (void)timer; [self setNeedsDisplay:YES]; }
+- (void)stopRefreshing { [refreshTimer_ invalidate]; refreshTimer_ = nil; }
+- (void)dealloc { [self stopRefreshing]; [super dealloc]; }
 - (BOOL)isFlipped { return YES; }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -26,9 +45,23 @@
   [@"Embedded Cocoa editor attached successfully."
       drawAtPoint:NSMakePoint(24.0, 64.0)
    withAttributes:bodyAttributes];
-  [@"Use the device panel to evaluate CLAP parameters."
-      drawAtPoint:NSMakePoint(24.0, 88.0)
-   withAttributes:bodyAttributes];
+  bwbrain::capability::MidiOffsetSnapshot snapshot{};
+  NSString* measurementText = @"MIDI offsets: waiting for MIDI";
+  NSString* resultText = @"Result: waiting";
+  if (measurement_ && measurement_->read(snapshot) && snapshot.observationCount > 0) {
+    if (snapshot.pushSucceeded) {
+      measurementText = [NSString stringWithFormat:@"Received: %u   Forwarded: %u   Count: %u",
+          snapshot.receivedOffset, snapshot.forwardedOffset, snapshot.observationCount];
+      resultText = snapshot.receivedOffset == snapshot.forwardedOffset
+          ? @"Result: SAME (push succeeded)" : @"Result: DIFFERENT (push succeeded)";
+    } else {
+      measurementText = [NSString stringWithFormat:@"Received: %u   Forwarded: n/a   Count: %u",
+          snapshot.receivedOffset, snapshot.observationCount];
+      resultText = @"Result: PUSH FAILED";
+    }
+  }
+  [measurementText drawAtPoint:NSMakePoint(24.0, 88.0) withAttributes:bodyAttributes];
+  [resultText drawAtPoint:NSMakePoint(24.0, 116.0) withAttributes:bodyAttributes];
 }
 @end
 
@@ -48,7 +81,7 @@ bool CapabilityProbeEditor::setParent(void* parent) {
   NSView* parentView = static_cast<NSView*>(parent);
   auto* child = [[BWCapabilityProbeView alloc]
       initWithFrame:NSMakeRect(0.0, 0.0, static_cast<CGFloat>(width_),
-                              static_cast<CGFloat>(height_))];
+                              static_cast<CGFloat>(height_)) measurement:measurement_];
   if (!child) return false;
   [child setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
   [child setHidden:!visible_];
@@ -87,7 +120,8 @@ bool CapabilityProbeEditor::hide() {
 void CapabilityProbeEditor::destroy() {
   if (!created_) return;
   if (nativeView_) {
-    NSView* child = static_cast<NSView*>(nativeView_);
+    BWCapabilityProbeView* child = static_cast<BWCapabilityProbeView*>(nativeView_);
+    [child stopRefreshing];
     [child removeFromSuperview];
     [child release];
     nativeView_ = nullptr;

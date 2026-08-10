@@ -23,6 +23,7 @@
 namespace {
 using bwbrain::capability::CapabilityProbeProcessor;
 using bwbrain::capability::CapabilityProbeEditor;
+using bwbrain::capability::MidiOffsetMeasurement;
 using bwbrain::capability::TrackInfoInput;
 
 constexpr char kPluginId[] = "com.bwbrain.capability-probe";
@@ -38,7 +39,8 @@ struct ProbePlugin {
   const clap_host_t* host{};
   const clap_host_params_t* hostParams{};
   CapabilityProbeProcessor processor;
-  CapabilityProbeEditor editor;
+  MidiOffsetMeasurement midiOffsetMeasurement;
+  CapabilityProbeEditor editor{&midiOffsetMeasurement};
   std::array<std::atomic<double>, 3> parameterValues{{0.0, 0.0, 0.5}};
 };
 
@@ -130,8 +132,10 @@ clap_process_status pluginProcess(const clap_plugin_t* plugin, const clap_proces
                                 event->type == CLAP_EVENT_NOTE_EXPRESSION ||
                                 event->type == CLAP_EVENT_MIDI || event->type == CLAP_EVENT_MIDI_SYSEX ||
                                 event->type == CLAP_EVENT_MIDI2);
-      if (isNoteEvent)
-        process->out_events->try_push(process->out_events, event);
+      if (isNoteEvent) {
+        const bool pushed = process->out_events->try_push(process->out_events, event);
+        self(plugin)->midiOffsetMeasurement.publish(event->time, pushed);
+      }
     }
   }
   return CLAP_PROCESS_CONTINUE;
