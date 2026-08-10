@@ -51,6 +51,7 @@ import { startQueryServer } from "../query/query-server.js";
 import { DEFAULT_SOCKET } from "../cli/query-client.js";
 import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory } from "../patch/patch-history.js";
+import { PeerServer } from "../peers/peer-server.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
@@ -102,6 +103,10 @@ export interface BootOptions {
   socketPath?: string;
   /** TCP port for the bridge listener (default {@link DEFAULT_TCP_PORT}). */
   tcpPort?: number;
+  /** Dedicated CLAP peer port (default 7879, never controller TCP). */
+  peerPort?: number;
+  /** Dedicated CLAP bind host; PeerServer refuses anything but 127.0.0.1. */
+  peerHost?: string;
   /** State-cache path (default {@link DEFAULT_STATE_CACHE_PATH}). */
   stateCachePath?: string;
   /** Intent path (default {@link DEFAULT_INTENT_PATH}). */
@@ -131,6 +136,7 @@ export interface BootHandle {
 export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   const socketPath = opts.socketPath ?? DEFAULT_SOCKET;
   const tcpPort = opts.tcpPort ?? DEFAULT_TCP_PORT;
+  const peerPort = opts.peerPort ?? PeerServer.DEFAULT_PORT;
   const stateCachePath = opts.stateCachePath ?? DEFAULT_STATE_CACHE_PATH;
   const intentPath = opts.intentPath ?? DEFAULT_INTENT_PATH;
   const arrangementSnapshotPath = opts.arrangementSnapshotPath ?? DEFAULT_ARRANGEMENT_SNAPSHOT_PATH;
@@ -168,6 +174,12 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   const tcp = new TcpServerTransport({ port: tcpPort });
   const uds = new UnixDomainSocketServerTransport({ socketPath });
   await uds.ready; // chmod 0o600 runs here (Pitfall 5 — asserted in smoke test).
+  // Phase 04.2: CLAP peers have a dedicated connection-aware endpoint.
+  // It shares no transport or dispatcher with controller TCP, and at this
+  // foundation stage accepts validated identity handshakes without starting
+  // analysis, Pi, proposal, approval, or mutation work.
+  const peers = new PeerServer({ port: peerPort, host: opts.peerHost });
+  await peers.ready;
 
   // `let` because step e swaps the correlator on bridge disconnect. The
   // query-server's pull callbacks + the dispatcher read this slot lazily so
@@ -393,6 +405,13 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       console.error("[boot] final state-cache save failed:", (e as Error).message);
     }
     try {
+      // Reject/close CLAP peers before the established controller/UDS close
+      // sequence. No peer command can race the existing mutation authority.
+      await peers.close();
+    } catch (e) {
+      console.error("[boot] peers.close failed:", (e as Error).message);
+    }
+    try {
       tcp.close();
     } catch (e) {
       console.error("[boot] tcp.close failed:", (e as Error).message);
@@ -411,7 +430,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     void shutdown().then(() => process.exit(0));
   });
 
-  console.error(`[boot] bw-brain daemon up: uds=${socketPath} tcp=127.0.0.1:${tcpPort}`);
+  console.error(`[boot] bw-brain daemon up: uds=${socketPath} tcp=127.0.0.1:${tcpPort} peers=127.0.0.1:${peers.port}`);
 
   return { shutdown };
 }
