@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 04.1
 current_phase_name: CLAP Capability & Host Evidence Gate
 status: in_progress
-stopped_at: Completed 04.1-02-PLAN.md
-last_updated: "2026-08-06T22:27:26.312Z"
-last_activity: 2026-08-06
-last_activity_desc: Plan 04.1-02 capability probe complete
+stopped_at: Completed 04.1-03-PLAN.md
+last_updated: "2026-08-10T22:23:48.328Z"
+last_activity: 2026-08-10
+last_activity_desc: Plan 04.1-03 evidence gate complete; Phase 04.2 planning unblocked
 progress:
   total_phases: 8
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 32
-  completed_plans: 30
-  percent: 94
+  completed_plans: 31
+  percent: 75
 ---
 
 # Project State
@@ -24,22 +24,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.1 — CLAP capability and host evidence gate. Phase 04.2 owns the companion product and is blocked until Q1–Q4 resolve.
+**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product planning, now unblocked by resolved Q1–Q4 evidence.
 
 ## Current Position
 
 Phase: 04.1 — CLAP Capability & Host Evidence Gate
-Plan: 2 of 3
-Status: In progress; Plan 03 live Bitwig evidence remains
-Last activity: 2026-08-06 — Plan 04.1-02 capability probe complete
+Plan: 3 of 3
+Status: Complete; Phase 04.2 planning is the next action
+Last activity: 2026-08-10 — Plan 04.1-03 evidence gate complete
 
-Progress: [███████████████████░] 30/32 plans complete (Phase 04.1: 2/3)
+Progress: [███████████████████░] 31/32 plans complete (Phase 04.1: 3/3)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 30
+- Total plans completed: 31
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -52,7 +52,7 @@ Progress: [███████████████████░] 30/32 p
 | 3. Reversible MIDI Patching (M2) | 5/5 | — | — |
 | 03.1 Gap Closure | 6/6 | — | — |
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
-| 04.1 CLAP Capability & Host Evidence Gate | 2/3 | 24 min | 12 min |
+| 04.1 CLAP Capability & Host Evidence Gate | 3/3 | 4 days elapsed across gated sessions | — |
 | 04.2 Hybrid CLAP Companion Product | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
@@ -78,6 +78,7 @@ Progress: [███████████████████░] 30/32 p
 | Phase 03.1 P06 | 4 min | 2 tasks | 3 files |
 | Phase 04.1 P01 | 6min | 2 tasks | 6 files |
 | Phase 04.1 P02 | 18min | 2 tasks | 8 files |
+| Phase 04.1 P03 | 4d | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,10 @@ Recent decisions affecting current work:
 - [Phase 04.1]: Bare throwaway CLAP capability probe; JUCE and adapter product architecture remain deferred. — Preserves the evidence/product boundary.
 - [Phase 04.1]: Copied persisted identity demonstrates duplication ambiguity, not production identity. — Live lease and rekey design remains Phase 04.2 work.
 - [Phase 04.1]: Editor and parameter evidence remains pending live Bitwig proof; no Q3 fallback selected. — Plan 03 owns host evidence and branch selection.
+- [Phase 04.1]: Q1 track-info is hint-only; controller confirmation remains authoritative because Bitwig supplied an empty name. — Live Bitwig track-info evidence returned channels=2 with an empty name.
+- [Phase 04.1]: Q2 uses explicit session.fork confirmation with no display-name heuristic. — Controller API 21 exposes no definitive document identity or Save As event.
+- [Phase 04.1]: Q3 keeps status/actions in hosted UI and automation only on musical controls. — Bitwig omitted non-automatable Analyze from the device panel while Generated Mix accepted fractional values.
+- [Phase 04.1]: Q4 approves exactly @earendil-works/pi-coding-agent@0.84.0 under the recorded audit scope without gate-time installation. — The user explicitly approved the audited package version and layout.
 
 ### Pending Todos
 
@@ -160,6 +165,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-06T22:27:06.720Z
-Stopped at: Completed 04.1-02-PLAN.md
+Last session: 2026-08-10T22:23:48.321Z
+Stopped at: Completed 04.1-03-PLAN.md
 Resume file: None
