@@ -80,14 +80,14 @@ Registry and tarball metadata agree on `clean`, `build`, `build:binary`, `copy-a
 
 ### Verdict
 
-**SUS pending human approval.** The exact candidate is now inspectable and has registry signatures plus trusted-publisher provenance, but this automated audit does not authorize installation. `daemon/package.json` and its lockfile remain unchanged; Plan 02 must retain its blocking package approval gate.
+**Approved by the user on 2026-08-10 for Phase 04.2 planning:** exactly `@earendil-works/pi-coding-agent@0.84.0` under the registry/tarball/publisher/dependency/shrinkwrap/lifecycle-script audit recorded above. This gate approval does not install the package. `daemon/package.json` and its lockfile remain unchanged; installation and session create/reopen/fork/dispose integration belong to Phase 04.2.
 
 ## Q1–Q4 gate outcomes
 
 ### Q1 — Track context
 
-- **Observed:** Pending. Audio/MIDI transparency does not prove whether Bitwig supplied track-info. The corrected probe now emits one read-only Bitwig host-log line beginning `[bw-brain capability] track-info` and records either present values or the exact absence reason.
-- **Selected:** Pending one reload/log observation. If present, track-info is hint-only; if absent, linking is controller-confirmation-only.
+- **Observed 2026-08-10:** After reload, Bitwig logged `[bw-brain capability] track-info present name="" channels=2` at 17:20:25.384 and again at 17:20:28.859. Track-info is available, but the empty name demonstrates incomplete metadata.
+- **Selected:** Treat CLAP track-info as hint-only. Controller confirmation remains authoritative for instance/track linking, especially when names are absent or incomplete.
 
 ### Q2 — Project identity and Save As
 
@@ -102,4 +102,4 @@ Registry and tarball metadata agree on `clean`, `build`, `build:binary`, `copy-a
 ### Q4 — Pi SDK package
 
 - **Observed:** The exact `@earendil-works/pi-coding-agent@0.84.0` registry/tarball/publisher/dependency/script evidence is recorded above; no package was installed and no lifecycle script executed.
-- **Selected:** Pending explicit human approval or rejection of this exact version and layout.
+- **Selected 2026-08-10:** User approved exactly `@earendil-works/pi-coding-agent@0.84.0` under the recorded audit scope. Approval is a Phase 04.2 planning input, not authorization to install during this gate.
