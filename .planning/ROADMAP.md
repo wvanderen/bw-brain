@@ -211,10 +211,47 @@ Plans:
 **Goal:** Deliver the thin CLAP companion specified by locked decisions D-01–D-16: an in-Bitwig focused workspace, aggregate-only real-time context, exact approved live-MIDI playback, confirmed multi-instance/project sessions, and controller/journal-preserving approval flows.
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16
 **Depends on:** Phase 04.1
-**Status:** Unblocked / unplanned
-**Plans:** TBD — run `$gsd-plan-phase 04.2` after Phase 04.1 completion
+**Status:** Planned — ready for execution
+**Plans:** 11 plans in 9 waves
 
-Planning input: `.planning/phases/04.2-hybrid-clap-companion-product/04.2-CONTEXT.md` and `DOWNSTREAM-PLAN-NOTES.md`. No executable Phase 04.2 plans exist yet.
+Plans:
+**Wave 1**
+
+- [ ] 04.2-01-PLAN.md — Separate product build and frozen bounded CLAP contracts (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04.2-02-PLAN.md — Dedicated connection-aware targeted peer endpoint (Wave 2)
+- [ ] 04.2-03-PLAN.md — Persistent native instance identity and duplicate rekey (Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04.2-04-PLAN.md — Nonce-bound authoritative controller correlation with apply.patch regression (Wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04.2-05-PLAN.md — Durable project/link/focus/fork transaction, lifecycle event, and early shared EditService (Wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04.2-06-PLAN.md — Exact Pi 0.84.0 real adapter, project session lifecycle, and post-fork rebind/rollback (Wave 5)
+- [ ] 04.2-07-PLAN.md — Aggregate-only RT telemetry and native peer worker (Wave 5)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04.2-08-PLAN.md — Proposal revisions, atomic approval, and shared edit trust spine (Wave 6)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 04.2-09-PLAN.md — Exact phrase scheduler, ordered merge, and owned-note cleanup (Wave 7)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 04.2-10-PLAN.md — Device-panel/editor UI, explicit actions, and global Stop (Wave 8)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 04.2-11-PLAN.md — Cross-platform CI/validator and blocking macOS live UAT (Wave 9)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
