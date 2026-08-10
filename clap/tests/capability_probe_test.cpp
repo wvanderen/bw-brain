@@ -64,8 +64,11 @@ int main() {
   assert(parameters.size() == 3);
   assert(parameters[0].category == ParameterCategory::ReadOnlyStatus);
   assert(parameters[0].readOnly && !parameters[0].automatable);
+  assert(parameters[0].stepped);
   assert(parameters[1].category == ParameterCategory::MomentaryAction);
   assert(!parameters[1].readOnly && !parameters[1].automatable);
+  assert(parameters[1].stepped);
   assert(parameters[2].category == ParameterCategory::AutomatableMusical);
   assert(!parameters[2].readOnly && parameters[2].automatable);
+  assert(!parameters[2].stepped);
 }

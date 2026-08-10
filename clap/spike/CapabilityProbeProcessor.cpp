@@ -7,9 +7,9 @@ namespace bwbrain::capability {
 
 const std::vector<ParameterCandidate>& CapabilityProbeProcessor::parameterCandidates() {
   static const std::vector<ParameterCandidate> candidates{
-      {100, "Connection Status", ParameterCategory::ReadOnlyStatus, true, false},
-      {101, "Analyze", ParameterCategory::MomentaryAction, false, false},
-      {102, "Generated Mix", ParameterCategory::AutomatableMusical, false, true},
+      {100, "Connection Status", ParameterCategory::ReadOnlyStatus, true, false, true},
+      {101, "Analyze", ParameterCategory::MomentaryAction, false, false, true},
+      {102, "Generated Mix", ParameterCategory::AutomatableMusical, false, true, false},
   };
   return candidates;
 }

@@ -15,6 +15,7 @@ struct ParameterCandidate {
   ParameterCategory category{};
   bool readOnly{};
   bool automatable{};
+  bool stepped{};
 };
 
 struct MidiObservation {

@@ -12,15 +12,22 @@ FetchContent_MakeAvailable(clap)
 
 enable_testing()
 
+set(BW_CAPABILITY_EDITOR_SOURCE spike/CapabilityProbeEditor.cpp)
+if(APPLE)
+  set(BW_CAPABILITY_EDITOR_SOURCE spike/CapabilityProbeEditor.mm)
+endif()
 add_library(bw_brain_capability_core STATIC
   spike/CapabilityProbeProcessor.cpp
-  spike/CapabilityProbeEditor.cpp
+  ${BW_CAPABILITY_EDITOR_SOURCE}
 )
 target_include_directories(bw_brain_capability_core PUBLIC
   ${CMAKE_CURRENT_LIST_DIR}/spike
   ${clap_SOURCE_DIR}/include
 )
 target_compile_features(bw_brain_capability_core PUBLIC cxx_std_20)
+if(APPLE)
+  target_link_libraries(bw_brain_capability_core PUBLIC "-framework Cocoa")
+endif()
 
 add_library(bw-brain-capability MODULE
   spike/CapabilityProbePlugin.cpp
@@ -48,3 +55,10 @@ add_executable(capability_probe_test tests/capability_probe_test.cpp)
 target_link_libraries(capability_probe_test PRIVATE bw_brain_capability_core)
 target_compile_features(capability_probe_test PRIVATE cxx_std_20)
 add_test(NAME capability_probe COMMAND capability_probe_test)
+
+if(APPLE)
+  add_executable(capability_probe_cocoa_test tests/capability_probe_cocoa_test.mm)
+  target_link_libraries(capability_probe_cocoa_test PRIVATE bw_brain_capability_core)
+  target_compile_features(capability_probe_cocoa_test PRIVATE cxx_std_20)
+  add_test(NAME capability_probe_cocoa COMMAND capability_probe_cocoa_test)
+endif()

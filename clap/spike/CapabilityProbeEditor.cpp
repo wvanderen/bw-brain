@@ -2,12 +2,15 @@
 
 namespace bwbrain::capability {
 
+CapabilityProbeEditor::~CapabilityProbeEditor() { destroy(); }
+
 bool CapabilityProbeEditor::create(std::string api) {
   if (created_ || api.empty()) return false;
   created_ = true;
   events_.push_back(EditorEvent::Created);
   return true;
 }
+bool CapabilityProbeEditor::setParent(void*) { return false; }
 bool CapabilityProbeEditor::show() {
   if (!created_) return false;
   visible_ = true;
@@ -36,5 +39,6 @@ void CapabilityProbeEditor::destroy() {
 const std::vector<EditorEvent>& CapabilityProbeEditor::events() const { return events_; }
 std::uint32_t CapabilityProbeEditor::lastWidth() const { return width_; }
 std::uint32_t CapabilityProbeEditor::lastHeight() const { return height_; }
+bool CapabilityProbeEditor::isAttached() const { return false; }
 
 }  // namespace bwbrain::capability

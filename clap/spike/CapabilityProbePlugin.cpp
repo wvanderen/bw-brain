@@ -193,7 +193,7 @@ bool parameterInfo(const clap_plugin_t*, uint32_t index, clap_param_info_t* info
   const auto& candidate = candidates[index];
   *info = {};
   info->id = candidate.id;
-  info->flags = CLAP_PARAM_IS_STEPPED;
+  info->flags = candidate.stepped ? CLAP_PARAM_IS_STEPPED : 0;
   if (candidate.readOnly) info->flags |= CLAP_PARAM_IS_READONLY;
   if (candidate.automatable) info->flags |= CLAP_PARAM_IS_AUTOMATABLE;
   std::strncpy(info->name, candidate.name.data(), sizeof(info->name) - 1);
@@ -261,8 +261,9 @@ bool guiAdjustSize(const clap_plugin_t*, uint32_t* width, uint32_t* height) {
 bool guiSetSize(const clap_plugin_t* plugin, uint32_t width, uint32_t height) {
   return self(plugin)->editor.resize(width, height);
 }
-bool guiSetParent(const clap_plugin_t*, const clap_window_t* window) {
-  return window && window->api && !std::strcmp(window->api, CLAP_WINDOW_API_COCOA);
+bool guiSetParent(const clap_plugin_t* plugin, const clap_window_t* window) {
+  return window && window->api && !std::strcmp(window->api, CLAP_WINDOW_API_COCOA) &&
+         self(plugin)->editor.setParent(window->cocoa);
 }
 bool guiSetTransient(const clap_plugin_t*, const clap_window_t*) { return false; }
 void guiSuggestTitle(const clap_plugin_t*, const char*) {}
