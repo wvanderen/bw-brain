@@ -2,9 +2,9 @@ include(FetchContent)
 include(ExternalProject)
 include(${CMAKE_CURRENT_LIST_DIR}/dependency-lock.cmake)
 
-# Declare the product-candidate dependencies so their source and immutable lock
-# are inspectable during the evidence phase. They are intentionally not made
-# available: Plan 04.1-01 builds no production plug-in target.
+# Dependencies remain pinned by dependency-lock.cmake. The top-level build makes
+# only CLAP available for the capability probe, and makes JUCE plus the adapter
+# available only for the separate product configuration.
 FetchContent_Declare(clap
   GIT_REPOSITORY ${BW_CLAP_URL}
   GIT_TAG ${BW_CLAP_SHA}
@@ -26,6 +26,7 @@ set(BW_VALIDATOR_CARGO_TARGET_DIR "${CMAKE_BINARY_DIR}/_deps/clap-validator-targ
 set(BW_VALIDATOR_OUTPUT_DIR "${CMAKE_BINARY_DIR}/tools/clap-validator")
 
 ExternalProject_Add(clap_validator_external
+  EXCLUDE_FROM_ALL TRUE
   PREFIX "${CMAKE_BINARY_DIR}/_deps/clap-validator"
   GIT_REPOSITORY ${BW_CLAP_VALIDATOR_URL}
   GIT_TAG ${BW_CLAP_VALIDATOR_SHA}

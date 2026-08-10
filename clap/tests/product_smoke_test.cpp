@@ -3,10 +3,21 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <array>
-#include <cassert>
-#include <cmath>
+#include <cstring>
+#include <cstdlib>
 
 namespace {
+
+void require(const bool condition) {
+  if (!condition) {
+    std::abort();
+  }
+}
+
+template <typename Sample>
+bool bitEqual(const Sample left, const Sample right) {
+  return std::memcmp(&left, &right, sizeof(Sample)) == 0;
+}
 
 template <typename Sample>
 void assertAudioAndMidiRemainTransparent() {
@@ -38,18 +49,22 @@ void assertAudioAndMidiRemainTransparent() {
 
   for (int channel = 0; channel < buffer.getNumChannels(); ++channel) {
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-      assert(buffer.getSample(channel, sample) ==
-             before[static_cast<std::size_t>(channel)][static_cast<std::size_t>(sample)]);
+      require(bitEqual(
+          buffer.getSample(channel, sample),
+          before[static_cast<std::size_t>(channel)][static_cast<std::size_t>(sample)]));
     }
   }
 
   int eventCount = 0;
   for (const auto metadata : midi) {
     ++eventCount;
-    assert(metadata.samplePosition == 7);
-    assert(metadata.getMessage() == noteOn);
+    require(metadata.samplePosition == 7);
+    const auto message = metadata.getMessage();
+    require(message.getRawDataSize() == noteOn.getRawDataSize());
+    require(std::memcmp(message.getRawData(), noteOn.getRawData(),
+                        static_cast<std::size_t>(noteOn.getRawDataSize())) == 0);
   }
-  assert(eventCount == 1);
+  require(eventCount == 1);
 }
 
 } // namespace

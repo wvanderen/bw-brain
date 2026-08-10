@@ -1,0 +1,6 @@
+function(bw_register_product_scheduler_tests product_target)
+  if(NOT TARGET "${product_target}")
+    message(FATAL_ERROR "Scheduler registration requires the product target: ${product_target}")
+  endif()
+  set_property(TARGET "${product_target}" PROPERTY BW_SCHEDULER_TESTS_REGISTERED TRUE)
+endfunction()
