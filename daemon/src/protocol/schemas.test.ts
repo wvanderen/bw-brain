@@ -41,6 +41,12 @@ import cliResultSchema from "../../../schemas/cli-query/result.schema.json" with
 // now $refs patch.schema.json#/$defs/PrimitiveOp — registered here so the
 // cross-file $ref resolves at runtime.
 import patchSchema from "../../../schemas/patch.schema.json" with { type: "json" };
+import clapPeerSchema from "../../../schemas/clap/peer.schema.json" with { type: "json" };
+import clapIdentitySchema from "../../../schemas/clap/identity.schema.json" with { type: "json" };
+import clapTelemetrySchema from "../../../schemas/clap/telemetry.schema.json" with { type: "json" };
+import clapProposalSchema from "../../../schemas/clap/proposal.schema.json" with { type: "json" };
+import clapPhraseSchema from "../../../schemas/clap/phrase.schema.json" with { type: "json" };
+import clapGolden from "../../../schemas/clap/fixtures/golden.json" with { type: "json" };
 import { OBSERVATIONAL_EVENT_TYPES } from "./reader.js";
 
 // Ajv2020 = JSON Schema Draft 2020-12 mode (AGENTS.md line 37: use 2020-12 not
@@ -674,6 +680,38 @@ describe("Pitfall 1: OBSERVATIONAL_EVENT_TYPES === event.schema.json type enum",
     const schemaEnum = new Set(eventSchema.properties.type.enum as string[]);
     for (const t of OBSERVATIONAL_EVENT_TYPES) {
       expect(schemaEnum.has(t), `OBSERVATIONAL_EVENT_TYPES has '${t}' not in event schema enum`).toBe(true);
+    }
+  });
+});
+
+describe("CLAP companion bounded protocol fixtures", () => {
+  const clapAjv = new Ajv2020({ allErrors: true, strict: false });
+  const schemas = [
+    clapPeerSchema,
+    clapIdentitySchema,
+    clapTelemetrySchema,
+    clapProposalSchema,
+    clapPhraseSchema,
+  ];
+  for (const schema of schemas) clapAjv.addSchema(schema);
+
+  it.each(clapGolden.valid)("accepts $name at its declared maximum", ({ schema, value }) => {
+    const validate = clapAjv.getSchema(schema);
+    expect(validate, `missing validator ${schema}`).toBeTypeOf("function");
+    expect(validate!(value), JSON.stringify(validate!.errors)).toBe(true);
+  });
+
+  it.each(clapGolden.invalid)("rejects $name", ({ schema, value }) => {
+    const validate = clapAjv.getSchema(schema);
+    expect(validate, `missing validator ${schema}`).toBeTypeOf("function");
+    expect(validate!(value)).toBe(false);
+  });
+
+  it("keeps every CLAP schema closed at the top-level", () => {
+    for (const schema of schemas) {
+      const validate = clapAjv.getSchema(schema.$id)!;
+      const valid = clapGolden.valid.find((fixture) => fixture.schema === schema.$id)!;
+      expect(validate({ ...valid.value, unknown: true })).toBe(false);
     }
   });
 });
