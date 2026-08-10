@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "Bitwig loads the capability CLAP, but its editor is blank; Connection Status reads 0; only Generated Mix is available and it is binary."
 created: 2026-08-10
 updated: 2026-08-10
@@ -18,9 +18,9 @@ updated: 2026-08-10
 ## Current Focus
 
 - **hypothesis:** Confirmed: `gui.set_parent` caused the blank editor by returning success without attaching an `NSView`; unconditional `CLAP_PARAM_IS_STEPPED` caused binary Generated Mix.
-- **test:** Automated native attachment/lifecycle tests and parameter metadata assertions pass; the rebuilt bundle passes the pinned deterministic validator.
-- **expecting:** Bitwig displays the painted `bw-brain Capability Probe` child view and exposes fractional Generated Mix values.
-- **next_action:** Have the user reload/rescan the rebuilt bundle in Bitwig and confirm visible rendering and continuous Generated Mix behavior.
+- **test:** Automated native attachment/lifecycle tests and parameter metadata assertions pass; the rebuilt bundle passes the pinned deterministic validator; the live Bitwig retest is confirmed fixed.
+- **expecting:** Resolved: Bitwig displays the painted `bw-brain Capability Probe` child view and exposes fractional Generated Mix values.
+- **next_action:** Archive this resolved session and add its confirmed pattern to the debug knowledge base.
 
 ### Structured Reasoning Checkpoint
 
@@ -54,6 +54,8 @@ reasoning_checkpoint:
   observation: Parameter regression assertions prove Generated Mix is automatable but not stepped, while status/action candidates remain stepped.
 - timestamp: 2026-08-10
   observation: Full CTest passes 2/2 tests and pinned clap-validator passes 38/38 applicable tests with 0 failures and 0 warnings (6 inapplicable skipped).
+- timestamp: 2026-08-10
+  observation: User confirmed the rebuilt capability probe passes the live Bitwig retest end-to-end.
 
 ## Eliminated
 
@@ -64,5 +66,5 @@ reasoning_checkpoint:
 
 - **root_cause:** The probe advertised a Cocoa GUI but `guiSetParent` only checked the API string and never created or attached a child `NSView`; independently, `parameterInfo` marked every parameter stepped, forcing Generated Mix to binary host semantics.
 - **fix:** Added a capability-only painted Cocoa child view with explicit attach, resize, show/hide, removal, and ownership cleanup; routed `guiSetParent` into that lifecycle; made stepped metadata category-specific so Generated Mix is continuous.
-- **verification:** Reconfigured and rebuilt in `clap/build-capability`; CTest passed 2/2 including native Cocoa lifecycle coverage; pinned clap-validator passed 38 applicable tests with 0 failures and 0 warnings. Awaiting live Bitwig confirmation.
+- **verification:** Reconfigured and rebuilt in `clap/build-capability`; CTest passed 2/2 including native Cocoa lifecycle coverage; pinned clap-validator passed 38 applicable tests with 0 failures and 0 warnings; user confirmed the live Bitwig retest is fixed end-to-end.
 - **files_changed:** `clap/CMakeLists.txt`, `clap/spike/CapabilityProbeEditor.cpp`, `clap/spike/CapabilityProbeEditor.h`, `clap/spike/CapabilityProbeEditor.mm`, `clap/spike/CapabilityProbePlugin.cpp`, `clap/spike/CapabilityProbeProcessor.cpp`, `clap/spike/CapabilityProbeProcessor.h`, `clap/tests/capability_probe_test.cpp`, `clap/tests/capability_probe_cocoa_test.mm`
