@@ -212,12 +212,12 @@ Plans:
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16
 **Depends on:** Phase 04.1
 **Status:** Planned — ready for execution
-**Plans:** 11 plans in 9 waves
+**Plans:** 1/11 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 04.2-01-PLAN.md — Separate product build and frozen bounded CLAP contracts (Wave 1)
+- [x] 04.2-01-PLAN.md — Separate product build and frozen bounded CLAP contracts (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -284,5 +284,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
-| 04.2. Hybrid CLAP Companion Product | 0/TBD | Unblocked / unplanned | - |
+| 04.2. Hybrid CLAP Companion Product | 1/11 | In Progress|  |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

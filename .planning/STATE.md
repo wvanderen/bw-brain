@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
-status: ready_for_planning
-stopped_at: Completed 04.1-04-PLAN.md
-last_updated: "2026-08-10T22:41:55.265Z"
+status: executing
+stopped_at: Completed 04.2-01-PLAN.md
+last_updated: "2026-08-10T23:41:23.209Z"
 last_activity: 2026-08-10
-last_activity_desc: Plan 04.1-04 live MIDI offset gap closure complete; Phase 04.2 planning is next
+last_activity_desc: Plan 04.2-01 product build and bounded contract foundation complete
 progress:
   total_phases: 8
   completed_phases: 6
-  total_plans: 33
-  completed_plans: 32
-  percent: 97
+  total_plans: 44
+  completed_plans: 33
+  percent: 75
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product planning, now unblocked by resolved Q1–Q4 evidence.
+**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (1/11 plans complete)
 
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 0 of TBD
-Status: Unblocked / unplanned; `$gsd-plan-phase 04.2` is the next action
-Last activity: 2026-08-10 — Plan 04.1-04 live MIDI offset gap closure complete
+Plan: 1 of 11
+Status: In Progress
+Last activity: 2026-08-10 — Plan 04.2-01 product build and bounded contract foundation complete
 
-Progress: [███████████████████░] 32/33 plans complete (Phase 04.1: 4/4)
+Progress: [████████░░] 33/44 plans complete (Phase 04.2: 1/11)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [███████████████████░] 32/33 p
 | Phase 04.1 P02 | 18min | 2 tasks | 8 files |
 | Phase 04.1 P03 | 4d | 2 tasks | 10 files |
 | Phase 04.1 P04 | 20 min + human verification | 2 tasks | 8 files |
+| Phase 04.2 P01 | 15min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,9 @@ Recent decisions affecting current work:
 - [Phase 04.1]: Q4 approves exactly @earendil-works/pi-coding-agent@0.84.0 under the recorded audit scope without gate-time installation. — The user explicitly approved the audited package version and layout.
 - [Phase 04.1]: GATE-02 accepted direct Bitwig 6.0.11 together-mode proof: received=32, forwarded=32, count=616, result SAME. — Direct non-zero host evidence replaces inference from transparent forwarding.
 - [Phase 04.1]: Phase 04.2 is unblocked for planning but remains unplanned and unimplemented. — Phase 04.1 closes evidence gates only and preserves the product boundary.
+- [Phase 04.2 P01]: Product uses clap/build while capability evidence remains isolated in clap/build-capability. — Prevents production and evidence caches or targets from contaminating each other.
+- [Phase 04.2 P01]: JUCE release packaging stays gated on explicit AGPLv3 or commercial license selection. — The product build does not silently choose release licensing terms.
+- [Phase 04.2 P01]: Five bounded CLAP schemas generate one deterministic daemon/src/gen/clap.ts surface. — Later native and daemon slices consume one closed contract foundation.
 
 ### Pending Todos
 
@@ -168,6 +172,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-10T22:41:29.099Z
-Stopped at: Completed 04.1-04-PLAN.md
+Last session: 2026-08-10T23:41:02.190Z
+Stopped at: Completed 04.2-01-PLAN.md
 Resume file: None
