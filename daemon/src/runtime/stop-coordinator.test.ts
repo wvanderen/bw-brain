@@ -21,8 +21,8 @@ describe("generated-only global Stop", () => {
     const result = await stop.stopProject("project-a");
     expect(result).toEqual({ ok: true, targeted: 2 });
     expect(sent).toEqual([
-      { connectionId: "c1", message: { type: "generation.stop", projectId: "project-a", instanceId: "i1", cleanup: true } },
-      { connectionId: "c2", message: { type: "generation.stop", projectId: "project-a", instanceId: "i2", cleanup: true } },
+      { connectionId: "c1", message: { type: "stop", projectId: "project-a", reason: "user" } },
+      { connectionId: "c2", message: { type: "stop", projectId: "project-a", reason: "user" } },
     ]);
     expect(await readFile(journal)).toEqual(before);
     expect(Object.keys((stop as any).deps).some((key) => /patch|journal|revert|history/i.test(key))).toBe(false);

@@ -55,6 +55,16 @@ import { PeerServer } from "../peers/peer-server.js";
 import { TelemetryDispatch } from "../peers/telemetry-dispatch.js";
 import { ControllerCorrelationService } from "../sessions/controller-correlation.js";
 import { EditService } from "./edit-service.js";
+import { ActionDispatch } from "../peers/action-dispatch.js";
+import { StopCoordinator } from "./stop-coordinator.js";
+import { ProjectRegistry } from "../sessions/project-registry.js";
+import { FocusRegistry } from "../sessions/focus-registry.js";
+import { ProjectSessionManager } from "../sessions/project-session-manager.js";
+import { PiSdkAdapter } from "../sessions/pi-sdk-adapter.js";
+import { createRestrictedPiTools } from "../sessions/pi-tools.js";
+import { ProposalStore, type ProposalInput } from "../proposals/proposal-store.js";
+import { ApprovalStore } from "../proposals/approval-store.js";
+import { ProposalDispatch } from "../proposals/proposal-dispatch.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
@@ -182,8 +192,9 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   // foundation stage accepts validated identity handshakes without starting
   // analysis, Pi, proposal, approval, or mutation work.
   let telemetry: TelemetryDispatch | undefined;
+  let routePeerAction: ((connectionId: string, message: Record<string, unknown>) => void) | undefined;
   const peers = new PeerServer({ port: peerPort, host: opts.peerHost,
-    onMessage: (connectionId, message) => { telemetry?.ingest(connectionId, message); },
+    onMessage: (connectionId, message) => { telemetry?.ingest(connectionId, message); routePeerAction?.(connectionId, message as Record<string, unknown>); },
   });
   telemetry = new TelemetryDispatch(peers.registry);
   await peers.ready;
@@ -377,6 +388,36 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
         return { applied: r.applied ?? 0, failed: r.failed ?? 0 };
       });
   const editService = new EditService({ candidateStore, patchHistory, applyPatchOverBridge, pullSelectedClip: () => correlator.send("get.selected_clip") });
+  const projectRoot = join(dirname(socketPath), "projects");
+  const projects = new ProjectRegistry(projectRoot);
+  const focus = new FocusRegistry();
+  const approvals = new ApprovalStore();
+  const proposals = new ProposalStore({ invalidateProposal: (proposalId) => approvals.invalidateProposal(proposalId) });
+  const sessions = new ProjectSessionManager(new PiSdkAdapter(join(dirname(socketPath), "pi")), () => createRestrictedPiTools({
+    readConfirmedScope: async () => focus.get() ?? null,
+    readContext: async () => lastState,
+    preview: async (input) => editService.preview(lastState ?? BASELINE_RAW_STATE, intent, watchdog.tick(), input),
+    createProposal: async (input) => proposals.publish(input as unknown as ProposalInput),
+  }));
+  const proposalDispatch = new ProposalDispatch({ proposals, approvals, editService, requireConfirmedScope: (scope) => projects.requireConfirmedScope(scope.projectId, scope.instanceId) });
+  const stop = new StopCoordinator({
+    stopAnalysis: (projectId) => sessions.stop(projectId),
+    invalidateApprovals: (projectId) => approvals.invalidateProject(projectId, "stop"),
+    clearPending: () => undefined,
+    projectPeers: (projectId) => peers.registry.projectPeers(projectId),
+    sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+    publishStopped: () => undefined,
+  });
+  const actions = new ActionDispatch({
+    requireConfirmedScope: (scope) => projects.requireConfirmedScope(scope.projectId, scope.instanceId),
+    analyze: async (request) => { await sessions.connect(request.projectId, request.instanceId); await sessions.analyze(request); },
+    getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
+    issueApproval: (proposal) => approvals.issue(proposal),
+    consumeApproval: (request) => proposalDispatch.consume(request),
+    stopProject: (projectId) => stop.stopProject(projectId),
+    sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+  });
+  routePeerAction = (connectionId, message) => { void actions.dispatch(connectionId, message); };
   startQueryServer({
     transport: uds,
     watchdog,
@@ -407,6 +448,8 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       persistTimer = null;
     }
     correlator.close();
+    for (const projectId of peers.registry.projectIds()) await stop.stopProject(projectId);
+    sessions.dispose();
     try {
       await save(stateCachePath, {
         version: "1.0",

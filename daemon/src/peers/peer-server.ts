@@ -96,6 +96,8 @@ export class PeerServer {
     connection.markAccepted();
     this.pending.delete(connection.connectionId);
     this.registry.accept(connection);
-    connection.send({ type: "clap.accept", connectionId: connection.connectionId, instanceId: hello.instanceId });
+    const result = this.registry.lease(connection.connectionId, hello.instanceId);
+    if (result.rekey) connection.send({ type: "instance.rekey", ...result.rekey, reason: "simultaneous_claim" });
+    else connection.send({ type: "clap.accept", connectionId: connection.connectionId, instanceId: hello.instanceId });
   }
 }

@@ -15,7 +15,7 @@ describe("confirmed hosted actions", () => {
   });
 
   it("previews exact stored scope, approves once, and targets phrase arm/countdown", async () => {
-    const proposal = { proposalId: "pr", revision: 2, digest: "d", kind: "live_midi", scope, rationale: "bounded", assumptions: [], material: {} };
+    const proposal: any = { proposalId: "pr", revision: 2, digest: "d", kind: "live_midi", scope, rationale: "bounded", assumptions: [], material: {} };
     const sent: object[] = [];
     const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze: vi.fn(), getProposal: vi.fn(() => proposal),
       issueApproval: vi.fn(() => ({ ...proposal, token: "token", expiresAt: 1 })),

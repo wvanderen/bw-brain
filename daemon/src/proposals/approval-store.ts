@@ -48,6 +48,10 @@ export class ApprovalStore {
     const error: ApprovalError = reason === "disconnect" ? "disconnected" : reason === "stop" ? "stopped" : "scope_mismatch";
     for (const [token, grant] of this.grants) if (!scope || grant.scope.projectId === scope.projectId && grant.scope.instanceId === scope.instanceId) this.retire(token, error);
   }
+  invalidateProject(projectId: string, reason: "disconnect" | "stop" | "fork" = "stop"): void {
+    const error: ApprovalError = reason === "disconnect" ? "disconnected" : reason === "stop" ? "stopped" : "scope_mismatch";
+    for (const [token, grant] of this.grants) if (grant.scope.projectId === projectId) this.retire(token, error);
+  }
   private retire(token: string, error: ApprovalError): void {
     this.grants.delete(token); this.tombstones.delete(token); this.tombstones.set(token, error);
     while (this.tombstones.size > this.maxApprovals) this.tombstones.delete(this.tombstones.keys().next().value as string);

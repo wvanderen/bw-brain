@@ -46,6 +46,8 @@ export class PeerRegistry {
     if (!lease || lease.connectionId !== connectionId || lease.projectId !== projectId || lease.status !== "confirmed") throw new Error("scope_not_confirmed");
     return { ...lease };
   }
+  projectPeers(projectId: string): InstanceLease[] { return [...this.leases.values()].filter((lease) => lease.projectId === projectId && lease.status === "confirmed").map((lease) => ({ ...lease })); }
+  projectIds(): string[] { return [...new Set([...this.leases.values()].flatMap((lease) => lease.projectId ? [lease.projectId] : []))]; }
 
   sendTo(connectionId: string, envelope: object): boolean {
     if (!this.validateEnvelope(envelope)) return false;
