@@ -6,14 +6,14 @@ current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
 status: executing
 stopped_at: Completed 04.2-08-PLAN.md
-last_updated: "2026-08-11T00:45:41.094Z"
+last_updated: "2026-08-11T00:58:27.100Z"
 last_activity: 2026-08-10
 last_activity_desc: Plan 04.2-04 controller correlation authority complete
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 75
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 8 of 11
+Plan: 9 of 11
 Status: Ready to execute
 Last activity: 2026-08-10 — Plan 04.2-04 controller correlation authority complete
 
@@ -87,6 +87,7 @@ Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/1
 | Phase 04.2 P06 | 9min | 2 tasks | 10 files |
 | Phase 04.2 P07 | 13min | 2 tasks | 12 files |
 | Phase 04.2 P08 | 5min | 1 tasks | 6 files |
+| Phase 04.2 P09 | 16min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,8 @@ Recent decisions affecting current work:
 - [Phase 04.2]: Daemon telemetry is a confirmed-scope bounded latest-value cache with no Pi/session-manager dependency, so telemetry never starts reasoning.
 - [Phase 04.2]: Proposal revisions retain exact confirmed project/instance/clip scope; approval never consults visible focus. — Prevents focus races from changing an inspected target.
 - [Phase 04.2]: Approval tokens are compare-and-delete before side effects; existing edits delegate unchanged to EditService while live MIDI stays outside PatchHistory. — Preserves one-shot authority and the canonical reversible mutation trust spine.
+- [Phase 04.2]: Original MIDI remains untouched in the host buffer; only bounded generated events are appended in sample order. — Preserves arbitrary event headers and payloads while keeping generation bounded.
+- [Phase 04.2]: Authority queues refuse on pressure and lifecycle disarm uses a non-droppable atomic latch. — Stop and cleanup authority must never inherit observational telemetry drop behavior.
 
 ### Pending Todos
 
@@ -192,6 +195,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-11T00:45:41.087Z
+Last session: 2026-08-11T00:58:10.533Z
 Stopped at: Completed 04.2-08-PLAN.md
 Resume file: None

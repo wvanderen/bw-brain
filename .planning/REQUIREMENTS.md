@@ -25,7 +25,7 @@
 - [x] **D-11**: Target the focused instance explicitly and display its project, track, and instance scope.
 - [x] **D-12**: Resume reopened projects, rekey duplicated instances, and fork Save As session history safely.
 - [x] **D-13**: Collect approval in the CLAP UI while existing-state mutation uses the controller and current candidate/pre-flight/journal path.
-- [ ] **D-14**: Arm exact approved live MIDI and launch it at the configured next beat/bar boundary with a visible countdown.
+- [x] **D-14**: Arm exact approved live MIDI and launch it at the configured next beat/bar boundary with a visible countdown.
 - [x] **D-15**: Make approval one-shot and exact-revision/project/instance/clip scoped; invalidate it on content or target change.
 - [x] **D-16**: Make global Stop cancel generated behavior and disarm instances without altering original signal or reverting journaled edits.
 
