@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "rt/Aggregator.h"
 
 namespace bw {
 
@@ -28,10 +29,21 @@ public:
   void changeProgramName(int index, const juce::String &name) override;
   void getStateInformation(juce::MemoryBlock &destinationData) override;
   void setStateInformation(const void *data, int sizeInBytes) override;
+  rt::Aggregator& telemetry() noexcept { return telemetry_; }
 
 private:
   template <typename Sample>
-  static void processTransparent(juce::AudioBuffer<Sample> &, juce::MidiBuffer &) noexcept {}
+  void processTransparent(juce::AudioBuffer<Sample> &audio, juce::MidiBuffer &midi) noexcept {
+    std::array<const Sample*, 2> pointers{};
+    const int channels = juce::jmin(2, audio.getNumChannels());
+    for (int c=0;c<channels;c++) pointers[c]=audio.getReadPointer(c);
+    for (const auto metadata : midi) {
+      const auto message=metadata.getMessage();
+      if (message.isNoteOnOrOff()) telemetry_.note(static_cast<uint32_t>(metadata.samplePosition),0,static_cast<uint8_t>(message.getChannel()-1),static_cast<uint8_t>(message.getNoteNumber()),static_cast<uint8_t>(message.getVelocity()),message.isNoteOn());
+    }
+    telemetry_.process(pointers.data(), channels, audio.getNumSamples());
+  }
+  rt::Aggregator telemetry_{};
 };
 
 } // namespace bw
