@@ -226,6 +226,11 @@ public final class PullHandlers {
                 case "get.clap_capabilities" -> outbox.offer(dispatchClapCapabilityRequest(type, id,
                         new ClapCapabilityView(observers.getCursorDeviceName(),
                                 !observers.getCursorDeviceName().isBlank())).orElseThrow());
+                case "get.clap_correlation" -> outbox.offer(ClapCorrelation.dispatch(type, id, req.path("payload"),
+                        new ClapCorrelation.SelectionEvidence(
+                                observers.getCursorTrackName(),
+                                observers.getCursorDeviceName(),
+                                !observers.getCursorDeviceName().isBlank())).orElseThrow());
                 // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
                 // (D-01 / Pitfall 7). The handler NEVER branches on the
                 // semantic-intent metadata field — it stays three-case forever.

@@ -52,6 +52,7 @@ import { DEFAULT_SOCKET } from "../cli/query-client.js";
 import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory } from "../patch/patch-history.js";
 import { PeerServer } from "../peers/peer-server.js";
+import { ControllerCorrelationService } from "../sessions/controller-correlation.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
@@ -185,6 +186,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   // query-server's pull callbacks + the dispatcher read this slot lazily so
   // the swap is transparent to both.
   let correlator: RequestCorrelator = new RequestCorrelator(tcp, { timeoutMs: 3_000 });
+  const controllerCorrelation = new ControllerCorrelationService(correlator);
 
   // --- i. Persistence debounce (Pitfall 3: never sync disk I/O on the event
   //     path). 1s coalesces a burst of events into one atomic write. --------
@@ -324,9 +326,11 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
         watchdog.onBridgeDisconnect();
       }
       correlator.close();
+      controllerCorrelation.onControllerDisconnect();
       correlator = new RequestCorrelator(tcp, { timeoutMs: 3_000 });
     } else if (connected && !prevConnected) {
       // false -> true: bridge (re)connect — refresh the snapshot + rebind.
+      controllerCorrelation.onControllerReconnect(correlator);
       await refreshSnapshot();
     }
     prevConnected = connected;
