@@ -25,6 +25,7 @@ function(bw_register_product_scheduler_tests product_target)
   add_executable(processor_generation_test
     ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../tests/processor_generation_test.cpp
     ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/PluginProcessor.cpp
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/Aggregator.cpp
     ${BW_SCHEDULER_SOURCES})
   target_include_directories(processor_generation_test PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src)
   target_compile_features(processor_generation_test PRIVATE cxx_std_20)
