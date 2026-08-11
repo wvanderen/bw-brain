@@ -31,8 +31,7 @@ rt::TransportBlock PluginProcessor::currentTransport(uint32_t frames) noexcept {
 void PluginProcessor::processGeneration(juce::MidiBuffer& midi,uint32_t frames) noexcept {
  if(disarmRequested_.exchange(false,std::memory_order_acq_rel)){scheduler_.disarm();ledger_.requestCleanup();}
  Command command{};while(commands_.tryPop(command)){if(command.kind==CommandKind::arm){if(!scheduler_.arm(command.phrase))generationArmed_.store(false,std::memory_order_release);}else{scheduler_.disarm();ledger_.requestCleanup();}}
- rt::FixedEventBuffer original{},generated{},cleanup{},merged{};
- for(const auto metadata:midi){if(original.count==original.events.size())break;const auto raw=metadata.getMessage().getRawData();const auto bytes=metadata.getMessage().getRawDataSize();auto&e=original[original.count++];e.time=static_cast<uint32_t>(metadata.samplePosition);e.kind=rt::EventKind::midi;e.generated=false;for(int i=0;i<bytes&&i<3;i++)e.midi[static_cast<std::size_t>(i)]=raw[i];}
+ rt::FixedEventBuffer generated{},cleanup{},merged{};
  const auto transport=currentTransport(frames);
  const bool stopped=havePreviousTransport_&&previousTransport_.playing&&!transport.playing;
  const bool jumped=transport.discontinuity;
@@ -40,11 +39,11 @@ void PluginProcessor::processGeneration(juce::MidiBuffer& midi,uint32_t frames) 
  else if(jumped)ledger_.requestCleanup();
  scheduler_.render(transport,generated); previousTransport_=transport;havePreviousTransport_=true;
  if(ledger_.cleanupPending())ledger_.drain(cleanup);
- rt::FixedEventBuffer withCleanup{}; if(!rt::mergeEvents(generated,cleanup,withCleanup)||!rt::mergeEvents(original,withCleanup,merged)){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
- if(merged.count>outputCapacity_){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
- juce::MidiBuffer replacement; replacement.ensureSize(static_cast<size_t>(merged.count*8)); bool outputOk=true;
- for(std::size_t i=0;i<merged.count;i++){const auto&e=merged[i];juce::MidiMessage message(e.midi.data(),3);replacement.addEvent(message,static_cast<int>(e.time));if(e.generated){if(e.kind==rt::EventKind::noteOn){if(!ledger_.noteOn(e.owner))outputOk=false;}else if(e.kind==rt::EventKind::noteOff)ledger_.noteOff(e.owner);}}
- if(outputOk){midi.swapWith(replacement);if(ledger_.cleanupPending())ledger_.completeCleanup();}else{scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);}
+ if(!rt::mergeEvents(generated,cleanup,merged)){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
+ if(static_cast<std::size_t>(midi.getNumEvents())+merged.count>outputCapacity_){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
+ bool outputOk=true;
+ for(std::size_t i=0;i<merged.count;i++){const auto&e=merged[i];juce::MidiMessage message(e.midi.data(),3);midi.addEvent(message,static_cast<int>(e.time));if(e.generated){if(e.kind==rt::EventKind::noteOn){if(!ledger_.noteOn(e.owner))outputOk=false;}else if(e.kind==rt::EventKind::noteOff)ledger_.noteOff(e.owner);}}
+ if(outputOk){if(ledger_.cleanupPending())ledger_.completeCleanup();}else{scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);}
  if(!scheduler_.armed())generationArmed_.store(false,std::memory_order_release);
 }
 
