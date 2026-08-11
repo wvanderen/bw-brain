@@ -10,7 +10,8 @@ function(bw_register_product_ui_tests product_target)
   set(BW_UI_PROCESSOR_DEPS
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/model/UiState.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/PluginEditor.cpp"
-    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/identity/InstanceState.cpp")
+    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/identity/InstanceState.cpp"
+    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/LoopbackTransport.cpp")
   target_sources(product_smoke_test PRIVATE ${BW_UI_PROCESSOR_DEPS})
   target_sources(processor_generation_test PRIVATE ${BW_UI_PROCESSOR_DEPS})
   add_executable(editor_state_test
@@ -19,6 +20,7 @@ function(bw_register_product_ui_tests product_target)
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/PluginEditor.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/PluginProcessor.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/identity/InstanceState.cpp"
+    "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/LoopbackTransport.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/Aggregator.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/PhraseScheduler.cpp"
     "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/OwnedNoteLedger.cpp"

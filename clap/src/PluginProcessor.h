@@ -7,7 +7,10 @@
 #include "rt/SpscQueue.h"
 #include "identity/InstanceState.h"
 #include "model/UiState.h"
+#include "peer/LoopbackTransport.h"
 #include <atomic>
+#include <memory>
+#include <mutex>
 
 namespace bw {
 
@@ -75,9 +78,11 @@ private:
   rt::TransportBlock testTransport_{}; bool useTestTransport_{};
   rt::TransportBlock previousTransport_{}; bool havePreviousTransport_{};
   std::size_t outputCapacity_{rt::kMaxEventsPerBlock};
+  mutable std::mutex instanceStateMutex_;
   identity::InstanceState instanceState_{"inst-local"};
   ui::UiStateStore uiState_{};
   ui::UiActionQueue uiActions_{};
+  std::unique_ptr<peer::LoopbackTransport> peerTransport_;
   juce::AudioParameterFloat* generatedMixParameter_{};
 };
 

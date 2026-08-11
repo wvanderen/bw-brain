@@ -4,7 +4,8 @@ function(bw_register_product_telemetry_tests product_target)
   endif()
   target_sources("${product_target}" PRIVATE
     ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/Aggregator.cpp
-    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/PeerClient.cpp)
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/PeerClient.cpp
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/LoopbackTransport.cpp)
   target_sources(product_smoke_test PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/rt/Aggregator.cpp)
 
   add_executable(telemetry_test
@@ -21,5 +22,12 @@ function(bw_register_product_telemetry_tests product_target)
   target_include_directories(peer_client_test PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src)
   target_compile_features(peer_client_test PRIVATE cxx_std_20)
   add_test(NAME peer_client COMMAND peer_client_test)
+
+  add_executable(loopback_transport_test
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../tests/loopback_transport_test.cpp
+    ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src/peer/LoopbackTransport.cpp)
+  target_include_directories(loopback_transport_test PRIVATE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../src)
+  target_compile_features(loopback_transport_test PRIVATE cxx_std_20)
+  add_test(NAME loopback_transport COMMAND loopback_transport_test)
   set_property(TARGET "${product_target}" PROPERTY BW_TELEMETRY_TESTS_REGISTERED TRUE)
 endfunction()
