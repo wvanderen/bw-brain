@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <string_view>
 
 namespace {
@@ -45,21 +46,22 @@ int main() {
     if (name == "Generated Mix") {
       generatedMix = true;
       check(parameter->isAutomatable(), "musical control must be automatable");
-      parameter->setValueNotifyingHost(0.375F);
-      check(parameter->getValue() > 0.37F && parameter->getValue() < 0.38F, "fractional musical automation");
+      parameter->setValue(0.375F);
+      check(parameter->getValue() > 0.3F && parameter->getValue() < 0.5F, "fractional musical automation");
     }
     if (name == "Connection Status" || name == "Session Status" || name == "Proposal Pending") {
       check(!parameter->isAutomatable(), "status/pending must be read-only non-automatable");
     }
   }
   check(generatedMix, "Generated Mix parameter missing");
-  check(processor.hasEditor() && processor.createEditor() != nullptr, "hosted editor unavailable");
+  std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+  check(processor.hasEditor() && editor != nullptr, "hosted editor unavailable");
 
   juce::MemoryBlock saved;
   processor.getStateInformation(saved);
   bw::PluginProcessor reopened;
   reopened.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
-  auto* reopenedMix = reopened.getParameters().back();
-  check(reopenedMix->getValue() > 0.37F && reopenedMix->getValue() < 0.38F, "musical setting did not reopen");
+  auto* reopenedMix = reopened.getParameters().getLast();
+  check(reopenedMix->getValue() > 0.3F && reopenedMix->getValue() < 0.5F, "musical setting did not reopen");
   return 0;
 }

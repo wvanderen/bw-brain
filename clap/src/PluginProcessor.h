@@ -5,6 +5,8 @@
 #include "rt/PhraseScheduler.h"
 #include "rt/OwnedNoteLedger.h"
 #include "rt/SpscQueue.h"
+#include "identity/InstanceState.h"
+#include "model/UiState.h"
 #include <atomic>
 
 namespace bw {
@@ -43,6 +45,9 @@ public:
   void setTestTransport(const rt::TransportBlock& transport) noexcept { testTransport_=transport; useTestTransport_=true; }
   void clearTestTransport() noexcept { useTestTransport_=false; }
   void setTestOutputCapacity(std::size_t capacity) noexcept { outputCapacity_=capacity; }
+  ui::UiActionQueue& uiActions() noexcept { return uiActions_; }
+  std::shared_ptr<const ui::UiState> uiSnapshot() const { return uiState_.snapshot(); }
+  void publishUi(const ui::UiEvent& event) { uiState_.reduce(event); }
 
 private:
   template <typename Sample>
@@ -70,6 +75,9 @@ private:
   rt::TransportBlock testTransport_{}; bool useTestTransport_{};
   rt::TransportBlock previousTransport_{}; bool havePreviousTransport_{};
   std::size_t outputCapacity_{rt::kMaxEventsPerBlock};
+  identity::InstanceState instanceState_{"inst-local"};
+  ui::UiStateStore uiState_{};
+  ui::UiActionQueue uiActions_{};
 };
 
 } // namespace bw
