@@ -52,6 +52,7 @@ import { DEFAULT_SOCKET } from "../cli/query-client.js";
 import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory } from "../patch/patch-history.js";
 import { PeerServer } from "../peers/peer-server.js";
+import { TelemetryDispatch } from "../peers/telemetry-dispatch.js";
 import { ControllerCorrelationService } from "../sessions/controller-correlation.js";
 import { EditService } from "./edit-service.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
@@ -180,7 +181,11 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   // It shares no transport or dispatcher with controller TCP, and at this
   // foundation stage accepts validated identity handshakes without starting
   // analysis, Pi, proposal, approval, or mutation work.
-  const peers = new PeerServer({ port: peerPort, host: opts.peerHost });
+  let telemetry: TelemetryDispatch | undefined;
+  const peers = new PeerServer({ port: peerPort, host: opts.peerHost,
+    onMessage: (connectionId, message) => { telemetry?.ingest(connectionId, message); },
+  });
+  telemetry = new TelemetryDispatch(peers.registry);
   await peers.ready;
 
   // `let` because step e swaps the correlator on bridge disconnect. The
