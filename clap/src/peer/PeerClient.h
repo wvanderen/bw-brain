@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -21,5 +22,6 @@ private:
   void run();
   rt::Aggregator& source_; const std::string projectId_, instanceId_; Send send_;
   std::string connectionId_; std::atomic<bool> running_{true}, connected_{false}; std::thread worker_;
+  mutable std::mutex connectionMutex_;
 };
 }
