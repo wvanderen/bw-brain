@@ -16,7 +16,7 @@
 - [ ] **D-02**: Use a compact context strip, central conversation pane, and proposal drawer shown only for inspectable material.
 - [ ] **D-03**: Expose read-only connection/session status and proposal-pending indication plus ordinary automatable musical controls in Bitwig's device panel; keep Analyze and Stop always available as non-recording hosted CLAP UI actions, never as automatable parameters. Superseded 2026-08-10 from the pre-gate wording by accepted Phase 04.1 Q3 evidence: Bitwig omitted the non-automatable Analyze parameter while the hosted editor worked.
 - [x] **D-04**: Start quietly with connection and identity only; do not automatically analyze, prompt Pi, or generate suggestions.
-- [ ] **D-05**: Permit continuous lightweight local feature extraction while initiating reasoning only on explicit user request.
+- [x] **D-05**: Permit continuous lightweight local feature extraction while initiating reasoning only on explicit user request.
 - [x] **D-06**: Allow bounded aggregates and note events to leave the plug-in; never transmit or persist raw audio.
 - [x] **D-07**: Play only bounded live MIDI that the user has inspected and explicitly armed.
 - [x] **D-08**: Preserve original audio/MIDI on disconnect and safely stop generated material with required note-offs.
@@ -27,7 +27,7 @@
 - [x] **D-13**: Collect approval in the CLAP UI while existing-state mutation uses the controller and current candidate/pre-flight/journal path.
 - [ ] **D-14**: Arm exact approved live MIDI and launch it at the configured next beat/bar boundary with a visible countdown.
 - [x] **D-15**: Make approval one-shot and exact-revision/project/instance/clip scoped; invalidate it on content or target change.
-- [ ] **D-16**: Make global Stop cancel generated behavior and disarm instances without altering original signal or reverting journaled edits.
+- [x] **D-16**: Make global Stop cancel generated behavior and disarm instances without altering original signal or reverting journaled edits.
 
 ## v1 Requirements
 
