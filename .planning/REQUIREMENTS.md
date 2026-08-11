@@ -12,9 +12,9 @@
 
 ## Phase 04.2 Product Requirements
 
-- [ ] **D-01**: Provide a focused in-Bitwig musical decision workspace with conversation, context, connection state, and proposal review.
-- [ ] **D-02**: Use a compact context strip, central conversation pane, and proposal drawer shown only for inspectable material.
-- [ ] **D-03**: Expose read-only connection/session status and proposal-pending indication plus ordinary automatable musical controls in Bitwig's device panel; keep Analyze and Stop always available as non-recording hosted CLAP UI actions, never as automatable parameters. Superseded 2026-08-10 from the pre-gate wording by accepted Phase 04.1 Q3 evidence: Bitwig omitted the non-automatable Analyze parameter while the hosted editor worked.
+- [x] **D-01**: Provide a focused in-Bitwig musical decision workspace with conversation, context, connection state, and proposal review.
+- [x] **D-02**: Use a compact context strip, central conversation pane, and proposal drawer shown only for inspectable material.
+- [x] **D-03**: Expose read-only connection/session status and proposal-pending indication plus ordinary automatable musical controls in Bitwig's device panel; keep Analyze and Stop always available as non-recording hosted CLAP UI actions, never as automatable parameters. Superseded 2026-08-10 from the pre-gate wording by accepted Phase 04.1 Q3 evidence: Bitwig omitted the non-automatable Analyze parameter while the hosted editor worked.
 - [x] **D-04**: Start quietly with connection and identity only; do not automatically analyze, prompt Pi, or generate suggestions.
 - [x] **D-05**: Permit continuous lightweight local feature extraction while initiating reasoning only on explicit user request.
 - [x] **D-06**: Allow bounded aggregates and note events to leave the plug-in; never transmit or persist raw audio.
