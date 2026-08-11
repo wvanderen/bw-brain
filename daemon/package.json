@@ -28,6 +28,7 @@
     "check:bridge-artifact": "node ../scripts/check-bridge-artifact.mjs"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.0",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
     "commander": "15.0.0",
