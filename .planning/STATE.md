@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
 status: executing
-stopped_at: Completed 04.2-03-PLAN.md
-last_updated: "2026-08-11T00:04:13.716Z"
+stopped_at: Completed 04.2-04-PLAN.md
+last_updated: "2026-08-11T00:11:59.203Z"
 last_activity: 2026-08-10
-last_activity_desc: Plan 04.2-03 persistent native instance identity complete
+last_activity_desc: Plan 04.2-04 controller correlation authority complete
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 44
-  completed_plans: 35
-  percent: 80
+  completed_plans: 36
+  percent: 82
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (3/11 plans complete)
+**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (4/11 plans complete)
 
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 3 of 11
+Plan: 4 of 11
 Status: Ready to execute
-Last activity: 2026-08-10 — Plan 04.2-03 persistent native instance identity complete
+Last activity: 2026-08-10 — Plan 04.2-04 controller correlation authority complete
 
-Progress: [████████░░] 35/44 plans complete (Phase 04.2: 3/11)
+Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/11)
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Progress: [████████░░] 35/44 plans complete (Phase 04.2: 3/1
 | Phase 04.2 P01 | 15min | 2 tasks | 18 files |
 | Phase 04.2 P02 | 6min | 2 tasks | 5 files |
 | Phase 04.2 P03 | 3min | 1 tasks | 4 files |
+| Phase 04.2 P04 | 7min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,9 @@ Recent decisions affecting current work:
 - [Phase 04.2]: Queue pressure on commands closes/refuses the peer rather than silently dropping identity, approval, Stop, arm, or phrase traffic.
 - [Phase 04.2]: Persisted plug-in state is a closed versioned binary record containing only a schema-valid instanceId and bounded musical settings. — Project/session authority remains daemon-owned.
 - [Phase 04.2]: Daemon rekey commands compare the expected old ID, require a different schema-valid new ID, and mark host state dirty. — Stale commands cannot replace current identity and successful rekeys persist.
+- [Phase 04.2]: Track and device names remain nullable hints; only an exact controller-selected-device tuple can confirm correlation. — Names cannot create controller authority.
+- [Phase 04.2]: Every confirmation nonce is single-use, fixed-expiry, and invalidated by disconnect, reconnect, or a newer request. — Prevents replay and cross-controller evidence reuse.
+- [Phase 04.2]: The correlation dispatcher recognizes only get.clap_correlation; apply.patch remains in its existing three-case mutation path. — Preserves D-13 controller mutation ownership.
 
 ### Pending Todos
 
@@ -179,6 +183,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-11T00:04:13.709Z
-Stopped at: Completed 04.2-03-PLAN.md
+Last session: 2026-08-11T00:11:44.127Z
+Stopped at: Completed 04.2-04-PLAN.md
 Resume file: None
