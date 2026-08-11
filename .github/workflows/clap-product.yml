@@ -1,0 +1,63 @@
+name: CLAP product
+
+on:
+  push:
+    paths:
+      - 'clap/**'
+      - 'daemon/**'
+      - 'bridge/**'
+      - 'schemas/**'
+      - 'scripts/validate-clap-product.sh'
+      - '.github/workflows/clap-product.yml'
+  pull_request:
+    paths:
+      - 'clap/**'
+      - 'daemon/**'
+      - 'bridge/**'
+      - 'schemas/**'
+      - 'scripts/validate-clap-product.sh'
+      - '.github/workflows/clap-product.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product:
+    name: Product / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+          cache-dependency-path: daemon/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libcurl4-openssl-dev libfreetype6-dev libgl1-mesa-dev libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libwebkit2gtk-4.1-dev
+      - name: Install daemon dependencies
+        working-directory: daemon
+        run: npm ci
+      - name: Run complete product gate
+        shell: bash
+        run: scripts/validate-clap-product.sh
+      - name: Archive packaged CLAP bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bw-brain-clap-${{ runner.os }}
+          path: clap/build/**/*bw-brain.clap*
+          if-no-files-found: error

@@ -78,6 +78,7 @@ private:
   identity::InstanceState instanceState_{"inst-local"};
   ui::UiStateStore uiState_{};
   ui::UiActionQueue uiActions_{};
+  juce::AudioParameterFloat* generatedMixParameter_{};
 };
 
 } // namespace bw

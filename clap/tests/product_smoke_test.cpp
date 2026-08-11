@@ -72,5 +72,12 @@ void assertAudioAndMidiRemainTransparent() {
 int main() {
   assertAudioAndMidiRemainTransparent<float>();
   assertAudioAndMidiRemainTransparent<double>();
+  bw::PluginProcessor original;
+  original.getParameters().getLast()->setValueNotifyingHost(0.51F);
+  juce::MemoryBlock state;
+  original.getStateInformation(state);
+  bw::PluginProcessor reopened;
+  reopened.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+  require(bitEqual(reopened.getParameters().getLast()->getValue(), 0.51F));
   return 0;
 }

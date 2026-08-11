@@ -8,7 +8,7 @@ namespace bw {
 PluginProcessor::PluginProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
-                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)) {addParameter(new ReadOnlyStatusParameter("Connection Status"));addParameter(new ReadOnlyStatusParameter("Session Status"));addParameter(new ReadOnlyStatusParameter("Proposal Pending"));addParameter(new juce::AudioParameterFloat({"generated_mix",1},"Generated Mix",0.0F,1.0F,0.0F));}
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)) {addParameter(new ReadOnlyStatusParameter("Connection Status"));addParameter(new ReadOnlyStatusParameter("Session Status"));addParameter(new ReadOnlyStatusParameter("Proposal Pending"));generatedMixParameter_=new juce::AudioParameterFloat({"generated_mix",1},"Generated Mix",0.0F,1.0F,0.0F);addParameter(generatedMixParameter_);}
 
 void PluginProcessor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) { setRateAndBufferSizeDetails(sampleRate,maximumExpectedSamplesPerBlock); }
 void PluginProcessor::releaseResources() { requestDisarm(); }
@@ -76,8 +76,8 @@ int PluginProcessor::getCurrentProgram() { return 0; }
 void PluginProcessor::setCurrentProgram(int) {}
 const juce::String PluginProcessor::getProgramName(int) { return {}; }
 void PluginProcessor::changeProgramName(int, const juce::String &) {}
-void PluginProcessor::getStateInformation(juce::MemoryBlock &destinationData) { instanceState_.setMusicalSettings({getParameters().getLast()->getValue()});const auto bytes=instanceState_.serialize();destinationData.replaceAll(bytes.data(),bytes.size()); }
-void PluginProcessor::setStateInformation(const void *data, int size) { if(size>0&&instanceState_.deserialize(std::span(static_cast<const std::uint8_t*>(data),static_cast<std::size_t>(size))))getParameters().getLast()->setValue(instanceState_.settings().generatedMix); }
+void PluginProcessor::getStateInformation(juce::MemoryBlock &destinationData) { instanceState_.setMusicalSettings({generatedMixParameter_->get()});const auto bytes=instanceState_.serialize();destinationData.replaceAll(bytes.data(),bytes.size()); }
+void PluginProcessor::setStateInformation(const void *data, int size) { if(size>0&&instanceState_.deserialize(std::span(static_cast<const std::uint8_t*>(data),static_cast<std::size_t>(size)))){generatedMixParameter_->setValueNotifyingHost(instanceState_.settings().generatedMix);updateHostDisplay(juce::AudioProcessorListener::ChangeDetails{}.withParameterInfoChanged(true));} }
 
 } // namespace bw
 
