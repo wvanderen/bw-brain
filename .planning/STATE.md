@@ -6,14 +6,14 @@ current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
 status: executing
 stopped_at: Completed 04.2-06-PLAN.md
-last_updated: "2026-08-11T00:28:01.105Z"
+last_updated: "2026-08-11T00:37:53.709Z"
 last_activity: 2026-08-10
 last_activity_desc: Plan 04.2-04 controller correlation authority complete
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 44
-  completed_plans: 38
+  completed_plans: 39
   percent: 75
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-06-29)
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 6 of 11
+Plan: 7 of 11
 Status: Ready to execute
 Last activity: 2026-08-10 — Plan 04.2-04 controller correlation authority complete
 
@@ -85,6 +85,7 @@ Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/1
 | Phase 04.2 P03 | 3min | 1 tasks | 4 files |
 | Phase 04.2 P04 | 7min | 2 tasks | 7 files |
 | Phase 04.2 P06 | 9min | 2 tasks | 10 files |
+| Phase 04.2 P07 | 13min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,8 @@ Recent decisions affecting current work:
 - [Phase 04.2]: The correlation dispatcher recognizes only get.clap_correlation; apply.patch remains in its existing three-case mutation path. — Preserves D-13 controller mutation ownership.
 - [Phase 04.2]: Quiet startup persists only an SDK-created session header plus bw-brain metadata; it never fabricates a prompt or model turn. — Pi 0.84.0 defers new-file persistence until an assistant response, but reopen must work with zero prompts.
 - [Phase 04.2]: Pi receives four handler-backed tools and no built-in, apply, arm-token, socket, filesystem, or raw-audio authority. — Daemon/controller trust boundaries remain authoritative.
+- [Phase 04.2]: The audio callback emits only fixed aggregate snapshots; raw PCM, sysex retention, JSON, logging, sockets, locks, allocation, and arbitrary history remain outside the process seam.
+- [Phase 04.2]: Daemon telemetry is a confirmed-scope bounded latest-value cache with no Pi/session-manager dependency, so telemetry never starts reasoning.
 
 ### Pending Todos
 
@@ -186,6 +189,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-11T00:28:01.098Z
+Last session: 2026-08-11T00:37:26.951Z
 Stopped at: Completed 04.2-06-PLAN.md
 Resume file: None
