@@ -21,6 +21,14 @@ public:
     write_.store(write + 1, std::memory_order_release);
     return !dropped;
   }
+  bool tryPushStrict(const T& value) noexcept {
+    const auto write = write_.load(std::memory_order_relaxed);
+    const auto read = read_.load(std::memory_order_acquire);
+    if (write - read == Capacity) return false;
+    storage_[write % Capacity] = value;
+    write_.store(write + 1, std::memory_order_release);
+    return true;
+  }
   bool tryPop(T& value) noexcept {
     const auto read = read_.load(std::memory_order_relaxed);
     const auto write = write_.load(std::memory_order_acquire);
