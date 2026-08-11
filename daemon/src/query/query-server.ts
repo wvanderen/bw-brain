@@ -47,6 +47,7 @@ import { classifyRisk, ScopeMismatchError } from "../patch/risk-classifier.js";
 import { inverseOps } from "../patch/inverse-ops.js";
 import type { CandidateStore } from "../patch/candidate-store.js";
 import type { PatchHistory, PatchHistoryEntry } from "../patch/patch-history.js";
+import type { EditService, EditResult } from "../runtime/edit-service.js";
 // Phase 3 Plan 03-04 — midi.* creative/cleanup dispatch (MIDI-02..05).
 import type { Profile } from "../gen/profile.js";
 import { loadProfile } from "../profiles/profile-loader.js";
@@ -161,6 +162,8 @@ export interface QueryServerDeps {
    * store). arrange.refresh persists track-role classifications here.
    */
   rolesPath?: string;
+  /** Canonical shared mutation authority; when present all edit routes delegate to it. */
+  editService?: EditService;
 }
 
 /** A schema-valid ok:true result. */
@@ -304,14 +307,17 @@ export function startQueryServer(deps: QueryServerDeps): void {
     // the handler resolves later + transport.send fires from the async
     // continuation (same shape as device/midi inspect above).
     if (op === "edit.preview") {
+      if (deps.editService) { void deps.editService.preview(state, intent, freshness, (msg as { payload?: { patch?: unknown } }).payload?.patch).then((r) => sendEditResult(deps, freshness, r)); return; }
       void handleEditPreview(deps, state, intent, freshness, msg as { payload?: { patch?: unknown } });
       return;
     }
     if (op === "edit.apply") {
+      if (deps.editService) { void deps.editService.apply(state, intent, freshness, (msg as { payload?: EditApplyPayload }).payload ?? {}).then((r) => sendEditResult(deps, freshness, r)); return; }
       void handleEditApply(deps, state, intent, freshness, msg as { payload?: EditApplyPayload });
       return;
     }
     if (op === "edit.revert") {
+      if (deps.editService) { void deps.editService.revert(state, intent, freshness, (msg as { payload?: { patchId?: string } }).payload?.patchId ?? "").then((r) => sendEditResult(deps, freshness, r)); return; }
       void handleEditRevert(deps, state, intent, freshness, msg as { payload?: { patchId?: string } });
       return;
     }
@@ -403,6 +409,11 @@ export function startQueryServer(deps: QueryServerDeps): void {
       lines.feed(chunk);
     }
   });
+}
+
+function sendEditResult(deps: QueryServerDeps, freshness: "live" | "stale" | "disconnected", result: EditResult): void {
+  if (result.ok) safeSendOk(deps.transport, freshness, result.payload ?? {}, result.assumptions as Assumption[]);
+  else safeSendErr(deps.transport, freshness, result.error ?? "apply_failed", result.details);
 }
 
 /** Construct a schema-valid ok:false result. */

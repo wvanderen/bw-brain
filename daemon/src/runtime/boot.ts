@@ -53,6 +53,7 @@ import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory } from "../patch/patch-history.js";
 import { PeerServer } from "../peers/peer-server.js";
 import { ControllerCorrelationService } from "../sessions/controller-correlation.js";
+import { EditService } from "./edit-service.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
@@ -370,6 +371,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
         }
         return { applied: r.applied ?? 0, failed: r.failed ?? 0 };
       });
+  const editService = new EditService({ candidateStore, patchHistory, applyPatchOverBridge, pullSelectedClip: () => correlator.send("get.selected_clip") });
   startQueryServer({
     transport: uds,
     watchdog,
@@ -380,6 +382,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     candidateStore,
     patchHistory,
     applyPatchOverBridge,
+    editService,
     // Phase 4 Plan 04-05 — arrangement intelligence deps.
     pullLauncherGrid: () => correlator.send("get.launcher_clips"),
     arrangementSnapshotPath,
