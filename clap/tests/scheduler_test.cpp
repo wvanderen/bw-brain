@@ -1,0 +1,36 @@
+#include "rt/EventMerge.h"
+#include "rt/PhraseScheduler.h"
+#include <cassert>
+#include <cmath>
+
+using namespace bw::rt;
+
+static ArmedPhrase phrase(LaunchQuantization launch = LaunchQuantization::nextBeat) {
+  ArmedPhrase p{}; p.revision=7; p.launch=launch; p.lengthBeats=1.0; p.noteCount=2;
+  p.notes[0]={0,0.0,0.25,0,0,60,0.5f,10}; p.notes[1]={1,0.5,0.25,0,0,64,0.5f,11};
+  return p;
+}
+
+int main() {
+  PhraseScheduler s; FixedEventBuffer generated{};
+  TransportBlock t{true,true,true,true,beatToFixed(1.75),120.0,4,4,48000.0,12000};
+  assert(s.render(t,generated)==0); // unarmed
+  assert(s.arm(phrase())); assert(s.render(t,generated)==1); assert(generated[0].time==6000);
+  s.disarm(); auto bar=phrase(LaunchQuantization::nextBar); assert(s.arm(bar));
+  t.beat=beatToFixed(3.5); assert(s.render(t,generated)==1); assert(generated[0].time==12000);
+  s.disarm(); assert(s.arm(phrase())); t.hasTempo=false; assert(s.render(t,generated)==0);
+  t.hasTempo=true; t.hasTimeSignature=false; assert(s.render(t,generated)==0);
+  t.hasTimeSignature=true; t.discontinuity=true; t.beat=beatToFixed(7.9); assert(s.render(t,generated)==1);
+  assert(generated[0].time==2400); // recomputed after jump
+
+  FixedEventBuffer original{}; original.count=2;
+  original[0]={2400,EventKind::midi,{0x90,50,90},false,{}};
+  original[1]={3000,EventKind::midi,{0x80,50,0},false,{}};
+  FixedEventBuffer merged{}; assert(mergeEvents(original,generated,merged));
+  assert(merged.count==3 && !merged[0].generated && merged[1].generated); // original first at tie
+
+  ArmedPhrase max{}; max.launch=LaunchQuantization::nextBeat; max.lengthBeats=64; max.noteCount=kMaxPhraseNotes;
+  for(std::size_t i=0;i<kMaxPhraseNotes;i++) max.notes[i]={static_cast<uint8_t>(i),0,64,0,0,static_cast<uint8_t>(i),1,-1};
+  s.disarm(); assert(s.arm(max)); max.noteCount=kMaxPhraseNotes+1; assert(!s.arm(max));
+  return 0;
+}
