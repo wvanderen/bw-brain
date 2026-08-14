@@ -146,6 +146,29 @@ function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?
       );
       return;
     }
+    // Phase 04.2: exact read-only controller proof for the currently selected
+    // device. Echo only the authoritative tuple and nonce supplied by daemon.
+    if (msg.type === "get.clap_correlation" && msg.id) {
+      socket.write(
+        JSON.stringify({
+          version: "1.0",
+          type: "response",
+          id: msg.id,
+          ok: true,
+          payload: {
+            available: true,
+            projectId: msg.payload?.projectId,
+            instanceId: msg.payload?.instanceId,
+            trackSid: msg.payload?.trackSid,
+            selectedDeviceEvidence: "controller-selected-device",
+            nonce: msg.payload?.nonce,
+            trackSidHint: msg.payload?.trackSid,
+            deviceHint: "bw-brain",
+          },
+        }) + "\n",
+      );
+      return;
+    }
     // Phase 3 Plan 03-02: handle apply.patch by dispatching primitive ops against
     // the in-memory mock clip (opts.applyPatchSink) + replying {applied, failed}.
     if (msg.type === "apply.patch" && msg.id) {
@@ -294,6 +317,21 @@ async function waitForSnapshot(env: Env, timeoutMs = 5_000): Promise<void> {
   // Not strictly fatal — the snapshot may be slow; tests below will assert.
 }
 
+function nextPeerLine(socket: net.Socket): Promise<Record<string, any>> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    const onData = (chunk: Buffer | string): void => {
+      buffer += chunk.toString();
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      socket.off("data", onData);
+      resolve(JSON.parse(buffer.slice(0, newline)) as Record<string, any>);
+    };
+    socket.on("data", onData);
+    socket.once("error", reject);
+  });
+}
+
 describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
   // Two distinct TCP ports so the two boot() instances (assertion 4 restart
   // + Major 2 soft-fallback) don't clash with each other or a real bridge
@@ -307,6 +345,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
       const handle = await boot({
         socketPath: env.socketPath,
         tcpPort: env.tcpPort,
+        peerPort: 0,
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });
@@ -329,6 +368,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
       const handle = await boot({
         socketPath: env.socketPath,
         tcpPort: env.tcpPort,
+        peerPort: 0,
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });
@@ -360,6 +400,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
       const handle = await boot({
         socketPath: env.socketPath,
         tcpPort: env.tcpPort,
+        peerPort: 0,
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });
@@ -398,6 +439,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         const handle = await boot({
           socketPath: env.socketPath,
           tcpPort: env.tcpPort,
+          peerPort: 0,
           stateCachePath: env.stateCachePath,
           intentPath: env.intentPath,
         });
@@ -422,6 +464,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         const handle = await boot({
           socketPath: env.socketPath,
           tcpPort: env.tcpPort,
+          peerPort: 0,
           stateCachePath: env.stateCachePath,
           intentPath: env.intentPath,
         });
@@ -450,6 +493,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
       const handle = await boot({
         socketPath: env.socketPath,
         tcpPort: env.tcpPort,
+        peerPort: 0,
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });
@@ -498,6 +542,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         const handle = await boot({
           socketPath: env.socketPath,
           tcpPort: env.tcpPort,
+          peerPort: 0,
           stateCachePath: env.stateCachePath,
           intentPath: env.intentPath,
         });
@@ -524,6 +569,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         const handle = await boot({
           socketPath: env.socketPath,
           tcpPort: env.tcpPort,
+          peerPort: 0,
           stateCachePath: env.stateCachePath,
           intentPath: env.intentPath,
         });
@@ -550,6 +596,75 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
     }
   });
 
+  it("assertion 6: peer link request -> controller proof -> nonce accept -> confirmed focus", async () => {
+    const env = await makeEnv(PORT_PRIMARY);
+    let peer: net.Socket | undefined;
+    try {
+      const handle = await boot({
+        socketPath: env.socketPath,
+        tcpPort: env.tcpPort,
+        peerPort: 0,
+        stateCachePath: env.stateCachePath,
+        intentPath: env.intentPath,
+      });
+      const fakeBridge = startFakeBridge(env);
+      try {
+        await fakeBridge.connected;
+        await waitForSnapshot(env);
+        fakeBridge.sendEvent("selection.changed", { slot: 1 });
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        peer = net.createConnection({ host: "127.0.0.1", port: handle.peerPort });
+        await new Promise<void>((resolve, reject) => { peer!.once("connect", resolve); peer!.once("error", reject); });
+        const acceptedLine = nextPeerLine(peer);
+        peer.write(JSON.stringify({
+          type: "clap.hello",
+          protocol: "1.0",
+          instanceId: "instance-product",
+          capabilities: ["identity.link"],
+          limits: { maxLineBytes: 65_536, maxQueueMessages: 32, maxQueueBytes: 262_144 },
+        }) + "\n");
+        expect(await acceptedLine).toMatchObject({ type: "clap.accept", instanceId: "instance-product" });
+
+        const pendingLine = nextPeerLine(peer);
+        peer.write('{"type":"link.confirm.request"}\n');
+        const pending = await pendingLine;
+        expect(pending).toMatchObject({
+          type: "link.confirm.pending",
+          scope: { instanceId: "instance-product", trackHint: "Bass" },
+        });
+        expect(pending.scope.projectId).toMatch(/^project-[0-9a-f-]{36}$/);
+        expect(pending.scope.trackSid).toMatch(/^trk_[0-9a-f]{16}$/);
+
+        const confirmedLine = nextPeerLine(peer);
+        peer.write(JSON.stringify({ type: "link.confirm.accept", nonce: pending.nonce }) + "\n");
+        const confirmed = await confirmedLine;
+        expect(confirmed).toEqual({ type: "link.status", status: "confirmed", scope: pending.scope });
+
+        const focusedLine = nextPeerLine(peer);
+        peer.write(JSON.stringify({
+          type: "focus.set",
+          scope: { projectId: pending.scope.projectId, instanceId: "instance-product" },
+        }) + "\n");
+        expect(await focusedLine).toEqual({
+          type: "focus.status",
+          scope: { projectId: pending.scope.projectId, instanceId: "instance-product" },
+        });
+
+        const persisted = JSON.parse(await fs.promises.readFile(
+          path.join(env.dir, "projects", pending.scope.projectId, "project-registry.json"), "utf8",
+        ));
+        expect(persisted.links["instance-product"]).toMatchObject({ status: "confirmed", trackSid: pending.scope.trackSid });
+      } finally {
+        peer?.destroy();
+        fakeBridge.close();
+        await handle.shutdown();
+      }
+    } finally {
+      await dropEnv(env);
+    }
+  });
+
   // =========================================================================
   // Phase 3 Plan 03-02 Task 3 — daemon↔fake-bridge apply/revert round-trip.
   // Proves the EDIT-02/04/05 wire contract end-to-end: preview mints a
@@ -557,7 +672,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
   // clip), history is appended with INV-14 inverseOps, revert replays the
   // inverse. NO live Bitwig required (RESEARCH.md §Validation "CLI Smoke").
   // =========================================================================
-  it("assertion 6 (Plan 03-02): preview -> apply.patch over TCP -> history appended (INV-14) -> revert -> inverse applied", async () => {
+  it("assertion 7 (Plan 03-02): preview -> apply.patch over TCP -> history appended (INV-14) -> revert -> inverse applied", async () => {
     const env = await makeEnv(PORT_PRIMARY);
     // A separate history path so this test asserts the journal gain in isolation.
     const historyPath = path.join(env.dir, "patch-history.jsonl");
@@ -571,6 +686,7 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
       const handle = await boot({
         socketPath: env.socketPath,
         tcpPort: env.tcpPort,
+        peerPort: 0,
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });

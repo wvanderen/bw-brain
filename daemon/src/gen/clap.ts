@@ -6,23 +6,35 @@
 
 export type ClapIdentityMessage =
   | {
-      type: "identity.link.request";
-      nonce: string;
-      instanceId: string;
-      hints: {
-        trackName?: string;
-        deviceName?: string;
-      };
+      type: "link.confirm.request";
     }
   | {
-      type: "identity.link.confirm";
+      type: "link.confirm.pending";
       nonce: string;
       scope: {
         projectId: string;
         instanceId: string;
+        trackSid: string;
         clipSid?: string;
+        trackHint?: string;
+        deviceHint?: string | null;
       };
-      confirmed: true;
+    }
+  | {
+      type: "link.confirm.accept";
+      nonce: string;
+    }
+  | {
+      type: "link.status";
+      status: "confirmed" | "stale" | "unlinked";
+      scope: {
+        projectId: string;
+        instanceId: string;
+        trackSid: string;
+        clipSid?: string;
+        trackHint?: string;
+        deviceHint?: string | null;
+      };
     }
   | {
       type: "focus.set";
@@ -33,10 +45,47 @@ export type ClapIdentityMessage =
       };
     }
   | {
-      type: "session.fork";
+      type: "focus.status";
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+    }
+  | {
+      type: "session.fork.request";
       sourceProjectId: string;
       newProjectId: string;
-      confirmed: true;
+    }
+  | {
+      type: "session.fork.confirmation_required";
+      token: string;
+      sourceProjectId: string;
+      newProjectId: string;
+      /**
+       * @maxItems 32
+       */
+      instanceIds: string[];
+    }
+  | {
+      type: "session.fork.confirm";
+      token: string;
+      sourceProjectId: string;
+      newProjectId: string;
+    }
+  | {
+      type: "ProjectForkCommitted";
+      sourceProjectId: string;
+      newProjectId: string;
+      /**
+       * @maxItems 32
+       */
+      instanceIds: string[];
+      lineageVersion: number;
+    }
+  | {
+      type: "action.error";
+      error: string;
     };
 
 /**

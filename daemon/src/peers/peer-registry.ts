@@ -37,6 +37,10 @@ export class PeerRegistry {
   }
 
   getLease(instanceId: string): InstanceLease | undefined { const lease = this.leases.get(instanceId); return lease && { ...lease }; }
+  getConnectionLease(connectionId: string): InstanceLease | undefined {
+    const lease = [...this.leases.values()].find((candidate) => candidate.connectionId === connectionId);
+    return lease && { ...lease };
+  }
   setLeaseScope(instanceId: string, projectId: string, status: InstanceLease["status"]): void {
     const lease = this.leases.get(instanceId); if (!lease) throw new Error("instance_not_leased");
     this.leases.set(instanceId, { ...lease, projectId, status });

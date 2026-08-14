@@ -69,6 +69,8 @@ private:
   void requestDisarm() noexcept;
   void processGeneration(juce::MidiBuffer&,uint32_t) noexcept;
   rt::TransportBlock currentTransport(uint32_t) noexcept;
+  bool nextPeerMessage(std::string& message);
+  void handlePeerMessage(const std::string& message);
   rt::Aggregator telemetry_{};
   rt::SpscQueue<Command,8> commands_{};
   rt::PhraseScheduler scheduler_{};

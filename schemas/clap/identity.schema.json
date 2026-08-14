@@ -3,36 +3,98 @@
   "$id": "https://bw-brain.local/schemas/clap/identity.schema.json",
   "title": "ClapIdentityMessage",
   "oneOf": [
-    { "$ref": "#/$defs/LinkRequest" }, { "$ref": "#/$defs/LinkConfirm" },
-    { "$ref": "#/$defs/FocusSet" }, { "$ref": "#/$defs/Fork" }
+    { "$ref": "#/$defs/LinkConfirmRequest" },
+    { "$ref": "#/$defs/LinkConfirmPending" },
+    { "$ref": "#/$defs/LinkConfirmAccept" },
+    { "$ref": "#/$defs/LinkStatus" },
+    { "$ref": "#/$defs/FocusSet" },
+    { "$ref": "#/$defs/FocusStatus" },
+    { "$ref": "#/$defs/SessionForkRequest" },
+    { "$ref": "#/$defs/SessionForkConfirmationRequired" },
+    { "$ref": "#/$defs/SessionForkConfirm" },
+    { "$ref": "#/$defs/ProjectForkCommitted" },
+    { "$ref": "#/$defs/ActionError" }
   ],
   "$defs": {
     "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
     "Hint": { "type": "string", "maxLength": 256 },
     "Scope": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["projectId", "instanceId"],
-      "properties": { "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "clipSid": { "$ref": "#/$defs/Id" } }
+      "properties": {
+        "projectId": { "$ref": "#/$defs/Id" },
+        "instanceId": { "$ref": "#/$defs/Id" },
+        "clipSid": { "$ref": "#/$defs/Id" }
+      }
     },
-    "LinkRequest": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "nonce", "instanceId", "hints"],
-      "properties": { "type": { "const": "identity.link.request" }, "nonce": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "hints": { "type": "object", "additionalProperties": false, "properties": { "trackName": { "$ref": "#/$defs/Hint" }, "deviceName": { "$ref": "#/$defs/Hint" } } } }
+    "LinkScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "instanceId", "trackSid"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/Id" },
+        "instanceId": { "$ref": "#/$defs/Id" },
+        "trackSid": { "$ref": "#/$defs/Id" },
+        "clipSid": { "$ref": "#/$defs/Id" },
+        "trackHint": { "$ref": "#/$defs/Hint" },
+        "deviceHint": { "oneOf": [{ "$ref": "#/$defs/Hint" }, { "type": "null" }] }
+      }
     },
-    "LinkConfirm": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "nonce", "scope", "confirmed"],
-      "properties": { "type": { "const": "identity.link.confirm" }, "nonce": { "$ref": "#/$defs/Id" }, "scope": { "$ref": "#/$defs/Scope" }, "confirmed": { "const": true } }
+    "LinkConfirmRequest": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": { "type": { "const": "link.confirm.request" } }
+    },
+    "LinkConfirmPending": {
+      "type": "object", "additionalProperties": false, "required": ["type", "nonce", "scope"],
+      "properties": { "type": { "const": "link.confirm.pending" }, "nonce": { "$ref": "#/$defs/Id" }, "scope": { "$ref": "#/$defs/LinkScope" } }
+    },
+    "LinkConfirmAccept": {
+      "type": "object", "additionalProperties": false, "required": ["type", "nonce"],
+      "properties": { "type": { "const": "link.confirm.accept" }, "nonce": { "$ref": "#/$defs/Id" } }
+    },
+    "LinkStatus": {
+      "type": "object", "additionalProperties": false, "required": ["type", "status", "scope"],
+      "properties": { "type": { "const": "link.status" }, "status": { "enum": ["confirmed", "stale", "unlinked"] }, "scope": { "$ref": "#/$defs/LinkScope" } }
     },
     "FocusSet": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "scope"],
+      "type": "object", "additionalProperties": false, "required": ["type", "scope"],
       "properties": { "type": { "const": "focus.set" }, "scope": { "$ref": "#/$defs/Scope" } }
     },
-    "Fork": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "sourceProjectId", "newProjectId", "confirmed"],
-      "properties": { "type": { "const": "session.fork" }, "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" }, "confirmed": { "const": true } }
+    "FocusStatus": {
+      "type": "object", "additionalProperties": false, "required": ["type", "scope"],
+      "properties": { "type": { "const": "focus.status" }, "scope": { "$ref": "#/$defs/Scope" } }
+    },
+    "SessionForkRequest": {
+      "type": "object", "additionalProperties": false, "required": ["type", "sourceProjectId", "newProjectId"],
+      "properties": { "type": { "const": "session.fork.request" }, "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" } }
+    },
+    "SessionForkConfirmationRequired": {
+      "type": "object", "additionalProperties": false, "required": ["type", "token", "sourceProjectId", "newProjectId", "instanceIds"],
+      "properties": {
+        "type": { "const": "session.fork.confirmation_required" }, "token": { "$ref": "#/$defs/Id" },
+        "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" },
+        "instanceIds": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/Id" } }
+      }
+    },
+    "SessionForkConfirm": {
+      "type": "object", "additionalProperties": false, "required": ["type", "token", "sourceProjectId", "newProjectId"],
+      "properties": {
+        "type": { "const": "session.fork.confirm" }, "token": { "$ref": "#/$defs/Id" },
+        "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" }
+      }
+    },
+    "ProjectForkCommitted": {
+      "type": "object", "additionalProperties": false, "required": ["type", "sourceProjectId", "newProjectId", "instanceIds", "lineageVersion"],
+      "properties": {
+        "type": { "const": "ProjectForkCommitted" }, "sourceProjectId": { "$ref": "#/$defs/Id" }, "newProjectId": { "$ref": "#/$defs/Id" },
+        "instanceIds": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/Id" } },
+        "lineageVersion": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    },
+    "ActionError": {
+      "type": "object", "additionalProperties": false, "required": ["type", "error"],
+      "properties": { "type": { "const": "action.error" }, "error": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$" } }
     }
   }
 }

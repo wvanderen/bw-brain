@@ -31,10 +31,25 @@ int main() {
   check(snapshot->showProposalDrawer && snapshot->proposal->revision == 2, "inspectable proposal drawer");
   check(snapshot->scheduler == "countdown" && snapshot->countdownBeats == 3.5, "countdown visible");
 
+  store.reduce(ScopeChanged{ScopeView{"project-a", "track hint", "inst-a", true, "clip-a"}});
+  snapshot = store.snapshot();
+  check(snapshot->scope.confirmed && snapshot->link == "confirmed", "confirmed link must rebind visible scope");
+  check(snapshot->confirmationNonce.empty(), "confirmed link must consume pending nonce");
+
+  std::string peerMessage;
+  check(encodePeerAction(UiAction::linkConfirmRequest(), peerMessage) && peerMessage == "{\"type\":\"link.confirm.request\"}", "link request wire encoding");
+  UiStateStore peerStore;
+  check(reducePeerMessage(peerStore, "{\"type\":\"link.confirm.pending\",\"nonce\":\"nonce-a\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"trackSid\":\"trk_0123456789abcdef\",\"trackHint\":\"Bass 2\"}}"), "pending peer response reducer");
+  check(peerStore.snapshot()->confirmationNonce == "nonce-a" && peerStore.snapshot()->scope.trackHint == "Bass 2", "pending scope must be visible");
+  check(encodePeerAction(UiAction::linkConfirmAccept(peerStore.snapshot()->confirmationNonce), peerMessage) && peerMessage.find("link.confirm.accept") != std::string::npos, "link accept wire encoding");
+  check(reducePeerMessage(peerStore, "{\"type\":\"link.status\",\"status\":\"confirmed\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"trackSid\":\"trk_0123456789abcdef\",\"trackHint\":\"Bass 2\"}}"), "confirmed peer response reducer");
+  check(peerStore.snapshot()->scope.confirmed && peerStore.snapshot()->confirmationNonce.empty(), "confirmed peer response must consume nonce");
+
   UiActionQueue actions;
   check(actions.enqueue(UiAction::analyze()), "Analyze must be hosted action");
   check(actions.enqueue(UiAction::stop()), "Stop must be hosted action");
-  check(actions.enqueue(UiAction::linkConfirmAccept("nonce-a")), "link confirmation action");
+  check(actions.enqueue(UiAction::linkConfirmRequest()), "link confirmation request action");
+  check(actions.enqueue(UiAction::linkConfirmAccept("nonce-a")), "link confirmation accept action");
   check(actions.enqueue(UiAction::focusSet("project-a", "inst-a", "clip-a")), "focus action");
   check(actions.enqueue(UiAction::forkConfirm("source-a", "fork-a", "fork-token")), "fork confirmation action");
 

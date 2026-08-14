@@ -1,14 +1,29 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include <span>
-namespace {class ReadOnlyStatusParameter final:public juce::AudioProcessorParameter{public:explicit ReadOnlyStatusParameter(juce::String n):name_(std::move(n)){}float getValue()const override{return value_.load();}void setValue(float)override{}float getDefaultValue()const override{return 0;}juce::String getName(int n)const override{return name_.substring(0,n);}juce::String getLabel()const override{return{};}int getNumSteps()const override{return 2;}juce::String getText(float,int)const override{return getValue()>.5F?"On":"Off";}float getValueForText(const juce::String&)const override{return getValue();}bool isAutomatable()const override{return false;}bool isOrientationInverted()const override{return false;}private:juce::String name_;std::atomic<float>value_{0};};}
+namespace {
+class ReadOnlyStatusParameter final:public juce::AudioProcessorParameter{public:explicit ReadOnlyStatusParameter(juce::String n):name_(std::move(n)){}float getValue()const override{return value_.load();}void setValue(float)override{}float getDefaultValue()const override{return 0;}juce::String getName(int n)const override{return name_.substring(0,n);}juce::String getLabel()const override{return{};}int getNumSteps()const override{return 2;}juce::String getText(float,int)const override{return getValue()>.5F?"On":"Off";}float getValueForText(const juce::String&)const override{return getValue();}bool isAutomatable()const override{return false;}bool isOrientationInverted()const override{return false;}private:juce::String name_;std::atomic<float>value_{0};};
+}
 
 namespace bw {
 
 PluginProcessor::PluginProcessor()
     : AudioProcessor(BusesProperties()
                          .withInput("Input", juce::AudioChannelSet::stereo(), true)
-                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)) {addParameter(new ReadOnlyStatusParameter("Connection Status"));addParameter(new ReadOnlyStatusParameter("Session Status"));addParameter(new ReadOnlyStatusParameter("Proposal Pending"));generatedMixParameter_=new juce::AudioParameterFloat({"generated_mix",1},"Generated Mix",0.0F,1.0F,0.0F);addParameter(generatedMixParameter_);peerTransport_=std::make_unique<peer::LoopbackTransport>(instanceState_.instanceId(),[this](bool connected){publishUi(ui::ConnectionChanged{connected?"connected":"disconnected"});},[this](const std::string&oldId,const std::string&newId){{std::lock_guard lock(instanceStateMutex_);if(!instanceState_.applyDaemonRekey(oldId,newId))return;}auto scope=uiSnapshot()->scope;scope.instanceId=newId;publishUi(ui::ScopeChanged{std::move(scope)});});}
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)) {addParameter(new ReadOnlyStatusParameter("Connection Status"));addParameter(new ReadOnlyStatusParameter("Session Status"));addParameter(new ReadOnlyStatusParameter("Proposal Pending"));generatedMixParameter_=new juce::AudioParameterFloat({"generated_mix",1},"Generated Mix",0.0F,1.0F,0.0F);addParameter(generatedMixParameter_);auto initialScope=uiSnapshot()->scope;initialScope.instanceId=instanceState_.instanceId();publishUi(ui::ScopeChanged{std::move(initialScope)});peerTransport_=std::make_unique<peer::LoopbackTransport>(instanceState_.instanceId(),[this](bool connected){publishUi(ui::ConnectionChanged{connected?"connected":"disconnected"});},[this](const std::string&oldId,const std::string&newId){{std::lock_guard lock(instanceStateMutex_);if(!instanceState_.applyDaemonRekey(oldId,newId))return;}auto scope=uiSnapshot()->scope;scope.instanceId=newId;publishUi(ui::ScopeChanged{std::move(scope)});},7879,std::chrono::milliseconds(250),[this](std::string&message){return nextPeerMessage(message);},[this](const std::string&message){handlePeerMessage(message);});}
+
+bool PluginProcessor::nextPeerMessage(std::string& message) {
+  ui::UiAction action;
+  while (uiActions_.tryPop(action)) {
+    if (ui::encodePeerAction(action,message)) return true;
+    publishUi(ui::HealthChanged{uiSnapshot()->droppedSnapshots,"invalid_or_unsupported_action"});
+  }
+  return false;
+}
+
+void PluginProcessor::handlePeerMessage(const std::string& message) {
+  ui::reducePeerMessage(uiState_,message);
+}
 
 void PluginProcessor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) { setRateAndBufferSizeDetails(sampleRate,maximumExpectedSamplesPerBlock); }
 void PluginProcessor::releaseResources() { requestDisarm(); }

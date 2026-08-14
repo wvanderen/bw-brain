@@ -56,6 +56,7 @@ import { TelemetryDispatch } from "../peers/telemetry-dispatch.js";
 import { ControllerCorrelationService } from "../sessions/controller-correlation.js";
 import { EditService } from "./edit-service.js";
 import { ActionDispatch } from "../peers/action-dispatch.js";
+import { SessionActions } from "../peers/session-actions.js";
 import { StopCoordinator } from "./stop-coordinator.js";
 import { ProjectRegistry } from "../sessions/project-registry.js";
 import { FocusRegistry } from "../sessions/focus-registry.js";
@@ -132,6 +133,8 @@ export interface BootOptions {
 
 /** Handle returned by boot() so callers (smoke test, harness) can shut down. */
 export interface BootHandle {
+  /** Actual CLAP peer port (useful when port 0 requests an ephemeral test port). */
+  peerPort: number;
   /** Gracefully shut down: persist state, close transports, unlink socket. */
   shutdown: () => Promise<void>;
 }
@@ -417,7 +420,35 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     stopProject: (projectId) => stop.stopProject(projectId),
     sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
   });
-  routePeerAction = (connectionId, message) => { void actions.dispatch(connectionId, message); };
+  const sessionActions = new SessionActions({
+    projects,
+    focus,
+    correlation: controllerCorrelation,
+    resolveLinkScope: async (connectionId) => {
+      const lease = peers.registry.getConnectionLease(connectionId);
+      const trackSid = lastState?.selection.trackSid;
+      if (!lease || !trackSid) throw new Error("link_scope_unavailable");
+      const projectId = await projects.getOrCreateActiveProjectId();
+      const trackHint = summaryTracks.find((track) => stableIds.byNameAndType.get(`track:${track.name}`) === trackSid)?.name;
+      return {
+        projectId,
+        instanceId: lease.instanceId,
+        trackSid,
+        ...(lastState?.selection.clipSid ? { clipSid: lastState.selection.clipSid } : {}),
+        ...(trackHint ? { trackHint: trackHint.slice(0, 256) } : {}),
+        deviceHint: null,
+      };
+    },
+    markLinkPending: (scope) => peers.registry.setLeaseScope(scope.instanceId, scope.projectId, "pending"),
+    markLinkConfirmed: (scope) => peers.registry.setLeaseScope(scope.instanceId, scope.projectId, "confirmed"),
+    sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+  });
+  routePeerAction = (connectionId, message) => {
+    void (async () => {
+      if (await sessionActions.dispatch(connectionId, message)) return;
+      await actions.dispatch(connectionId, message);
+    })().catch((error) => console.error("[boot] peer action failed:", (error as Error).message));
+  };
   startQueryServer({
     transport: uds,
     watchdog,
@@ -487,7 +518,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
 
   console.error(`[boot] bw-brain daemon up: uds=${socketPath} tcp=127.0.0.1:${tcpPort} peers=127.0.0.1:${peers.port}`);
 
-  return { shutdown };
+  return { shutdown, peerPort: peers.port };
 }
 
 /**

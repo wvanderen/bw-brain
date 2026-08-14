@@ -58,12 +58,16 @@ LoopbackTransport::LoopbackTransport(std::string instanceId,
                                      ConnectionChanged connectionChanged,
                                      RekeyReceived rekeyReceived,
                                      std::uint16_t port,
-                                     std::chrono::milliseconds retryDelay)
+                                     std::chrono::milliseconds retryDelay,
+                                     OutboundMessage outboundMessage,
+                                     InboundMessage inboundMessage)
     : instanceId_(std::move(instanceId)),
       connectionChanged_(std::move(connectionChanged)),
       rekeyReceived_(std::move(rekeyReceived)),
       port_(port),
       retryDelay_(retryDelay),
+      outboundMessage_(std::move(outboundMessage)),
+      inboundMessage_(std::move(inboundMessage)),
       worker_([this] { run(); }) {}
 
 LoopbackTransport::~LoopbackTransport() {
@@ -100,7 +104,7 @@ bool LoopbackTransport::connectAndServe() {
 
   const std::string hello =
       "{\"type\":\"clap.hello\",\"protocol\":\"1.0\",\"instanceId\":\"" + instanceId_ +
-      "\",\"capabilities\":[\"telemetry.snapshot\"],\"limits\":{\"maxLineBytes\":65536,"
+      "\",\"capabilities\":[\"identity.link\",\"telemetry.snapshot\"],\"limits\":{\"maxLineBytes\":65536,"
       "\"maxQueueMessages\":32,\"maxQueueBytes\":262144}}\n";
   if (!validId(instanceId_) || !sendAll(socket, hello)) {
     if (socket_.exchange(-1, std::memory_order_acq_rel) == socket) ::close(socket);
@@ -112,6 +116,22 @@ bool LoopbackTransport::connectAndServe() {
   std::string input;
   input.reserve(4096);
   while (running_.load(std::memory_order_acquire)) {
+    if (accepted && outboundMessage_) {
+      for (std::size_t count = 0; count < 32; ++count) {
+        std::string line;
+        if (!outboundMessage_(line)) break;
+        if (line.empty() || line.size() + 1 > kMaxLineBytes) {
+          rekeyed = true;
+          break;
+        }
+        line.push_back('\n');
+        if (!sendAll(socket, line)) {
+          rekeyed = true;
+          break;
+        }
+      }
+      if (rekeyed) break;
+    }
     fd_set readable;
     FD_ZERO(&readable);
     FD_SET(socket, &readable);
@@ -150,6 +170,8 @@ bool LoopbackTransport::connectAndServe() {
           rekeyed = true;
           break;
         }
+      } else if (accepted && inboundMessage_) {
+        inboundMessage_(line);
       }
     }
     if (rekeyed) break;

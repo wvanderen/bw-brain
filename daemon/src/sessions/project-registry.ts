@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { atomicWriteJson } from "../store/atomic-write.js";
 
@@ -22,9 +23,36 @@ const validId = (id: string) => /^[A-Za-z0-9._:-]{1,64}$/.test(id);
 /** Durable owner of project identity, lineage, and controller-confirmed links. */
 export class ProjectRegistry {
   private readonly records = new Map<string, ProjectRecord>();
+  private activeProjectId: string | undefined;
   constructor(private readonly storageDir: string) {}
 
   private path(projectId: string): string { return join(this.storageDir, projectId, "project-registry.json"); }
+  private activePath(): string { return join(this.storageDir, "active-project.json"); }
+
+  /** Persisted daemon-owned project identity. It is minted, never inferred from names or cwd. */
+  async getOrCreateActiveProjectId(): Promise<string> {
+    if (this.activeProjectId) return this.activeProjectId;
+    try {
+      const record = JSON.parse(await readFile(this.activePath(), "utf8")) as { version?: unknown; projectId?: unknown };
+      if (record.version !== "1.0" || typeof record.projectId !== "string" || !validId(record.projectId)) {
+        throw new Error("invalid active project identity");
+      }
+      this.activeProjectId = record.projectId;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      this.activeProjectId = `project-${randomUUID()}`;
+      await atomicWriteJson(this.activePath(), { version: "1.0", projectId: this.activeProjectId });
+    }
+    await this.open(this.activeProjectId);
+    return this.activeProjectId;
+  }
+
+  async setActiveProjectId(projectId: string): Promise<void> {
+    if (!validId(projectId)) throw new Error("invalid projectId");
+    await this.open(projectId);
+    await atomicWriteJson(this.activePath(), { version: "1.0", projectId });
+    this.activeProjectId = projectId;
+  }
 
   async open(projectId: string): Promise<ProjectRecord> {
     if (!validId(projectId)) throw new Error("invalid projectId");
