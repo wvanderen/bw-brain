@@ -78,6 +78,23 @@ LoopbackTransport::~LoopbackTransport() {
   if (socket >= 0) ::close(socket);
 }
 
+bool LoopbackTransport::setInstanceId(std::string instanceId) {
+  if (!validId(instanceId)) return false;
+  {
+    std::lock_guard lock(instanceIdMutex_);
+    if (instanceId_ == instanceId) return true;
+    instanceId_ = std::move(instanceId);
+  }
+  const int socket = socket_.load(std::memory_order_acquire);
+  if (socket >= 0) ::shutdown(socket, SHUT_RDWR);
+  return true;
+}
+
+std::string LoopbackTransport::currentInstanceId() const {
+  std::lock_guard lock(instanceIdMutex_);
+  return instanceId_;
+}
+
 void LoopbackTransport::run() {
   while (running_.load(std::memory_order_acquire)) {
     connectAndServe();
@@ -102,11 +119,12 @@ bool LoopbackTransport::connectAndServe() {
     return false;
   }
 
+  const auto helloInstanceId = currentInstanceId();
   const std::string hello =
-      "{\"type\":\"clap.hello\",\"protocol\":\"1.0\",\"instanceId\":\"" + instanceId_ +
+      "{\"type\":\"clap.hello\",\"protocol\":\"1.0\",\"instanceId\":\"" + helloInstanceId +
       "\",\"capabilities\":[\"identity.link\",\"telemetry.snapshot\"],\"limits\":{\"maxLineBytes\":65536,"
       "\"maxQueueMessages\":32,\"maxQueueBytes\":262144}}\n";
-  if (!validId(instanceId_) || !sendAll(socket, hello)) {
+  if (!validId(helloInstanceId) || !sendAll(socket, hello)) {
     if (socket_.exchange(-1, std::memory_order_acq_rel) == socket) ::close(socket);
     return false;
   }
@@ -157,18 +175,23 @@ bool LoopbackTransport::connectAndServe() {
       if (type == "clap.accept") {
         const auto acceptedId = jsonString(line, "instanceId");
         const auto connectionId = jsonString(line, "connectionId");
-        if (acceptedId == instanceId_ && validId(connectionId) && !accepted) {
+        if (acceptedId == currentInstanceId() && validId(connectionId) && !accepted) {
           accepted = true;
           if (connectionChanged_) connectionChanged_(true);
         }
       } else if (type == "instance.rekey" && rekeyReceived_) {
         const auto oldId = jsonString(line, "oldInstanceId");
         const auto newId = jsonString(line, "newInstanceId");
-        if (oldId == instanceId_ && validId(newId)) {
+        if (oldId == currentInstanceId() && validId(newId)) {
           rekeyReceived_(oldId, newId);
-          instanceId_ = newId;
-          rekeyed = true;
-          break;
+          {
+            std::lock_guard lock(instanceIdMutex_);
+            if (instanceId_ == oldId) {
+              instanceId_ = newId;
+              rekeyed = true;
+            }
+          }
+          if (rekeyed) break;
         }
       } else if (accepted && inboundMessage_) {
         inboundMessage_(line);

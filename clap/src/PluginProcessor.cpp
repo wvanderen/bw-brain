@@ -92,7 +92,29 @@ void PluginProcessor::setCurrentProgram(int) {}
 const juce::String PluginProcessor::getProgramName(int) { return {}; }
 void PluginProcessor::changeProgramName(int, const juce::String &) {}
 void PluginProcessor::getStateInformation(juce::MemoryBlock &destinationData) { std::lock_guard lock(instanceStateMutex_);instanceState_.setMusicalSettings({generatedMixParameter_->get()});const auto bytes=instanceState_.serialize();destinationData.replaceAll(bytes.data(),bytes.size()); }
-void PluginProcessor::setStateInformation(const void *data, int size) { std::lock_guard lock(instanceStateMutex_);if(size>0&&instanceState_.deserialize(std::span(static_cast<const std::uint8_t*>(data),static_cast<std::size_t>(size)))){generatedMixParameter_->setValueNotifyingHost(instanceState_.settings().generatedMix);updateHostDisplay(juce::AudioProcessorListener::ChangeDetails{}.withParameterInfoChanged(true));} }
+void PluginProcessor::setStateInformation(const void *data, int size) {
+  std::string restoredInstanceId;
+  identity::MusicalSettings restoredSettings;
+  {
+    std::lock_guard lock(instanceStateMutex_);
+    if (size <= 0 ||
+        !instanceState_.deserialize(std::span(
+            static_cast<const std::uint8_t*>(data),
+            static_cast<std::size_t>(size)))) {
+      return;
+    }
+    restoredInstanceId = instanceState_.instanceId();
+    restoredSettings = instanceState_.settings();
+  }
+
+  generatedMixParameter_->setValueNotifyingHost(restoredSettings.generatedMix);
+  auto scope = uiSnapshot()->scope;
+  scope.instanceId = restoredInstanceId;
+  publishUi(ui::ScopeChanged{std::move(scope)});
+  peerTransport_->setInstanceId(std::move(restoredInstanceId));
+  updateHostDisplay(
+      juce::AudioProcessorListener::ChangeDetails{}.withParameterInfoChanged(true));
+}
 
 } // namespace bw
 

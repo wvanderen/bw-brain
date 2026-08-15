@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -25,10 +26,14 @@ class LoopbackTransport final {
   LoopbackTransport(const LoopbackTransport&) = delete;
   LoopbackTransport& operator=(const LoopbackTransport&) = delete;
 
+  bool setInstanceId(std::string instanceId);
+
  private:
   void run();
   bool connectAndServe();
+  [[nodiscard]] std::string currentInstanceId() const;
 
+  mutable std::mutex instanceIdMutex_;
   std::string instanceId_;
   ConnectionChanged connectionChanged_;
   RekeyReceived rekeyReceived_;

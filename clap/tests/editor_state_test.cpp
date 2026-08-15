@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "identity/InstanceState.h"
 #include "model/UiState.h"
 
 #include <cstdlib>
@@ -92,5 +93,15 @@ int main() {
   reopened.setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
   auto* reopenedMix = reopened.getParameters().getLast();
   check(reopenedMix->getValue() > 0.3F && reopenedMix->getValue() < 0.5F, "musical setting did not reopen");
+
+  bw::identity::InstanceState persistedIdentity(
+      "inst-persisted-reopen", {.generatedMix = 0.625F});
+  const auto persistedBytes = persistedIdentity.serialize();
+  bw::PluginProcessor identityReopened;
+  identityReopened.setStateInformation(persistedBytes.data(),
+                                       static_cast<int>(persistedBytes.size()));
+  check(identityReopened.uiSnapshot()->scope.instanceId ==
+            "inst-persisted-reopen",
+        "persisted instance identity did not reach live processor scope");
   return 0;
 }
