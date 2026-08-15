@@ -34,7 +34,7 @@ class PullHandlersApplyPatchTest {
     void correlationSeamCannotDispatchApplyPatchOrAnyControllerMutation() throws Exception {
         final JsonNode payload = MAPPER.readTree("{\"projectId\":\"p\",\"instanceId\":\"i\",\"trackSid\":\"t\",\"nonce\":\"n\"}");
         final ClapCorrelation.SelectionEvidence evidence =
-                new ClapCorrelation.SelectionEvidence("track hint", "device hint", true);
+                new ClapCorrelation.SelectionEvidence(0, "track hint", "device hint", true);
         assertTrue(ClapCorrelation.dispatch("get.clap_correlation", "read-1", payload, evidence).isPresent());
         assertTrue(ClapCorrelation.dispatch("apply.patch", "mut-1", payload, evidence).isEmpty());
         assertTrue(ClapCorrelation.dispatch("set.device", "mut-2", payload, evidence).isEmpty());

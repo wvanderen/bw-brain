@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bw-brain.local/schemas/clap/telemetry.schema.json",
   "title": "ClapTelemetryMessage",
-  "oneOf": [ { "$ref": "#/$defs/Snapshot" }, { "$ref": "#/$defs/AnalysisRequest" }, { "$ref": "#/$defs/ConversationChunk" }, { "$ref": "#/$defs/AnalysisComplete" } ],
+  "oneOf": [ { "$ref": "#/$defs/Snapshot" }, { "$ref": "#/$defs/AnalysisRequest" }, { "$ref": "#/$defs/AnalysisStatus" }, { "$ref": "#/$defs/ConversationChunk" }, { "$ref": "#/$defs/AnalysisComplete" } ],
   "$defs": {
     "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
     "Note": {
@@ -36,8 +36,10 @@
         "recentNotes": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/Note" } }
       }
     },
-    "AnalysisRequest": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "projectId", "instanceId"], "properties": { "type": { "const": "analysis.request" }, "requestId": { "$ref": "#/$defs/Id" }, "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" } } },
+    "Scope": { "type": "object", "additionalProperties": false, "required": ["projectId", "instanceId"], "properties": { "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "clipSid": { "$ref": "#/$defs/Id" } } },
+    "AnalysisRequest": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "scope"], "properties": { "type": { "const": "analysis.request" }, "requestId": { "$ref": "#/$defs/Id" }, "scope": { "$ref": "#/$defs/Scope" }, "prompt": { "type": "string", "maxLength": 512 } } },
+    "AnalysisStatus": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "status", "scope"], "properties": { "type": { "const": "analysis.status" }, "requestId": { "$ref": "#/$defs/Id" }, "status": { "const": "running" }, "scope": { "$ref": "#/$defs/Scope" } } },
     "ConversationChunk": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "sequence", "text"], "properties": { "type": { "const": "conversation.chunk" }, "requestId": { "$ref": "#/$defs/Id" }, "sequence": { "type": "integer", "minimum": 0, "maximum": 65535 }, "text": { "type": "string", "maxLength": 512 } } },
-    "AnalysisComplete": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "status"], "properties": { "type": { "const": "analysis.complete" }, "requestId": { "$ref": "#/$defs/Id" }, "status": { "enum": ["ok", "aborted", "error"] }, "error": { "type": "string", "maxLength": 256 } } }
+    "AnalysisComplete": { "type": "object", "additionalProperties": false, "required": ["type", "requestId", "status"], "properties": { "type": { "const": "analysis.complete" }, "requestId": { "$ref": "#/$defs/Id" }, "status": { "enum": ["ok", "aborted", "error"] }, "error": { "enum": ["analysis_auth_required", "analysis_model_unavailable", "analysis_failed"] } } }
   }
 }

@@ -78,14 +78,16 @@ const DEVICE_CHAIN_PAGES = {
  * the sink (an in-memory mock clip) + replying {applied, failed}. This proves
  * the daemon↔bridge wire contract end-to-end without live Bitwig.
  */
-function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?: unknown[] } = {}): {
+function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?: unknown[]; initialSummaryTracks?: { slot: number; name: string }[] } = {}): {
   socket: net.Socket;
   close: () => void;
   sendEvent: (type: string, payload: Record<string, unknown>) => void;
   connected: Promise<void>;
   applyPatchCalls: { undoLabel: string; operations: unknown[] }[];
+  setSummaryTracks: (tracks: { slot: number; name: string }[]) => void;
 } {
   const applyPatchCalls: { undoLabel: string; operations: unknown[] }[] = [];
+  let currentSummaryTracks = opts.initialSummaryTracks ?? SUMMARY_TRACKS;
   const socket = net.createConnection({ port: env.tcpPort });
   socket.setEncoding("utf8");
 
@@ -115,7 +117,7 @@ function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?
           type: "response",
           id: msg.id,
           ok: true,
-          payload: { tracks: SUMMARY_TRACKS },
+          payload: { tracks: currentSummaryTracks },
         }) + "\n",
       );
       return;
@@ -162,7 +164,8 @@ function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?
             trackSid: msg.payload?.trackSid,
             selectedDeviceEvidence: "controller-selected-device",
             nonce: msg.payload?.nonce,
-            trackSidHint: msg.payload?.trackSid,
+            trackSlot: 1,
+            trackSidHint: "Master",
             deviceHint: "bw-brain",
           },
         }) + "\n",
@@ -213,6 +216,7 @@ function startFakeBridge(env: Env, opts: { applyPatchSink?: MockClip; clipNotes?
     socket,
     connected,
     applyPatchCalls,
+    setSummaryTracks: (tracks): void => { currentSummaryTracks = tracks; },
     sendEvent: (type: string, payload: Record<string, unknown>): void => {
       socket.write(
         JSON.stringify({ version: "1.0", type, timestamp: Math.floor(Date.now() / 1000), payload }) + "\n",
@@ -607,10 +611,11 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
         stateCachePath: env.stateCachePath,
         intentPath: env.intentPath,
       });
-      const fakeBridge = startFakeBridge(env);
+      const fakeBridge = startFakeBridge(env, { initialSummaryTracks: [{ slot: 0, name: "Kick" }, { slot: 1, name: "Audio 2" }] });
       try {
         await fakeBridge.connected;
         await waitForSnapshot(env);
+        fakeBridge.setSummaryTracks(SUMMARY_TRACKS);
         fakeBridge.sendEvent("selection.changed", { slot: 1 });
         await new Promise((resolve) => setTimeout(resolve, 200));
 

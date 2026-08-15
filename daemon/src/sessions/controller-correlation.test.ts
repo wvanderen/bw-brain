@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ControllerCorrelationService } from "./controller-correlation.js";
 
-const scope = { projectId: "project-1", instanceId: "instance-1", trackSid: "trk_0123456789abcdef", deviceHint: "Polymer" };
-const reply = (nonce: string) => ({ ...scope, selectedDeviceEvidence: "controller-selected-device", nonce, available: true });
+const scope = { projectId: "project-1", instanceId: "instance-1", trackSid: "trk_0123456789abcdef", trackSlot: 3, trackHint: "Bass 2", deviceHint: "Polymer" };
+const reply = (nonce: string) => ({ ...scope, trackSidHint: scope.trackHint, selectedDeviceEvidence: "controller-selected-device", nonce, available: true });
 
 describe("ControllerCorrelationService", () => {
   it("confirms only an exact tuple and consumes the nonce once", async () => {
     const sent: object[] = [];
-    const service = new ControllerCorrelationService({ send: async (_type, payload) => { sent.push(payload); return reply("nonce-1"); } }, { nonce: () => "nonce-1" });
+    const service = new ControllerCorrelationService({ send: async (_type, payload) => { sent.push(payload ?? {}); return reply("nonce-1"); } }, { nonce: () => "nonce-1" });
     expect(await service.requestConfirmation(scope)).toMatchObject({ status: "confirmed", ...scope, nonce: "nonce-1" });
     expect(sent).toEqual([{ ...scope, nonce: "nonce-1" }]);
     expect(service.accept(reply("nonce-1"))).toBe(false);
@@ -19,6 +19,7 @@ describe("ControllerCorrelationService", () => {
       { ...reply("n"), projectId: "other" },
       { ...reply("n"), instanceId: "other" },
       { ...reply("n"), trackSid: "other" },
+      { ...reply("n"), trackSlot: 4 },
       { ...reply("other") },
       { ...reply("n"), selectedDeviceEvidence: "name-match" },
     ]) {
@@ -26,6 +27,12 @@ describe("ControllerCorrelationService", () => {
       await expect(service.requestConfirmation(scope)).rejects.toThrow("controller confirmation rejected");
       expect(service.state().status).toBe("unconfirmed");
     }
+  });
+
+  it("keeps track and device names hint-only", async () => {
+    const response = { ...reply("n"), trackSidHint: "Master", deviceHint: "Other device" };
+    const service = new ControllerCorrelationService({ send: async () => response }, { nonce: () => "n" });
+    await expect(service.requestConfirmation(scope)).resolves.toMatchObject({ status: "confirmed", trackSlot: 3 });
   });
 
   it("expires pending evidence", async () => {

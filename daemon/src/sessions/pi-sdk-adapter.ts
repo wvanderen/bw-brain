@@ -3,21 +3,22 @@ import { join } from "node:path";
 import {
   createAgentSession,
   DefaultResourceLoader,
+  getAgentDir,
   SessionManager,
   type AgentSessionEvent,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { PiProjectSession, PiRuntime, PiSessionEvent, PiTool } from "./pi-runtime.js";
+import { classifyPiSdkFailure, type PiProjectSession, type PiRuntime, type PiSessionEvent, type PiTool } from "./pi-runtime.js";
 
 const validId = (id: string) => /^[A-Za-z0-9._:-]{1,64}$/.test(id);
 
 export class PiSdkAdapter implements PiRuntime {
-  constructor(private readonly rootDir: string, private readonly cwd = process.cwd()) {}
+  constructor(private readonly rootDir: string, private readonly agentDir = getAgentDir()) {}
 
   private paths(projectId: string) {
     if (!validId(projectId)) throw new Error("invalid projectId");
     const projectDir = join(this.rootDir, "projects", projectId);
-    return { projectDir, historyDir: join(projectDir, "history"), agentDir: join(projectDir, "agent") };
+    return { projectDir, historyDir: join(projectDir, "history") };
   }
 
   private sdkTools(tools: PiTool[]): ToolDefinition[] {
@@ -29,15 +30,26 @@ export class PiSdkAdapter implements PiRuntime {
   }
 
   private async wrap(manager: SessionManager, projectId: string, tools: PiTool[]): Promise<PiProjectSession> {
-    const { projectDir, agentDir } = this.paths(projectId);
-    await mkdir(agentDir, { recursive: true });
-    const loader = new DefaultResourceLoader({ cwd: projectDir, agentDir, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true });
+    const { projectDir } = this.paths(projectId);
+    await mkdir(this.agentDir, { recursive: true });
+    const loader = new DefaultResourceLoader({ cwd: projectDir, agentDir: this.agentDir, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true });
     await loader.reload();
-    const { session } = await createAgentSession({ cwd: projectDir, agentDir, sessionManager: manager, resourceLoader: loader, noTools: "all", customTools: this.sdkTools(tools), tools: tools.map(t => t.name) });
+    const { session } = await createAgentSession({ cwd: projectDir, agentDir: this.agentDir, sessionManager: manager, resourceLoader: loader, noTools: "all", customTools: this.sdkTools(tools), tools: tools.map(t => t.name) });
     return {
       sessionFile: manager.getSessionFile(),
       subscribe: listener => session.subscribe((event: AgentSessionEvent) => listener(event as PiSessionEvent)),
-      prompt: async (text, signal) => { if (signal?.aborted) throw signal.reason; const onAbort = () => void session.abort(); signal?.addEventListener("abort", onAbort, { once: true }); try { await session.prompt(text); } finally { signal?.removeEventListener("abort", onAbort); } },
+      prompt: async (text, signal) => {
+        if (signal?.aborted) throw signal.reason;
+        const onAbort = () => void session.abort();
+        signal?.addEventListener("abort", onAbort, { once: true });
+        try {
+          await session.prompt(text);
+        } catch (error) {
+          throw classifyPiSdkFailure(error);
+        } finally {
+          signal?.removeEventListener("abort", onAbort);
+        }
+      },
       abort: () => { void session.abort(); },
       dispose: () => session.dispose(),
     };

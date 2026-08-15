@@ -4,7 +4,7 @@ import type { FocusRegistry } from "../sessions/focus-registry.js";
 import type { ProjectRegistry } from "../sessions/project-registry.js";
 
 export interface ProjectForkCommitted { type: "ProjectForkCommitted"; sourceProjectId: string; newProjectId: string; instanceIds: string[]; lineageVersion: number; }
-export interface LinkScope extends CorrelationScope { clipSid?: string; trackHint?: string; }
+export interface LinkScope extends CorrelationScope { clipSid?: string; }
 type Sender = (connectionId: string, message: object) => boolean;
 
 export class SessionActions {
@@ -38,6 +38,8 @@ export class SessionActions {
           projectId: scope.projectId,
           instanceId: scope.instanceId,
           trackSid: scope.trackSid,
+          trackSlot: scope.trackSlot,
+          trackHint: scope.trackHint,
           deviceHint: scope.deviceHint,
         });
         const pending = { nonce: confirmed.nonce, scope };
@@ -58,6 +60,11 @@ export class SessionActions {
         await this.deps.projects.confirmLink(pending.scope.projectId, pending.scope.instanceId, {
           trackSid: pending.scope.trackSid,
           deviceHint: pending.scope.deviceHint,
+        });
+        this.deps.focus.set({
+          projectId: pending.scope.projectId,
+          instanceId: pending.scope.instanceId,
+          ...(pending.scope.clipSid ? { clipSid: pending.scope.clipSid } : {}),
         });
         this.deps.markLinkConfirmed(pending.scope);
         return this.deps.sendTo(connectionId, { type: "link.status", status: "confirmed", scope: pending.scope });

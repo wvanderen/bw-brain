@@ -1,7 +1,9 @@
 import type { ApprovalRequest } from "../proposals/approval-store.js";
 import type { ProposalRevision, ProposalScope } from "../proposals/proposal-store.js";
+import { PiRuntimeFailure } from "../sessions/pi-runtime.js";
 
 type DispatchResult = { ok: true; armedPhrase?: object } | { ok: false; error: string } | object;
+type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_failed";
 type Dependencies = {
   requireConfirmedScope(scope: ProposalScope): Promise<ProposalScope>;
   analyze(request: ProposalScope & { prompt: string }): Promise<void>;
@@ -10,8 +12,15 @@ type Dependencies = {
   consumeApproval(request: ApprovalRequest): Promise<DispatchResult>;
   stopProject(projectId: string): Promise<object>;
   sendTo(connectionId: string, message: object): boolean;
+  reportAnalysisFailure?(failure: { requestId: string; code: AnalysisErrorCode }): void;
 };
 const sameScope = (a: ProposalScope, b: ProposalScope) => a.projectId === b.projectId && a.instanceId === b.instanceId && a.clipSid === b.clipSid;
+const analysisErrorCode = (error: unknown): AnalysisErrorCode => {
+  if (!(error instanceof PiRuntimeFailure)) return "analysis_failed";
+  if (error.code === "pi_auth_required") return "analysis_auth_required";
+  if (error.code === "pi_model_unavailable") return "analysis_model_unavailable";
+  return "analysis_failed";
+};
 
 /** Hosted action ingress. Every authoritative action is revalidated against daemon scope. */
 export class ActionDispatch {
@@ -29,8 +38,16 @@ export class ActionDispatch {
     if (!sameScope(confirmed, scope)) return this.deps.sendTo(connectionId, { type: "action.error", error: "scope_mismatch" });
 
     if (message.type === "analysis.request") {
-      await this.deps.analyze({ ...scope, prompt: String(message.prompt ?? "Analyze the confirmed musical context") });
-      return this.deps.sendTo(connectionId, { type: "analysis.status", status: "running", scope });
+      const requestId = String(message.requestId ?? "");
+      this.deps.sendTo(connectionId, { type: "analysis.status", requestId, status: "running", scope });
+      try {
+        await this.deps.analyze({ ...scope, prompt: String(message.prompt ?? "Analyze the confirmed musical context") });
+        return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "ok" });
+      } catch (error) {
+        const code = analysisErrorCode(error);
+        this.deps.reportAnalysisFailure?.({ requestId, code });
+        return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "error", error: code });
+      }
     }
     const proposalId = String(message.proposalId ?? ""), revision = Number(message.revision);
     const proposal = this.deps.getProposal(proposalId, revision);

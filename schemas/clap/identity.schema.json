@@ -31,11 +31,12 @@
     "LinkScope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["projectId", "instanceId", "trackSid"],
+      "required": ["projectId", "instanceId", "trackSid", "trackSlot"],
       "properties": {
         "projectId": { "$ref": "#/$defs/Id" },
         "instanceId": { "$ref": "#/$defs/Id" },
         "trackSid": { "$ref": "#/$defs/Id" },
+        "trackSlot": { "type": "integer", "minimum": 0, "maximum": 1048575 },
         "clipSid": { "$ref": "#/$defs/Id" },
         "trackHint": { "$ref": "#/$defs/Hint" },
         "deviceHint": { "oneOf": [{ "$ref": "#/$defs/Hint" }, { "type": "null" }] }

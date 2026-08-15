@@ -15,6 +15,7 @@ export type ClapIdentityMessage =
         projectId: string;
         instanceId: string;
         trackSid: string;
+        trackSlot: number;
         clipSid?: string;
         trackHint?: string;
         deviceHint?: string | null;
@@ -31,6 +32,7 @@ export type ClapIdentityMessage =
         projectId: string;
         instanceId: string;
         trackSid: string;
+        trackSlot: number;
         clipSid?: string;
         trackHint?: string;
         deviceHint?: string | null;
@@ -2889,8 +2891,22 @@ export type ClapTelemetryMessage =
   | {
       type: "analysis.request";
       requestId: string;
-      projectId: string;
-      instanceId: string;
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+      prompt?: string;
+    }
+  | {
+      type: "analysis.status";
+      requestId: string;
+      status: "running";
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
     }
   | {
       type: "conversation.chunk";
@@ -2902,5 +2918,5 @@ export type ClapTelemetryMessage =
       type: "analysis.complete";
       requestId: string;
       status: "ok" | "aborted" | "error";
-      error?: string;
+      error?: "analysis_auth_required" | "analysis_model_unavailable" | "analysis_failed";
     };

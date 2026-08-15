@@ -228,6 +228,7 @@ public final class PullHandlers {
                                 !observers.getCursorDeviceName().isBlank())).orElseThrow());
                 case "get.clap_correlation" -> outbox.offer(ClapCorrelation.dispatch(type, id, req.path("payload"),
                         new ClapCorrelation.SelectionEvidence(
+                                observers.getCursorSlot(),
                                 observers.getCursorTrackName(),
                                 observers.getCursorDeviceName(),
                                 !observers.getCursorDeviceName().isBlank())).orElseThrow());
@@ -569,8 +570,17 @@ public final class PullHandlers {
         final java.util.function.IntFunction<String> trackNameFor = t ->
                 observers.getBankTrackNames().getOrDefault(t, "");
 
+        final int originalTrackSlot = observers.getCursorSlot();
         final LauncherGridWalker.LauncherGridResponse grid = walker.walkGrid(
-                selector, hasContent, notes, readySignal, trackSidFor, trackNameFor);
+                selector, hasContent, notes, readySignal, trackSidFor, trackNameFor,
+                () -> {
+                    if (originalTrackSlot < 0 || originalTrackSlot >= observers.getBankSize()) return;
+                    try {
+                        trackBank.getItemAt(originalTrackSlot).selectInEditor();
+                    } catch (final Exception ignored) {
+                        // Best effort: an out-of-window/deleted track must not fail the pull.
+                    }
+                });
 
         // Enrich sceneNames from the observers cache (PULL-ONLY; Pitfall 6 —
         // no new event type, just the response array).

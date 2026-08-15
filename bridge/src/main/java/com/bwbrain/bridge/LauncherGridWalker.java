@@ -231,6 +231,31 @@ final class LauncherGridWalker {
                                    final ReadySignal readySignal,
                                    final java.util.function.IntFunction<String> trackSidFor,
                                    final java.util.function.IntFunction<String> trackNameFor) {
+        return walkGrid(slotSelector, hasContentReader, notesReader, readySignal,
+                trackSidFor, trackNameFor, () -> {});
+    }
+
+    LauncherGridResponse walkGrid(final SlotSelector slotSelector,
+                                   final HasContentReader hasContentReader,
+                                   final NotesReader notesReader,
+                                   final ReadySignal readySignal,
+                                   final java.util.function.IntFunction<String> trackSidFor,
+                                   final java.util.function.IntFunction<String> trackNameFor,
+                                   final Runnable restoreSelection) {
+        try {
+            return walkGridWithoutRestore(slotSelector, hasContentReader, notesReader, readySignal,
+                    trackSidFor, trackNameFor);
+        } finally {
+            restoreSelection.run();
+        }
+    }
+
+    private LauncherGridResponse walkGridWithoutRestore(final SlotSelector slotSelector,
+                                   final HasContentReader hasContentReader,
+                                   final NotesReader notesReader,
+                                   final ReadySignal readySignal,
+                                   final java.util.function.IntFunction<String> trackSidFor,
+                                   final java.util.function.IntFunction<String> trackNameFor) {
         int state = IDLE;
         final List<TrackRowView> tracks = new ArrayList<>();
         int trackIdx = 0;

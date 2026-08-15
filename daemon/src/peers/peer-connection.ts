@@ -9,7 +9,14 @@ export interface PeerConnectionOptions {
   onHello: (connection: PeerConnection, message: Extract<ClapPeerMessage, { type: "clap.hello" }>) => void;
   onMessage?: (connectionId: string, message: object) => void;
   validateMessage?: (message: unknown) => boolean;
+  onProtocolError?: (error: PeerProtocolError) => void;
   onClose: (connectionId: string) => void;
+}
+
+export interface PeerProtocolError {
+  connectionId: string;
+  reason: "schema_rejected";
+  frame: unknown;
 }
 
 /** A single bounded CLAP socket. It owns framing, handshake state and writes. */
@@ -121,6 +128,7 @@ export class PeerConnection {
         return;
       }
       if (!this.options.validateMessage?.(message)) {
+        this.options.onProtocolError?.({ connectionId: this.connectionId, reason: "schema_rejected", frame: message });
         this.close();
         return;
       }

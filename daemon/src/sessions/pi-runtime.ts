@@ -1,5 +1,26 @@
 export type PiSessionEvent = { type: string; [key: string]: unknown };
 
+export type PiRuntimeFailureCode = "pi_auth_required" | "pi_model_unavailable" | "pi_failed";
+
+/** Bounded Pi failure classification. Raw SDK errors may contain local paths or provider details. */
+export class PiRuntimeFailure extends Error {
+  constructor(readonly code: PiRuntimeFailureCode) {
+    super(code);
+    this.name = "PiRuntimeFailure";
+  }
+}
+
+export function classifyPiSdkFailure(error: unknown): PiRuntimeFailure {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.startsWith("No API key found for ") || message.startsWith("Authentication failed for ")) {
+    return new PiRuntimeFailure("pi_auth_required");
+  }
+  if (message.startsWith("No model selected") || message.startsWith("No models available")) {
+    return new PiRuntimeFailure("pi_model_unavailable");
+  }
+  return new PiRuntimeFailure("pi_failed");
+}
+
 export interface PiTool {
   readonly name: string;
   readonly description: string;

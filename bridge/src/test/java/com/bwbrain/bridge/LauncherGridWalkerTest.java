@@ -238,6 +238,21 @@ class LauncherGridWalkerTest {
     }
 
     @Test
+    void restoresOriginalSelectionAfterCursorWalk() {
+        final LauncherGridWalker walker = new LauncherGridWalker(1, 1);
+        final AtomicInteger restores = new AtomicInteger();
+        walker.walkGrid(
+                new RecordingSelector(),
+                new ScriptedHasContent(true),
+                new ScriptedNotes().queue(List.of()),
+                new ScriptedReadySignal().fire(4.0),
+                t -> "track",
+                t -> "Track",
+                restores::incrementAndGet);
+        assertEquals(1, restores.get(), "cursor traversal must restore the user's selection exactly once");
+    }
+
+    @Test
     void emptyCellsSkipSelectAndAwait() {
         // hasContent=false cells MUST NOT call select() or arm() — they emit
         // empty + advance directly. This avoids unnecessary GUI focus moves

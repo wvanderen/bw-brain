@@ -8,7 +8,7 @@ import telemetrySchema from "../../../schemas/clap/telemetry.schema.json" with {
 import proposalSchema from "../../../schemas/clap/proposal.schema.json" with { type: "json" };
 import phraseSchema from "../../../schemas/clap/phrase.schema.json" with { type: "json" };
 import type { ClapPeerMessage } from "../gen/clap.js";
-import { PeerConnection } from "./peer-connection.js";
+import { PeerConnection, type PeerProtocolError } from "./peer-connection.js";
 import { PeerRegistry } from "./peer-registry.js";
 
 const LOOPBACK_HOST = "127.0.0.1";
@@ -26,6 +26,7 @@ export interface PeerServerOptions {
   maxQueueMessages?: number;
   maxQueueBytes?: number;
   onMessage?: (connectionId: string, message: object) => void;
+  onProtocolError?: (error: PeerProtocolError) => void;
 }
 
 /** Dedicated connection-aware CLAP endpoint. It never touches controller TCP. */
@@ -78,6 +79,10 @@ export class PeerServer {
       maxQueueMessages: this.options.maxQueueMessages ?? 32,
       maxQueueBytes: this.options.maxQueueBytes ?? 262_144,
       validateMessage,
+      onProtocolError: this.options.onProtocolError ?? ((error) => {
+        const frame = error.frame as { type?: unknown; requestId?: unknown };
+        console.error(`[peer-server] ${error.reason} connection=${error.connectionId} type=${String(frame?.type ?? "unknown")} requestId=${String(frame?.requestId ?? "none")}`);
+      }),
       onHello: (peer, hello) => this.acceptHello(peer, hello),
       onMessage: this.options.onMessage,
       onClose: (id) => {

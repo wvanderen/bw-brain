@@ -45,6 +45,20 @@ int main() {
   check(reducePeerMessage(peerStore, "{\"type\":\"link.status\",\"status\":\"confirmed\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"trackSid\":\"trk_0123456789abcdef\",\"trackHint\":\"Bass 2\"}}"), "confirmed peer response reducer");
   check(peerStore.snapshot()->scope.confirmed && peerStore.snapshot()->confirmationNonce.empty(), "confirmed peer response must consume nonce");
 
+  auto analyzeAction = UiAction::analyze();
+  analyzeAction.projectId = "project-a";
+  analyzeAction.instanceId = "inst-a";
+  analyzeAction.clipSid = "clip-a";
+  analyzeAction.token = "analysis-1";
+  check(encodePeerAction(analyzeAction, peerMessage), "Analyze must encode for the confirmed visible scope");
+  check(peerMessage == "{\"type\":\"analysis.request\",\"requestId\":\"analysis-1\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"clipSid\":\"clip-a\"}}", "Analyze wire scope mismatch");
+  check(reducePeerMessage(peerStore, "{\"type\":\"analysis.status\",\"requestId\":\"analysis-1\",\"status\":\"running\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"clipSid\":\"clip-a\"}}"), "analysis running response reducer");
+  check(peerStore.snapshot()->analysis == "running" && peerStore.snapshot()->session == "open", "Analyze must visibly leave idle");
+  check(reducePeerMessage(peerStore, "{\"type\":\"analysis.complete\",\"requestId\":\"analysis-1\",\"status\":\"error\",\"error\":\"analysis_failed\"}"), "analysis failure response reducer");
+  check(peerStore.snapshot()->analysis == "error: analysis_failed", "Analyze failure must be visible");
+  check(reducePeerMessage(peerStore, "{\"type\":\"analysis.complete\",\"requestId\":\"analysis-2\",\"status\":\"error\",\"error\":\"analysis_auth_required\"}"), "analysis auth response reducer");
+  check(peerStore.snapshot()->analysis == "error: analysis_auth_required", "actionable Analyze auth failure must be visible");
+
   UiActionQueue actions;
   check(actions.enqueue(UiAction::analyze()), "Analyze must be hosted action");
   check(actions.enqueue(UiAction::stop()), "Stop must be hosted action");

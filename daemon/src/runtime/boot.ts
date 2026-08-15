@@ -59,7 +59,7 @@ import { ActionDispatch } from "../peers/action-dispatch.js";
 import { SessionActions } from "../peers/session-actions.js";
 import { StopCoordinator } from "./stop-coordinator.js";
 import { ProjectRegistry } from "../sessions/project-registry.js";
-import { FocusRegistry } from "../sessions/focus-registry.js";
+import { FocusRegistry, requireConfirmedFocusedScope } from "../sessions/focus-registry.js";
 import { ProjectSessionManager } from "../sessions/project-session-manager.js";
 import { PiSdkAdapter } from "../sessions/pi-sdk-adapter.js";
 import { createRestrictedPiTools } from "../sessions/pi-tools.js";
@@ -412,13 +412,14 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     publishStopped: () => undefined,
   });
   const actions = new ActionDispatch({
-    requireConfirmedScope: (scope) => projects.requireConfirmedScope(scope.projectId, scope.instanceId),
+    requireConfirmedScope: (scope) => requireConfirmedFocusedScope(projects, focus, scope),
     analyze: async (request) => { await sessions.connect(request.projectId, request.instanceId); await sessions.analyze(request); },
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),
     consumeApproval: (request) => proposalDispatch.consume(request),
     stopProject: (projectId) => stop.stopProject(projectId),
     sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+    reportAnalysisFailure: ({ requestId, code }) => console.error(`[analysis] requestId=${requestId} code=${code}`),
   });
   const sessionActions = new SessionActions({
     projects,
@@ -426,17 +427,47 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     correlation: controllerCorrelation,
     resolveLinkScope: async (connectionId) => {
       const lease = peers.registry.getConnectionLease(connectionId);
-      const trackSid = lastState?.selection.trackSid;
-      if (!lease || !trackSid) throw new Error("link_scope_unavailable");
+      if (!lease) throw new Error("link_scope_unavailable");
+      const controllerEvidence = (await correlator.send("get.clap_correlation")) as {
+        available?: boolean;
+        trackSlot?: number;
+        trackSidHint?: string | null;
+        deviceHint?: string | null;
+      };
+      const trackSlot = controllerEvidence.trackSlot;
+      if (controllerEvidence.available !== true || !Number.isInteger(trackSlot) || trackSlot! < 0) throw new Error("link_scope_unavailable");
+
+      const summaryResp = (await correlator.send("get.project_summary")) as { tracks?: { slot: number; name: string }[] };
+      const freshSummaryTracks = summaryResp.tracks ?? [];
+      const observed = normalize({
+        ...BASELINE_RAW_STATE,
+        tracks: enrichSummaryTracks(freshSummaryTracks),
+        project: lastState?.project ?? { ...DEFAULT_PROJECT },
+      });
+      if (!observed) throw new Error("link_scope_unavailable");
+      summaryTracks = freshSummaryTracks;
+      reconcile(observed, stableIds, Date.now());
+      const selectedTrack = freshSummaryTracks.find((track) => track.slot === trackSlot);
+      const trackHint = selectedTrack?.name ?? "";
+      if (!trackHint) throw new Error("link_scope_unavailable");
+      const trackSid = stableIds.byNameAndType.get(`track:${trackHint}`);
+      if (!trackSid) throw new Error("link_scope_unavailable");
+      const clipResp = (await correlator.send("get.selected_clip")) as { clipSid?: string };
+      const clipSid = typeof clipResp.clipSid === "string" && clipResp.clipSid ? clipResp.clipSid : undefined;
+      lastState = {
+        ...observed,
+        selection: { ...(lastState?.selection ?? {}), trackSid, ...(clipSid ? { clipSid } : {}) },
+      };
+      schedulePersist(lastState);
       const projectId = await projects.getOrCreateActiveProjectId();
-      const trackHint = summaryTracks.find((track) => stableIds.byNameAndType.get(`track:${track.name}`) === trackSid)?.name;
       return {
         projectId,
         instanceId: lease.instanceId,
         trackSid,
-        ...(lastState?.selection.clipSid ? { clipSid: lastState.selection.clipSid } : {}),
-        ...(trackHint ? { trackHint: trackHint.slice(0, 256) } : {}),
-        deviceHint: null,
+        trackSlot: trackSlot!,
+        ...(clipSid ? { clipSid } : {}),
+        trackHint: trackHint.slice(0, 256),
+        deviceHint: typeof controllerEvidence.deviceHint === "string" ? controllerEvidence.deviceHint.slice(0, 256) : null,
       };
     },
     markLinkPending: (scope) => peers.registry.setLeaseScope(scope.instanceId, scope.projectId, "pending"),

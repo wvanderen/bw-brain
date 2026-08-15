@@ -10,7 +10,7 @@ import java.util.Optional;
 public final class ClapCorrelation {
     private ClapCorrelation() {}
 
-    public record SelectionEvidence(String trackSidHint, String deviceNameHint,
+    public record SelectionEvidence(int trackSlot, String trackSidHint, String deviceNameHint,
                                     boolean selectedDeviceAvailable) {}
 
     public static String respond(final String id, final JsonNode payload,
@@ -21,10 +21,12 @@ public final class ClapCorrelation {
         final String requestedTrackSid = text(payload, "trackSid");
         final String nonce = text(payload, "nonce");
 
-        out.put("available", evidence.selectedDeviceAvailable());
+        final boolean available = evidence.selectedDeviceAvailable() && evidence.trackSlot() >= 0;
+        out.put("available", available);
+        out.put("trackSlot", evidence.trackSlot());
         out.put("trackSidHint", nullable(evidence.trackSidHint()));
         out.put("deviceHint", nullable(evidence.deviceNameHint()));
-        if (evidence.selectedDeviceAvailable()
+        if (available
                 && projectId != null && instanceId != null
                 && requestedTrackSid != null && nonce != null) {
             out.put("projectId", projectId);

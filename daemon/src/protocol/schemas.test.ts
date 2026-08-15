@@ -736,4 +736,14 @@ describe("CLAP companion bounded protocol fixtures", () => {
     expect(proposal({ ...published, rationale: "x".repeat(513) })).toBe(false);
     expect(phrase({ ...armed, lengthBeats: 65 })).toBe(false);
   });
+
+  it("accepts one confirmed-scope Analyze request and its bounded lifecycle responses", () => {
+    const telemetry = clapAjv.getSchema(clapTelemetrySchema.$id)!;
+    const scope = { projectId: "project-a", instanceId: "instance-a", clipSid: "clip-a" };
+    expect(telemetry({ type: "analysis.request", requestId: "analysis-1", scope })).toBe(true);
+    expect(telemetry({ type: "analysis.status", requestId: "analysis-1", status: "running", scope })).toBe(true);
+    expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "ok" })).toBe(true);
+    expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "error", error: "analysis_auth_required" })).toBe(true);
+    expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "error", error: "raw provider detail" })).toBe(false);
+  });
 });

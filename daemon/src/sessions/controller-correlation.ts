@@ -4,6 +4,8 @@ export interface CorrelationScope {
   projectId: string;
   instanceId: string;
   trackSid: string;
+  trackSlot: number;
+  trackHint?: string;
   deviceHint: string | null;
 }
 
@@ -63,15 +65,16 @@ export class ControllerCorrelationService {
       if (requestGeneration === this.generation) this.current = { status: "unconfirmed" };
       throw error;
     }
-    if (requestGeneration !== this.generation || !this.accept(response)) {
+    const confirmed = requestGeneration === this.generation ? this.accept(response) : false;
+    if (!confirmed) {
       if (requestGeneration === this.generation) this.current = { status: "unconfirmed" };
       throw new Error("controller confirmation rejected");
     }
-    return this.current as ConfirmedCorrelation;
+    return confirmed;
   }
 
   /** Accept the current proof once; late, replayed, expired, or mismatched proofs fail closed. */
-  accept(response: object): boolean {
+  accept(response: object): ConfirmedCorrelation | false {
     if (this.current.status !== "confirmationPending") return false;
     const pending = this.current;
     if (this.now() > pending.expiresAt) return false;
@@ -80,15 +83,17 @@ export class ControllerCorrelationService {
         || r.projectId !== pending.scope.projectId
         || r.instanceId !== pending.scope.instanceId
         || r.trackSid !== pending.scope.trackSid
+        || r.trackSlot !== pending.scope.trackSlot
         || r.nonce !== pending.nonce
         || r.selectedDeviceEvidence !== "controller-selected-device") return false;
-    this.current = {
+    const confirmed: ConfirmedCorrelation = {
       status: "confirmed",
       ...pending.scope,
       selectedDeviceEvidence: "controller-selected-device",
       nonce: pending.nonce,
     };
-    return true;
+    this.current = confirmed;
+    return confirmed;
   }
 
   onControllerDisconnect(): void {

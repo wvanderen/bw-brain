@@ -19,8 +19,9 @@ class ClapCorrelationTest {
 
     @Test void unavailableSelectionReturnsNullableHintsAndNeverConfirms() throws Exception {
         final JsonNode payload = parse(ClapCorrelation.respond("c1", request(),
-                new ClapCorrelation.SelectionEvidence(null, null, false)));
+                new ClapCorrelation.SelectionEvidence(-1, null, null, false)));
         assertFalse(payload.path("available").asBoolean());
+        assertEquals(-1, payload.path("trackSlot").asInt());
         assertTrue(payload.path("trackSidHint").isNull());
         assertTrue(payload.path("deviceHint").isNull());
         assertFalse(payload.has("nonce"));
@@ -29,8 +30,9 @@ class ClapCorrelationTest {
 
     @Test void selectedControllerDeviceReturnsExactNonceBoundTuple() throws Exception {
         final JsonNode payload = parse(ClapCorrelation.respond("c2", request(),
-                new ClapCorrelation.SelectionEvidence("trk_hint_only", "Polymer", true)));
+                new ClapCorrelation.SelectionEvidence(3, "trk_hint_only", "Polymer", true)));
         assertTrue(payload.path("available").asBoolean());
+        assertEquals(3, payload.path("trackSlot").asInt());
         assertEquals("trk_hint_only", payload.path("trackSidHint").asText());
         assertEquals("Polymer", payload.path("deviceHint").asText());
         assertEquals("project-1", payload.path("projectId").asText());
@@ -43,7 +45,7 @@ class ClapCorrelationTest {
     @Test void incompleteRequestCannotCreateConfirmationMaterial() throws Exception {
         final JsonNode incomplete = MAPPER.readTree("{\"projectId\":\"project-1\",\"nonce\":\"nonce-1\"}");
         final JsonNode payload = parse(ClapCorrelation.respond("c3", incomplete,
-                new ClapCorrelation.SelectionEvidence("track", "device", true)));
+                new ClapCorrelation.SelectionEvidence(2, "track", "device", true)));
         assertTrue(payload.path("available").asBoolean());
         assertFalse(payload.has("selectedDeviceEvidence"));
         assertFalse(payload.has("nonce"));

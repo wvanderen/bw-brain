@@ -102,6 +102,29 @@ describe("PeerServer targeted CLAP routing", () => {
     controllerClient.destroy();
   });
 
+  it("accepts the current scoped analysis request without closing the peer", async () => {
+    let deliver!: (value: { connectionId: string; message: object }) => void;
+    const delivered = new Promise<{ connectionId: string; message: object }>((resolve) => { deliver = resolve; });
+    const server = new PeerServer({
+      port: 0,
+      onMessage: (connectionId, message) => deliver({ connectionId, message }),
+    });
+    servers.push(server);
+    await server.ready;
+
+    const socket = await connect(server.port);
+    const connectionId = await handshake(socket, "inst-live-probe");
+    const request = {
+      type: "analysis.request",
+      requestId: "analysis-live-probe",
+      scope: { projectId: "project-live-probe", instanceId: "inst-live-probe" },
+    };
+    socket.write(JSON.stringify(request) + "\n");
+
+    await expect(delivered).resolves.toEqual({ connectionId, message: request });
+    expect(server.registry.has(connectionId)).toBe(true);
+  });
+
   it("closes oversized and invalid peers and removes disconnected peers", async () => {
     const server = new PeerServer({ port: 0, maxLineBytes: 512 });
     servers.push(server);
@@ -140,6 +163,32 @@ describe("PeerServer targeted CLAP routing", () => {
 });
 
 describe("PeerConnection outbound refusal", () => {
+  it("reports the rejected frame and schema close reason", () => {
+    class InputSocket extends EventEmitter {
+      destroyed = false;
+      write = vi.fn(() => true);
+      destroy(): void { this.destroyed = true; this.emit("close"); }
+      setEncoding(): void {}
+    }
+    const socket = new InputSocket();
+    const rejected = vi.fn();
+    new PeerConnection("peer-reject", socket as unknown as net.Socket, {
+      handshakeTimeoutMs: 1_000,
+      maxLineBytes: 65_536,
+      maxQueueMessages: 32,
+      maxQueueBytes: 262_144,
+      validateMessage: () => false,
+      onProtocolError: rejected,
+      onHello: () => {},
+      onClose: () => {},
+    });
+
+    const frame = { type: "analysis.request", requestId: "analysis-1", scope: { projectId: "project-1", instanceId: "instance-1" } };
+    socket.emit("data", JSON.stringify(frame) + "\n");
+    expect(rejected).toHaveBeenCalledWith({ connectionId: "peer-reject", reason: "schema_rejected", frame });
+    expect(socket.destroyed).toBe(true);
+  });
+
   it("closes instead of dropping a command when its queue overflows", () => {
     class BlockedSocket extends EventEmitter {
       destroyed = false;

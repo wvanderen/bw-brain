@@ -26,7 +26,7 @@ describe("SessionActions", () => it("requires exact one-shot fork confirmation a
 describe("SessionActions identity link", () => it("derives a pending scope and consumes its exact nonce before granting authority", async () => {
   const projects = new ProjectRegistry(await mkdtemp(join(tmpdir(), "actions-link-")));
   const focus = new FocusRegistry();
-  const scope = { projectId: "project-1", instanceId: "instance-1", trackSid: "trk_0123456789abcdef", clipSid: "clip_0123456789abcdef", trackHint: "Bass 2", deviceHint: "bw-brain" };
+  const scope = { projectId: "project-1", instanceId: "instance-1", trackSid: "trk_0123456789abcdef", trackSlot: 2, clipSid: "clip_0123456789abcdef", trackHint: "Bass 2", deviceHint: "bw-brain" };
   let correlationState: any = { status: "unconfirmed" };
   const correlation: any = {
     requestConfirmation: vi.fn(async (requested) => {
@@ -41,7 +41,7 @@ describe("SessionActions identity link", () => it("derives a pending scope and c
     markLinkPending, markLinkConfirmed, sendTo: (_id, message) => (sent.push(message), true) });
 
   await actions.dispatch("connection-1", { type: "link.confirm.request" });
-  expect(correlation.requestConfirmation).toHaveBeenCalledWith({ projectId: scope.projectId, instanceId: scope.instanceId, trackSid: scope.trackSid, deviceHint: scope.deviceHint });
+  expect(correlation.requestConfirmation).toHaveBeenCalledWith({ projectId: scope.projectId, instanceId: scope.instanceId, trackSid: scope.trackSid, trackSlot: scope.trackSlot, trackHint: scope.trackHint, deviceHint: scope.deviceHint });
   expect(sent.at(-1)).toEqual({ type: "link.confirm.pending", nonce: "nonce-1", scope });
   expect(markLinkPending).toHaveBeenCalledWith(scope);
 
@@ -52,6 +52,7 @@ describe("SessionActions identity link", () => it("derives a pending scope and c
   await actions.dispatch("connection-1", { type: "link.confirm.accept", nonce: "nonce-1" });
   expect(sent.at(-1)).toEqual({ type: "link.status", status: "confirmed", scope });
   await expect(projects.requireConfirmedScope(scope.projectId, scope.instanceId)).resolves.toMatchObject({ trackSid: scope.trackSid });
+  expect(focus.get()).toEqual({ projectId: scope.projectId, instanceId: scope.instanceId, clipSid: scope.clipSid });
   expect(markLinkConfirmed).toHaveBeenCalledWith(scope);
 
   await actions.dispatch("connection-1", { type: "link.confirm.accept", nonce: "nonce-1" });

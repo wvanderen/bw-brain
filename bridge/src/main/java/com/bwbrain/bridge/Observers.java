@@ -208,8 +208,8 @@ public final class Observers {
         // Bitwig index; the daemon computes the STATE-04 fingerprint (Pitfall 2).
         final AtomicBoolean skipPos = new AtomicBoolean(true);
         cursorTrack.position().addValueObserver((IntegerValueChangedCallback) (int idx) -> {
-            if (skipPos.getAndSet(false)) { return; }
             cursorSlot = idx;
+            if (skipPos.getAndSet(false)) { return; }
             outbox.offer(LineJson.event("selection.changed",
                     mapOf("slot", idx), ts()));
         }, 1);
@@ -217,10 +217,10 @@ public final class Observers {
         // name() — inherited from DeviceChain (Track -> Channel -> DeviceChain).
         final AtomicBoolean skipName = new AtomicBoolean(true);
         cursorTrack.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+            cursorTrackName = name == null ? "" : name;
             if (skipName.getAndSet(false)) { return; }
-            cursorTrackName = name;
             outbox.offer(LineJson.event("track.name_changed",
-                    mapOf("name", name), ts()));
+                    mapOf("name", cursorTrackName), ts()));
         });
     }
 
@@ -255,10 +255,10 @@ public final class Observers {
         // name() — inherited from Device (CursorDevice extends Device).
         final AtomicBoolean skip = new AtomicBoolean(true);
         cursorDevice.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+            cursorDeviceName = name == null ? "" : name;
             if (skip.getAndSet(false)) { return; }
-            cursorDeviceName = name;
             outbox.offer(LineJson.event("device.name_changed",
-                    mapOf("name", name), ts()));
+                    mapOf("name", cursorDeviceName), ts()));
         });
     }
 
