@@ -32,7 +32,7 @@ import * as fs from "node:fs";
 import { unlink } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { TcpServerTransport } from "../transport/tcp.js";
 import { UnixDomainSocketServerTransport } from "../transport/uds.js";
@@ -396,13 +396,30 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   const focus = new FocusRegistry();
   const approvals = new ApprovalStore();
   const proposals = new ProposalStore({ invalidateProposal: (proposalId) => approvals.invalidateProposal(proposalId) });
-  const sessions = new ProjectSessionManager(new PiSdkAdapter(join(dirname(socketPath), "pi")), () => createRestrictedPiTools({
+  const reportPiDiagnostic = process.env.BW_BRAIN_PI_DIAGNOSTICS === "1"
+    ? (event: object) => console.error(`[pi] ${JSON.stringify(event)}`)
+    : undefined;
+  const proposalDispatch = new ProposalDispatch({
+    proposals,
+    approvals,
+    editService,
+    requireConfirmedScope: async (scope) => {
+      await projects.requireConfirmedScope(scope.projectId, scope.instanceId);
+      return scope;
+    },
+    requirePublicationScope: (scope) => requireConfirmedFocusedScope(projects, focus, scope),
+    connectionForScope: (scope) => {
+      const lease = peers.registry.getLease(scope.instanceId);
+      return lease?.projectId === scope.projectId && lease.status === "confirmed" ? lease.connectionId : undefined;
+    },
+    sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+  });
+  const sessions = new ProjectSessionManager(new PiSdkAdapter(join(dirname(socketPath), "pi"), undefined, { diagnostic: reportPiDiagnostic }), () => createRestrictedPiTools({
     readConfirmedScope: async () => focus.get() ?? null,
     readContext: async () => lastState,
     preview: async (input) => editService.preview(lastState ?? BASELINE_RAW_STATE, intent, watchdog.tick(), input),
-    createProposal: async (input) => proposals.publish(input as unknown as ProposalInput),
-  }));
-  const proposalDispatch = new ProposalDispatch({ proposals, approvals, editService, requireConfirmedScope: (scope) => projects.requireConfirmedScope(scope.projectId, scope.instanceId) });
+    createProposal: async (input) => proposalDispatch.publish(input as unknown as ProposalInput),
+  }), undefined, reportPiDiagnostic);
   const stop = new StopCoordinator({
     stopAnalysis: (projectId) => sessions.stop(projectId),
     invalidateApprovals: (projectId) => approvals.invalidateProject(projectId, "stop"),
@@ -412,7 +429,10 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     publishStopped: () => undefined,
   });
   const actions = new ActionDispatch({
-    requireConfirmedScope: (scope) => requireConfirmedFocusedScope(projects, focus, scope),
+    requireConfirmedScope: async (connectionId, scope) => {
+      peers.registry.requireConfirmed(connectionId, scope.projectId, scope.instanceId);
+      return requireConfirmedFocusedScope(projects, focus, scope);
+    },
     analyze: async (request) => { await sessions.connect(request.projectId, request.instanceId); await sessions.analyze(request); },
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),
@@ -550,7 +570,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     void shutdown().then(() => process.exit(0));
   });
 
-  console.error(`[boot] bw-brain daemon up: uds=${socketPath} tcp=127.0.0.1:${tcpPort} peers=127.0.0.1:${peers.port}`);
+  console.error(`[boot] bw-brain daemon up: pid=${process.pid} entry=${fileURLToPath(import.meta.url)} cwd=${process.cwd()} uds=${socketPath} tcp=127.0.0.1:${tcpPort} peers=127.0.0.1:${peers.port}`);
 
   return { shutdown, peerPort: peers.port };
 }

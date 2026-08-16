@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -6,14 +7,62 @@ import {
   getAgentDir,
   SessionManager,
   type AgentSessionEvent,
+  type CreateAgentSessionOptions,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { classifyPiSdkFailure, type PiProjectSession, type PiRuntime, type PiSessionEvent, type PiTool } from "./pi-runtime.js";
 
 const validId = (id: string) => /^[A-Za-z0-9._:-]{1,64}$/.test(id);
+const PROMPT_DIAGNOSTIC_LIMIT = 4_096;
+
+export type PiProposalRejectionCode =
+  | "proposal_turn_inactive"
+  | "proposal_already_created"
+  | "proposal_scope_mismatch"
+  | "scope_mismatch"
+  | "disconnected"
+  | "invalid_proposal_scope"
+  | "invalid_proposal_content"
+  | "invalid_patch_id"
+  | "invalid_phrase"
+  | "proposal_rejected";
+
+const proposalRejectionCodes: Readonly<Record<string, PiProposalRejectionCode>> = {
+  proposal_turn_inactive: "proposal_turn_inactive",
+  proposal_already_created: "proposal_already_created",
+  proposal_scope_mismatch: "proposal_scope_mismatch",
+  scope_mismatch: "scope_mismatch",
+  disconnected: "disconnected",
+  "invalid proposal scope": "invalid_proposal_scope",
+  "invalid proposal content": "invalid_proposal_content",
+  "invalid patchId": "invalid_patch_id",
+  "invalid phrase": "invalid_phrase",
+};
+
+function classifyProposalRejection(tool: string, error: unknown): PiProposalRejectionCode | undefined {
+  if (tool !== "create_proposal") return undefined;
+  const message = error instanceof Error ? error.message : "";
+  return proposalRejectionCodes[message] ?? "proposal_rejected";
+}
+
+export type PiSdkDiagnostic =
+  | { event: "pi.session.ready"; projectId: string; activeTools: string[] }
+  | { event: "pi.prompt.start"; projectId: string; prompt: string; promptLength: number; promptSha256: string; promptTruncated: boolean }
+  | { event: "pi.prompt.complete"; projectId: string; outcome: "ok" | "pi_auth_required" | "pi_model_unavailable" | "pi_proposal_required" | "pi_failed" }
+  | { event: "pi.tool.call"; projectId: string; tool: string; callId: string }
+  | { event: "pi.tool.complete"; projectId: string; tool: string; ok: true }
+  | { event: "pi.tool.complete"; projectId: string; tool: string; ok: false; rejection?: PiProposalRejectionCode };
+
+export type PiSdkAdapterOptions = Pick<CreateAgentSessionOptions, "model" | "modelRuntime"> & {
+  diagnostic?: (event: PiSdkDiagnostic) => void;
+};
 
 export class PiSdkAdapter implements PiRuntime {
-  constructor(private readonly rootDir: string, private readonly agentDir = getAgentDir()) {}
+  constructor(private readonly rootDir: string, private readonly agentDir = getAgentDir(), private readonly options: PiSdkAdapterOptions = {}) {}
+
+  private emit(event: PiSdkDiagnostic): void {
+    try { this.options.diagnostic?.(event); } catch { /* Diagnostics never affect the Pi turn. */ }
+  }
 
   private paths(projectId: string) {
     if (!validId(projectId)) throw new Error("invalid projectId");
@@ -21,11 +70,23 @@ export class PiSdkAdapter implements PiRuntime {
     return { projectDir, historyDir: join(projectDir, "history") };
   }
 
-  private sdkTools(tools: PiTool[]): ToolDefinition[] {
+  private sdkTools(projectId: string, tools: PiTool[]): ToolDefinition[] {
     return tools.map(tool => ({
       name: tool.name, label: tool.name, description: tool.description,
-      parameters: { type: "object", additionalProperties: true } as never,
-      execute: async (_callId, params, signal) => ({ content: [{ type: "text", text: JSON.stringify(await tool.execute(params as Record<string, unknown>, signal)) }], details: {} }),
+      parameters: (tool.parameters ?? { type: "object", additionalProperties: true }) as never,
+      execute: async (callId, params, signal) => {
+        const diagnosticName = tool.name.slice(0, 64);
+        this.emit({ event: "pi.tool.call", projectId, tool: diagnosticName, callId: callId.slice(0, 128) });
+        try {
+          const result = await tool.execute(params as Record<string, unknown>, signal);
+          this.emit({ event: "pi.tool.complete", projectId, tool: diagnosticName, ok: true });
+          return { content: [{ type: "text" as const, text: JSON.stringify(result) }], details: {} };
+        } catch (error) {
+          const rejection = classifyProposalRejection(tool.name, error);
+          this.emit({ event: "pi.tool.complete", projectId, tool: diagnosticName, ok: false, ...(rejection ? { rejection } : {}) });
+          throw error;
+        }
+      },
     }));
   }
 
@@ -34,18 +95,40 @@ export class PiSdkAdapter implements PiRuntime {
     await mkdir(this.agentDir, { recursive: true });
     const loader = new DefaultResourceLoader({ cwd: projectDir, agentDir: this.agentDir, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true });
     await loader.reload();
-    const { session } = await createAgentSession({ cwd: projectDir, agentDir: this.agentDir, sessionManager: manager, resourceLoader: loader, noTools: "all", customTools: this.sdkTools(tools), tools: tools.map(t => t.name) });
+    const { session } = await createAgentSession({
+      cwd: projectDir,
+      agentDir: this.agentDir,
+      sessionManager: manager,
+      resourceLoader: loader,
+      noTools: "all",
+      customTools: this.sdkTools(projectId, tools),
+      tools: tools.map(t => t.name),
+      model: this.options.model,
+      modelRuntime: this.options.modelRuntime,
+    });
+    this.emit({ event: "pi.session.ready", projectId, activeTools: session.getActiveToolNames().slice(0, 32).map(name => name.slice(0, 64)) });
     return {
       sessionFile: manager.getSessionFile(),
       subscribe: listener => session.subscribe((event: AgentSessionEvent) => listener(event as PiSessionEvent)),
       prompt: async (text, signal) => {
         if (signal?.aborted) throw signal.reason;
+        this.emit({
+          event: "pi.prompt.start",
+          projectId,
+          prompt: text.slice(0, PROMPT_DIAGNOSTIC_LIMIT),
+          promptLength: text.length,
+          promptSha256: createHash("sha256").update(text).digest("hex"),
+          promptTruncated: text.length > PROMPT_DIAGNOSTIC_LIMIT,
+        });
         const onAbort = () => void session.abort();
         signal?.addEventListener("abort", onAbort, { once: true });
         try {
           await session.prompt(text);
+          this.emit({ event: "pi.prompt.complete", projectId, outcome: "ok" });
         } catch (error) {
-          throw classifyPiSdkFailure(error);
+          const failure = classifyPiSdkFailure(error);
+          this.emit({ event: "pi.prompt.complete", projectId, outcome: failure.code });
+          throw failure;
         } finally {
           signal?.removeEventListener("abort", onAbort);
         }

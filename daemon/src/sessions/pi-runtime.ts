@@ -1,6 +1,6 @@
 export type PiSessionEvent = { type: string; [key: string]: unknown };
 
-export type PiRuntimeFailureCode = "pi_auth_required" | "pi_model_unavailable" | "pi_failed";
+export type PiRuntimeFailureCode = "pi_auth_required" | "pi_model_unavailable" | "pi_proposal_required" | "pi_failed";
 
 /** Bounded Pi failure classification. Raw SDK errors may contain local paths or provider details. */
 export class PiRuntimeFailure extends Error {
@@ -24,6 +24,8 @@ export function classifyPiSdkFailure(error: unknown): PiRuntimeFailure {
 export interface PiTool {
   readonly name: string;
   readonly description: string;
+  /** Model-facing JSON schema. Runtime handlers remain the final authority. */
+  readonly parameters?: Readonly<Record<string, unknown>>;
   execute(params: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>;
 }
 

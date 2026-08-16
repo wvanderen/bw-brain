@@ -2,26 +2,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bw-brain.local/schemas/clap/proposal.schema.json",
   "title": "ClapProposalMessage",
-  "oneOf": [ { "$ref": "#/$defs/Publish" }, { "$ref": "#/$defs/ApprovalIssue" }, { "$ref": "#/$defs/ApprovalConsume" }, { "$ref": "#/$defs/ApprovalResult" } ],
+  "oneOf": [
+    { "$ref": "#/$defs/Publish" },
+    { "$ref": "#/$defs/Inspect" },
+    { "$ref": "#/$defs/ApprovalRequest" },
+    { "$ref": "#/$defs/ApprovalIssue" },
+    { "$ref": "#/$defs/ApprovalConsume" },
+    { "$ref": "#/$defs/ApprovalResult" }
+  ],
   "$defs": {
     "Id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9._:-]+$" },
     "Scope": { "type": "object", "additionalProperties": false, "required": ["projectId", "instanceId"], "properties": { "projectId": { "$ref": "#/$defs/Id" }, "instanceId": { "$ref": "#/$defs/Id" }, "clipSid": { "$ref": "#/$defs/Id" } } },
+    "Note": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ordinal", "startBeats", "durationBeats", "port", "channel", "key", "velocity", "noteId"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0, "maximum": 15 }, "startBeats": { "type": "number", "minimum": 0, "maximum": 64 },
+        "durationBeats": { "type": "number", "exclusiveMinimum": 0, "maximum": 64 }, "port": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "channel": { "type": "integer", "minimum": 0, "maximum": 15 }, "key": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "velocity": { "type": "number", "minimum": 0, "maximum": 1 }, "noteId": { "type": "integer", "minimum": -1, "maximum": 2147483647 }
+      }
+    },
     "Material": {
       "oneOf": [
         { "type": "object", "additionalProperties": false, "required": ["patchId"], "properties": { "patchId": { "$ref": "#/$defs/Id" } } },
-        { "type": "object", "additionalProperties": false, "required": ["phraseId"], "properties": { "phraseId": { "$ref": "#/$defs/Id" } } }
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["phraseId", "launch", "lengthBeats", "notes"],
+          "properties": {
+            "phraseId": { "$ref": "#/$defs/Id" }, "launch": { "enum": ["next_beat", "next_bar"] },
+            "lengthBeats": { "type": "number", "exclusiveMinimum": 0, "maximum": 64 },
+            "notes": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/Note" } }
+          }
+        }
       ]
     },
     "Publish": {
       "type": "object", "additionalProperties": false,
-      "required": ["type", "proposalId", "revision", "kind", "scope", "rationale", "assumptions", "material"],
+      "required": ["type", "proposalId", "revision", "digest", "kind", "scope", "rationale", "assumptions", "material"],
       "properties": {
         "type": { "const": "proposal.publish" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 },
+        "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "kind": { "enum": ["existing_edit", "live_midi"] }, "scope": { "$ref": "#/$defs/Scope" }, "rationale": { "type": "string", "minLength": 1, "maxLength": 512 },
         "assumptions": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 256 } }, "material": { "$ref": "#/$defs/Material" }
       }
     },
-    "ApprovalIssue": { "type": "object", "additionalProperties": false, "required": ["type", "proposalId", "revision", "scope", "digest", "expiresAt"], "properties": { "type": { "const": "approval.issue" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }, "scope": { "$ref": "#/$defs/Scope" }, "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "expiresAt": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
+    "Inspect": { "type": "object", "additionalProperties": false, "required": ["type", "proposalId", "revision", "scope"], "properties": { "type": { "const": "proposal.inspect" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }, "scope": { "$ref": "#/$defs/Scope" } } },
+    "ApprovalRequest": { "type": "object", "additionalProperties": false, "required": ["type", "proposalId", "revision", "scope"], "properties": { "type": { "const": "proposal.approval.request" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }, "scope": { "$ref": "#/$defs/Scope" } } },
+    "ApprovalIssue": { "type": "object", "additionalProperties": false, "required": ["type", "token", "proposalId", "revision", "scope", "digest", "expiresAt"], "properties": { "type": { "const": "approval.issue" }, "token": { "$ref": "#/$defs/Id" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }, "scope": { "$ref": "#/$defs/Scope" }, "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "expiresAt": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 } } },
     "ApprovalConsume": { "type": "object", "additionalProperties": false, "required": ["type", "token", "proposalId", "revision", "scope", "digest"], "properties": { "type": { "const": "approval.consume" }, "token": { "$ref": "#/$defs/Id" }, "proposalId": { "$ref": "#/$defs/Id" }, "revision": { "type": "integer", "minimum": 1, "maximum": 4294967295 }, "scope": { "$ref": "#/$defs/Scope" }, "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
     "ApprovalResult": { "type": "object", "additionalProperties": false, "required": ["type", "proposalId", "ok"], "properties": { "type": { "const": "approval.result" }, "proposalId": { "$ref": "#/$defs/Id" }, "ok": { "type": "boolean" }, "error": { "enum": ["expired", "consumed", "scope_mismatch", "revision_mismatch", "disconnected", "stopped"] } } }
   }

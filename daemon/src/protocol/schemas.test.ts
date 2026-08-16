@@ -744,6 +744,27 @@ describe("CLAP companion bounded protocol fixtures", () => {
     expect(telemetry({ type: "analysis.status", requestId: "analysis-1", status: "running", scope })).toBe(true);
     expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "ok" })).toBe(true);
     expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "error", error: "analysis_auth_required" })).toBe(true);
+    expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "error", error: "analysis_proposal_required" })).toBe(true);
     expect(telemetry({ type: "analysis.complete", requestId: "analysis-1", status: "error", error: "raw provider detail" })).toBe(false);
+  });
+
+  it("accepts the complete exact-scope proposal approval and live phrase lifecycle", () => {
+    const proposal = clapAjv.getSchema(clapProposalSchema.$id)!;
+    const phrase = clapAjv.getSchema(clapPhraseSchema.$id)!;
+    const scope = { projectId: "project-a", instanceId: "instance-a", clipSid: "clip-a" };
+    const digest = "a".repeat(64);
+    const material = {
+      phraseId: "phrase-a",
+      launch: "next_bar",
+      lengthBeats: 1,
+      notes: [{ ordinal: 0, startBeats: 0, durationBeats: 0.5, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: -1 }],
+    };
+    expect(proposal({ type: "proposal.publish", proposalId: "proposal-a", revision: 1, digest, kind: "live_midi", scope, rationale: "inspect", assumptions: [], material })).toBe(true);
+    expect(proposal({ type: "proposal.inspect", proposalId: "proposal-a", revision: 1, scope })).toBe(true);
+    expect(proposal({ type: "proposal.approval.request", proposalId: "proposal-a", revision: 1, scope })).toBe(true);
+    expect(proposal({ type: "approval.issue", token: "token-a", proposalId: "proposal-a", revision: 1, scope, digest, expiresAt: 1 })).toBe(true);
+    expect(proposal({ type: "approval.consume", token: "token-a", proposalId: "proposal-a", revision: 1, scope, digest })).toBe(true);
+    expect(proposal({ type: "approval.result", proposalId: "proposal-a", ok: true })).toBe(true);
+    expect(phrase({ type: "phrase.arm", armToken: "arm-a", proposalId: "proposal-a", revision: 1, phraseId: "phrase-a", scope, launch: "next_bar", lengthBeats: 1, notes: material.notes })).toBe(true);
   });
 });

@@ -16,6 +16,7 @@ struct TransportBlock { bool playing{},hasBeat{},hasTempo{},hasTimeSignature{}; 
 class PhraseScheduler {
 public:
  bool arm(const ArmedPhrase&) noexcept; void disarm() noexcept; bool armed()const noexcept{return armed_;}
+ bool launchScheduled()const noexcept{return launched_;} double launchBeat()const noexcept{return launchBeat_;}
  std::size_t render(const TransportBlock&,FixedEventBuffer&) noexcept;
 private:
  ArmedPhrase phrase_{}; bool armed_{}; bool launched_{}; double launchBeat_{}; double previousEndBeat_{}; bool havePrevious_{};

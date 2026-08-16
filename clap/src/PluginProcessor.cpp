@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include <algorithm>
+#include <cmath>
 #include <span>
 namespace {
 class ReadOnlyStatusParameter final:public juce::AudioProcessorParameter{public:explicit ReadOnlyStatusParameter(juce::String n):name_(std::move(n)){}float getValue()const override{return value_.load();}void setValue(float)override{}float getDefaultValue()const override{return 0;}juce::String getName(int n)const override{return name_.substring(0,n);}juce::String getLabel()const override{return{};}int getNumSteps()const override{return 2;}juce::String getText(float,int)const override{return getValue()>.5F?"On":"Off";}float getValueForText(const juce::String&)const override{return getValue();}bool isAutomatable()const override{return false;}bool isOrientationInverted()const override{return false;}private:juce::String name_;std::atomic<float>value_{0};};
@@ -22,15 +24,30 @@ bool PluginProcessor::nextPeerMessage(std::string& message) {
 }
 
 void PluginProcessor::handlePeerMessage(const std::string& message) {
-  ui::reducePeerMessage(uiState_,message);
+  const auto type=ui::peerMessageType(message);
+  if(type=="phrase.arm"){
+    rt::ArmedPhrase phrase{};
+    if(!ui::decodeArmedPhrase(message,phrase)){
+      publishUi(ui::HealthChanged{uiSnapshot()->droppedSnapshots,"invalid_phrase_arm"});
+      return;
+    }
+    const auto scope=uiSnapshot()->scope;
+    const bool exactScope=scope.confirmed&&scope.projectId==phrase.projectId.data()&&
+      scope.instanceId==phrase.instanceId.data()&&scope.clipSid.value_or("")==phrase.clipSid.data();
+    if(!exactScope||!armPhrase(phrase)){
+      publishUi(ui::HealthChanged{uiSnapshot()->droppedSnapshots,"invalid_phrase_arm"});
+      return;
+    }
+  }else if(type=="phrase.disarm"||type=="stop")requestDisarm();
+  if(!ui::reducePeerMessage(uiState_,message)&&!type.empty())publishUi(ui::HealthChanged{uiSnapshot()->droppedSnapshots,"unsupported_peer_message"});
 }
 
 void PluginProcessor::prepareToPlay(double sampleRate, int maximumExpectedSamplesPerBlock) { setRateAndBufferSizeDetails(sampleRate,maximumExpectedSamplesPerBlock); }
 void PluginProcessor::releaseResources() { requestDisarm(); }
 void PluginProcessor::reset() { requestDisarm(); }
 
-bool PluginProcessor::armPhrase(const rt::ArmedPhrase& phrase) noexcept { Command c{CommandKind::arm,phrase}; if(!commands_.tryPushStrict(c))return false;disarmRequested_.store(false,std::memory_order_release);generationArmed_.store(true,std::memory_order_release);return true; }
-void PluginProcessor::requestDisarm() noexcept { disarmRequested_.store(true,std::memory_order_release);generationArmed_.store(false,std::memory_order_release); }
+bool PluginProcessor::armPhrase(const rt::ArmedPhrase& phrase) noexcept { Command c{CommandKind::arm,phrase}; if(!commands_.tryPushStrict(c))return false;disarmRequested_.store(false,std::memory_order_release);generationCountdownMilliBeats_.store(0,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::waitingForTransport),std::memory_order_release);generationArmed_.store(true,std::memory_order_release);return true; }
+void PluginProcessor::requestDisarm() noexcept { disarmRequested_.store(true,std::memory_order_release);generationArmed_.store(false,std::memory_order_release);generationCountdownMilliBeats_.store(0,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::stopped),std::memory_order_release); }
 void PluginProcessor::stopGenerated() noexcept { requestDisarm(); }
 void PluginProcessor::disconnectGenerated() noexcept { requestDisarm(); }
 
@@ -53,16 +70,29 @@ void PluginProcessor::processGeneration(juce::MidiBuffer& midi,uint32_t frames) 
  const auto transport=currentTransport(frames);
  const bool stopped=havePreviousTransport_&&previousTransport_.playing&&!transport.playing;
  const bool jumped=transport.discontinuity;
- if(stopped){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);}
+ if(stopped){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);generationCountdownMilliBeats_.store(0,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::stopped),std::memory_order_release);}
  else if(jumped)ledger_.requestCleanup();
  scheduler_.render(transport,generated); previousTransport_=transport;havePreviousTransport_=true;
+ if(scheduler_.armed()){
+   if(scheduler_.launchScheduled()&&transport.playing&&transport.hasBeat){
+     const auto remaining=std::max(0.0,scheduler_.launchBeat()-rt::fixedToBeat(transport.beat));
+     generationCountdownMilliBeats_.store(static_cast<std::int32_t>(std::llround(remaining*1000.0)),std::memory_order_release);
+     generationStatus_.store(static_cast<std::uint8_t>(remaining>0.0005?GenerationUiStatus::countdown:GenerationUiStatus::playing),std::memory_order_release);
+   }else{
+     generationCountdownMilliBeats_.store(0,std::memory_order_release);
+     generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::waitingForTransport),std::memory_order_release);
+   }
+ }
  if(ledger_.cleanupPending())ledger_.drain(cleanup);
- if(!rt::mergeEvents(generated,cleanup,merged)){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
- if(static_cast<std::size_t>(midi.getNumEvents())+merged.count>outputCapacity_){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);return;}
+ if(!rt::mergeEvents(generated,cleanup,merged)){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::stopped),std::memory_order_release);return;}
+ if(static_cast<std::size_t>(midi.getNumEvents())+merged.count>outputCapacity_){scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::stopped),std::memory_order_release);return;}
  bool outputOk=true;
  for(std::size_t i=0;i<merged.count;i++){const auto&e=merged[i];juce::MidiMessage message(e.midi.data(),3);midi.addEvent(message,static_cast<int>(e.time));if(e.generated){if(e.kind==rt::EventKind::noteOn){if(!ledger_.noteOn(e.owner))outputOk=false;}else if(e.kind==rt::EventKind::noteOff)ledger_.noteOff(e.owner);}}
- if(outputOk){if(ledger_.cleanupPending())ledger_.completeCleanup();}else{scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);}
- if(!scheduler_.armed())generationArmed_.store(false,std::memory_order_release);
+ if(outputOk){if(ledger_.cleanupPending())ledger_.completeCleanup();}else{scheduler_.disarm();ledger_.requestCleanup();generationArmed_.store(false,std::memory_order_release);generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::stopped),std::memory_order_release);}
+ if(!scheduler_.armed()){
+   generationCountdownMilliBeats_.store(0,std::memory_order_release);
+   if(generationArmed_.exchange(false,std::memory_order_acq_rel))generationStatus_.store(static_cast<std::uint8_t>(GenerationUiStatus::complete),std::memory_order_release);
+ }
 }
 
 bool PluginProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const {

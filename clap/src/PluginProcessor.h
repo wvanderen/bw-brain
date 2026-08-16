@@ -14,6 +14,8 @@
 
 namespace bw {
 
+enum class GenerationUiStatus : std::uint8_t { idle, waitingForTransport, countdown, playing, complete, stopped };
+
 class PluginProcessor final : public juce::AudioProcessor {
 public:
   PluginProcessor();
@@ -44,6 +46,8 @@ public:
   void stopGenerated() noexcept;
   void disconnectGenerated() noexcept;
   bool generationArmed() const noexcept { return generationArmed_.load(std::memory_order_acquire); }
+  GenerationUiStatus generationStatus() const noexcept { return static_cast<GenerationUiStatus>(generationStatus_.load(std::memory_order_acquire)); }
+  double generationCountdownBeats() const noexcept { return static_cast<double>(generationCountdownMilliBeats_.load(std::memory_order_acquire)) / 1000.0; }
   std::size_t ownedGeneratedNotes() const noexcept { return ledger_.size(); }
   void setTestTransport(const rt::TransportBlock& transport) noexcept { testTransport_=transport; useTestTransport_=true; }
   void clearTestTransport() noexcept { useTestTransport_=false; }
@@ -51,6 +55,7 @@ public:
   ui::UiActionQueue& uiActions() noexcept { return uiActions_; }
   std::shared_ptr<const ui::UiState> uiSnapshot() const { return uiState_.snapshot(); }
   void publishUi(const ui::UiEvent& event) { uiState_.reduce(event); }
+  void handlePeerMessage(const std::string& message);
 
 private:
   template <typename Sample>
@@ -70,13 +75,14 @@ private:
   void processGeneration(juce::MidiBuffer&,uint32_t) noexcept;
   rt::TransportBlock currentTransport(uint32_t) noexcept;
   bool nextPeerMessage(std::string& message);
-  void handlePeerMessage(const std::string& message);
   rt::Aggregator telemetry_{};
   rt::SpscQueue<Command,8> commands_{};
   rt::PhraseScheduler scheduler_{};
   rt::OwnedNoteLedger ledger_{};
   std::atomic<bool> generationArmed_{false};
   std::atomic<bool> disarmRequested_{false};
+  std::atomic<std::uint8_t> generationStatus_{static_cast<std::uint8_t>(GenerationUiStatus::idle)};
+  std::atomic<std::int32_t> generationCountdownMilliBeats_{0};
   rt::TransportBlock testTransport_{}; bool useTestTransport_{};
   rt::TransportBlock previousTransport_{}; bool havePreviousTransport_{};
   std::size_t outputCapacity_{rt::kMaxEventsPerBlock};

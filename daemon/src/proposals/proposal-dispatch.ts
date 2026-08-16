@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { RawState } from "../state/reconcile.js";
 import type { EditService, EditResult } from "../runtime/edit-service.js";
 import type { ClapPhraseMessage } from "../gen/clap.js";
-import { sameScope, type LiveMidiMaterial, type ProposalScope, type ProposalStore } from "./proposal-store.js";
+import { sameScope, type LiveMidiMaterial, type ProposalInput, type ProposalRevision, type ProposalScope, type ProposalStore } from "./proposal-store.js";
 import type { ApprovalRequest, ApprovalStore } from "./approval-store.js";
 
 type ArmedPhrase = Extract<ClapPhraseMessage, { type: "phrase.arm" }>;
@@ -17,7 +17,21 @@ export class ProposalDispatch {
   constructor(private readonly deps: {
     proposals: ProposalStore; approvals: ApprovalStore; editService: EditService;
     requireConfirmedScope: (scope: ProposalScope) => Promise<ProposalScope>;
+    requirePublicationScope?: (scope: ProposalScope) => Promise<ProposalScope>;
+    connectionForScope?: (scope: ProposalScope) => string | undefined;
+    sendTo?: (connectionId: string, message: object) => boolean;
   }) {}
+
+  async publish(input: ProposalInput): Promise<ProposalRevision> {
+    const requireScope = this.deps.requirePublicationScope ?? this.deps.requireConfirmedScope;
+    const confirmed = await requireScope(input.scope);
+    if (!sameScope(confirmed, input.scope)) throw new Error("scope_mismatch");
+    const connectionId = this.deps.connectionForScope?.(input.scope);
+    if (!connectionId || !this.deps.sendTo) throw new Error("disconnected");
+    const proposal = this.deps.proposals.publish(input);
+    if (!this.deps.sendTo(connectionId, { type: "proposal.publish", ...proposal })) throw new Error("disconnected");
+    return proposal;
+  }
 
   async consume(request: ApprovalRequest): Promise<DispatchResult> {
     const proposal = this.deps.proposals.get(request.proposalId, request.revision);

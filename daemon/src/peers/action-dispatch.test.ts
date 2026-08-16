@@ -36,6 +36,7 @@ describe("confirmed hosted actions", () => {
   it.each([
     ["pi_auth_required", "analysis_auth_required"],
     ["pi_model_unavailable", "analysis_model_unavailable"],
+    ["pi_proposal_required", "analysis_proposal_required"],
   ] as const)("maps %s to bounded actionable diagnostics", async (piCode, peerCode) => {
     const sent: object[] = [], reportAnalysisFailure = vi.fn();
     const dispatch = new ActionDispatch({
@@ -68,8 +69,26 @@ describe("confirmed hosted actions", () => {
     ]);
   });
 
+  it("binds every scoped action to the sending connection's confirmed lease", async () => {
+    const sent: object[] = [], getProposal = vi.fn(), issueApproval = vi.fn();
+    const requireConfirmedScope = vi.fn(async (connectionId: string) => {
+      if (connectionId !== "connection-a") throw new Error("scope_not_confirmed");
+      return scope;
+    });
+    const dispatch = new ActionDispatch({ requireConfirmedScope, analyze: vi.fn(), getProposal, issueApproval,
+      consumeApproval: vi.fn(), stopProject: vi.fn(), sendTo: (_id, message) => (sent.push(message), true) });
+
+    await dispatch.dispatch("connection-b", { type: "proposal.approval.request", proposalId: "pr", revision: 2, scope });
+
+    expect(requireConfirmedScope).toHaveBeenCalledWith("connection-b", scope);
+    expect(getProposal).not.toHaveBeenCalled();
+    expect(issueApproval).not.toHaveBeenCalled();
+    expect(sent).toEqual([{ type: "action.error", error: "scope_not_confirmed" }]);
+  });
+
   it("previews exact stored scope, approves once, and targets phrase arm/countdown", async () => {
-    const proposal: any = { proposalId: "pr", revision: 2, digest: "d", kind: "live_midi", scope, rationale: "bounded", assumptions: [], material: {} };
+    const digest = "d".repeat(64);
+    const proposal: any = { proposalId: "pr", revision: 2, digest, kind: "live_midi", scope, rationale: "bounded", assumptions: [], material: { phraseId: "phrase", launch: "next_beat", lengthBeats: 1, notes: [{ ordinal: 0, startBeats: 0, durationBeats: 1, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: -1 }] } };
     const sent: object[] = [];
     const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze: vi.fn(), getProposal: vi.fn(() => proposal),
       issueApproval: vi.fn(() => ({ ...proposal, token: "token", expiresAt: 1 })),
@@ -77,11 +96,11 @@ describe("confirmed hosted actions", () => {
       stopProject: vi.fn(), sendTo: (_id, message) => (sent.push(message), true) });
     await dispatch.dispatch("c", { type: "proposal.inspect", proposalId: "pr", revision: 2, scope });
     await dispatch.dispatch("c", { type: "proposal.approval.request", proposalId: "pr", revision: 2, scope });
-    await dispatch.dispatch("c", { type: "proposal.approve", proposalId: "pr", revision: 2, digest: "d", token: "token", scope });
-    expect(sent).toContainEqual({ type: "proposal.snapshot", proposal });
-    expect(sent).toContainEqual(expect.objectContaining({ type: "approval.pending", token: "token", scope }));
+    await dispatch.dispatch("c", { type: "approval.consume", proposalId: "pr", revision: 2, digest, token: "token", scope });
+    expect(sent).toContainEqual({ type: "proposal.publish", ...proposal });
+    expect(sent).toContainEqual({ type: "approval.issue", proposalId: "pr", revision: 2, scope, digest, token: "token", expiresAt: 1 });
+    expect(sent).toContainEqual({ type: "approval.result", proposalId: "pr", ok: true });
     expect(sent).toContainEqual(expect.objectContaining({ type: "phrase.arm", scope }));
-    expect(sent.at(-1)).toEqual({ type: "scheduler.status", status: "countdown", scope });
   });
 
   it("routes Stop globally without requiring current focus", async () => {

@@ -21,7 +21,7 @@
   "scripts": {
     "gen:types": "node ../scripts/gen-types.mjs",
     "start": "tsx src/runtime/boot.ts",
-    "dev": "tsx src/runtime/boot.ts",
+    "dev": "tsx watch src/runtime/boot.ts",
     "test": "vitest run",
     "test:property": "vitest run --testNamePattern property",
     "check:capabilities": "node ../scripts/check-capabilities-doc.mjs",

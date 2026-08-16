@@ -1,8 +1,15 @@
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from "../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/index.js";
 import { describe, expect, it } from "vitest";
 import { PiSdkAdapter } from "./pi-sdk-adapter.js";
+import { createRestrictedPiTools } from "./pi-tools.js";
+import { ProjectSessionManager } from "./project-session-manager.js";
+import { ProposalStore, type ProposalInput } from "../proposals/proposal-store.js";
+import { ProposalDispatch } from "../proposals/proposal-dispatch.js";
+import { ApprovalStore } from "../proposals/approval-store.js";
 
 describe("PiSdkAdapter real 0.84.0 contract", () => {
   it("creates, opens, resumes, forks, subscribes, aborts, and disposes without prompting", async () => {
@@ -34,5 +41,122 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
       message: "pi_auth_required",
     });
     session.dispose();
+  });
+
+  it("registers restricted tools and enforces ProjectSessionManager proposal completion through the real SDK", async () => {
+    const root = await mkdtemp(join(tmpdir(), "bw-pi-sdk-manager-"));
+    const agentDir = join(root, "agent");
+    await mkdir(agentDir, { recursive: true });
+    const modelRuntime = await ModelRuntime.create({ authPath: join(agentDir, "auth.json"), modelsPath: null, allowModelNetwork: false });
+    const faux = fauxProvider();
+    faux.provider.auth!.apiKey!.resolve = async () => ({ auth: { apiKey: "test-only" } });
+    modelRuntime.registerNativeProvider(faux.provider);
+
+    const sdkDiagnostics: Record<string, unknown>[] = [];
+    const managerDiagnostics: Record<string, unknown>[] = [];
+    const proposalCalls: { projectId: string; scope: unknown }[] = [];
+    let providerSchema: Record<string, unknown> | undefined;
+    const proposals = new ProposalStore();
+    const published: object[] = [];
+    const proposalDispatch = new ProposalDispatch({
+      proposals,
+      approvals: new ApprovalStore(),
+      editService: { apply: async () => ({ ok: false, error: "not_used" }) } as never,
+      requireConfirmedScope: async scope => scope,
+      requirePublicationScope: async scope => scope,
+      connectionForScope: () => "connection-real-sdk",
+      sendTo: (_connectionId, message) => { published.push(message); return true; },
+    });
+    const adapter = new PiSdkAdapter(root, agentDir, {
+      modelRuntime,
+      model: faux.getModel(),
+      diagnostic: event => sdkDiagnostics.push(event),
+    });
+    const manager = new ProjectSessionManager(adapter, projectId => createRestrictedPiTools({
+      readConfirmedScope: async () => ({ projectId }),
+      readContext: async () => null,
+      preview: async () => null,
+      createProposal: async input => {
+        proposalCalls.push({ projectId, scope: input.scope });
+        return proposalDispatch.publish(input as unknown as ProposalInput);
+      },
+    }), undefined, event => managerDiagnostics.push(event));
+
+    await manager.connect("p-none", "i-none");
+    faux.setResponses([fauxAssistantMessage("completed without a tool")]);
+    await expect(manager.analyze({ projectId: "p-none", instanceId: "i-none", clipSid: "c-none", prompt: "Analyze no-call" }))
+      .rejects.toMatchObject({ name: "PiRuntimeFailure", code: "pi_proposal_required" });
+
+    await manager.connect("p-tool", "i-tool");
+    faux.setResponses([
+      context => {
+        providerSchema = context.tools?.find(tool => tool.name === "create_proposal")?.parameters as Record<string, unknown> | undefined;
+        return fauxAssistantMessage(fauxToolCall("create_proposal", {
+          proposalId: "proposal-real-sdk",
+          kind: "live_midi",
+          scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" },
+          rationale: "Bounded real-SDK test",
+          assumptions: [],
+          material: {
+            phraseId: "phrase-real-sdk",
+            launch: "next_beat",
+            lengthBeats: 1,
+            notes: [{ ordinal: 0, startBeats: 0, durationBeats: 0.5, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: -1 }],
+          },
+        }));
+      },
+      fauxAssistantMessage("proposal created"),
+    ]);
+    await expect(manager.analyze({ projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool", prompt: "Analyze tool-call" })).resolves.toBeUndefined();
+
+    await manager.connect("p-wrong", "i-wrong");
+    faux.setResponses([
+      fauxAssistantMessage(fauxToolCall("create_proposal", {
+        proposalId: "proposal-wrong-scope",
+        kind: "existing_edit",
+        scope: { projectId: "p-wrong", instanceId: "other", clipSid: "c-wrong" },
+        rationale: "Must remain unstored",
+        assumptions: [],
+        material: { patchId: "patch-wrong-scope" },
+      })),
+      fauxAssistantMessage("proposal refused"),
+    ]);
+    await expect(manager.analyze({ projectId: "p-wrong", instanceId: "i-wrong", clipSid: "c-wrong", prompt: "Analyze wrong-scope counterfactual" }))
+      .rejects.toMatchObject({ name: "PiRuntimeFailure", code: "pi_proposal_required" });
+
+    faux.setResponses([fauxAssistantMessage("still no tool")]);
+    await expect(manager.analyze({ projectId: "p-none", instanceId: "i-none", clipSid: "c-none", prompt: "Analyze no-call again" }))
+      .rejects.toMatchObject({ name: "PiRuntimeFailure", code: "pi_proposal_required" });
+
+    expect(proposalCalls).toEqual([{ projectId: "p-tool", scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" } }]);
+    expect(providerSchema).toMatchObject({
+      type: "object",
+      additionalProperties: false,
+      required: ["proposalId", "kind", "scope", "rationale", "assumptions", "material"],
+      properties: expect.objectContaining({ proposalId: expect.any(Object), kind: expect.any(Object), scope: expect.any(Object), rationale: expect.any(Object), assumptions: expect.any(Object), material: expect.any(Object) }),
+    });
+    expect(proposals.get("proposal-real-sdk")).toMatchObject({ revision: 1, kind: "live_midi", scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" } });
+    expect(proposals.get("proposal-wrong-scope")).toBeUndefined();
+    expect(published).toContainEqual(expect.objectContaining({ type: "proposal.publish", proposalId: "proposal-real-sdk", revision: 1 }));
+    expect(sdkDiagnostics).toContainEqual({
+      event: "pi.session.ready",
+      projectId: "p-tool",
+      activeTools: ["read_confirmed_scope", "read_context", "preview_edit", "create_proposal"],
+    });
+    expect(sdkDiagnostics).toContainEqual(expect.objectContaining({
+      event: "pi.prompt.start",
+      projectId: "p-tool",
+      prompt: expect.stringContaining('Confirmed scope (authoritative; use exactly this JSON): {"projectId":"p-tool","instanceId":"i-tool","clipSid":"c-tool"}'),
+      promptTruncated: false,
+    }));
+    expect(sdkDiagnostics).toContainEqual(expect.objectContaining({ event: "pi.tool.call", projectId: "p-tool", tool: "create_proposal" }));
+    expect(sdkDiagnostics).toContainEqual(expect.objectContaining({ event: "pi.tool.complete", projectId: "p-wrong", tool: "create_proposal", ok: false, rejection: "proposal_scope_mismatch" }));
+    expect(managerDiagnostics.filter(event => event.event === "pi.analysis.complete")).toEqual([
+      expect.objectContaining({ projectId: "p-none", instanceId: "i-none", created: 0, outcome: "proposal_required" }),
+      expect.objectContaining({ projectId: "p-tool", instanceId: "i-tool", created: 1, outcome: "ok" }),
+      expect.objectContaining({ projectId: "p-wrong", instanceId: "i-wrong", created: 0, outcome: "proposal_required" }),
+      expect.objectContaining({ projectId: "p-none", instanceId: "i-none", created: 0, outcome: "proposal_required" }),
+    ]);
+    manager.dispose();
   });
 });

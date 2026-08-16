@@ -25,6 +25,18 @@ const phrase = {
   notes: [{ ordinal: 0, startBeats: 0, durationBeats: 0.5, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: 1 }],
 };
 
+const publishedProposal = {
+  type: "proposal.publish" as const,
+  proposalId: "proposal-1",
+  revision: 1,
+  digest: "a".repeat(64),
+  kind: "live_midi" as const,
+  scope: phrase.scope,
+  rationale: "inspect",
+  assumptions: [],
+  material: { phraseId: "phrase-1", launch: "next_bar" as const, lengthBeats: 1, notes: phrase.notes },
+};
+
 const sockets: net.Socket[] = [];
 const servers: PeerServer[] = [];
 const controllerServers: net.Server[] = [];
@@ -93,6 +105,8 @@ describe("PeerServer targeted CLAP routing", () => {
     b.on("data", bData);
     controller.on("data", controllerData);
 
+    expect(server.registry.sendTo(aId, publishedProposal)).toBe(true);
+    expect((await nextLine(a)).type).toBe("proposal.publish");
     expect(server.registry.sendTo(aId, phrase)).toBe(true);
     expect((await nextLine(a)).type).toBe("phrase.arm");
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -122,6 +136,28 @@ describe("PeerServer targeted CLAP routing", () => {
     socket.write(JSON.stringify(request) + "\n");
 
     await expect(delivered).resolves.toEqual({ connectionId, message: request });
+    expect(server.registry.has(connectionId)).toBe(true);
+  });
+
+  it("accepts exact proposal approval request and consume actions without closing the peer", async () => {
+    const delivered: object[] = [];
+    let complete!: () => void;
+    const received = new Promise<void>((resolve) => { complete = resolve; });
+    const server = new PeerServer({
+      port: 0,
+      onMessage: (_connectionId, message) => { delivered.push(message); if (delivered.length === 2) complete(); },
+    });
+    servers.push(server);
+    await server.ready;
+    const socket = await connect(server.port);
+    const connectionId = await handshake(socket, "instance-a");
+    const scope = { projectId: "project-1", instanceId: "instance-a", clipSid: "clip-1" };
+    const request = { type: "proposal.approval.request", proposalId: "proposal-1", revision: 1, scope };
+    const consume = { type: "approval.consume", token: "token-1", proposalId: "proposal-1", revision: 1, scope, digest: "a".repeat(64) };
+    socket.write(JSON.stringify(request) + "\n");
+    socket.write(JSON.stringify(consume) + "\n");
+    await received;
+    expect(delivered).toEqual([request, consume]);
     expect(server.registry.has(connectionId)).toBe(true);
   });
 

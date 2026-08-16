@@ -1639,6 +1639,7 @@ export type ClapProposalMessage =
       type: "proposal.publish";
       proposalId: string;
       revision: number;
+      digest: string;
       kind: "existing_edit" | "live_midi";
       scope: {
         projectId: string;
@@ -1665,10 +1666,1430 @@ export type ClapProposalMessage =
           }
         | {
             phraseId: string;
+            launch: "next_beat" | "next_bar";
+            lengthBeats: number;
+            /**
+             * @minItems 1
+             * @maxItems 16
+             */
+            notes:
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ]
+              | [
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  },
+                  {
+                    ordinal: number;
+                    startBeats: number;
+                    durationBeats: number;
+                    port: number;
+                    channel: number;
+                    key: number;
+                    velocity: number;
+                    noteId: number;
+                  }
+                ];
           };
     }
   | {
+      type: "proposal.inspect";
+      proposalId: string;
+      revision: number;
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+    }
+  | {
+      type: "proposal.approval.request";
+      proposalId: string;
+      revision: number;
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+    }
+  | {
       type: "approval.issue";
+      token: string;
       proposalId: string;
       revision: number;
       scope: {
@@ -2918,5 +4339,9 @@ export type ClapTelemetryMessage =
       type: "analysis.complete";
       requestId: string;
       status: "ok" | "aborted" | "error";
-      error?: "analysis_auth_required" | "analysis_model_unavailable" | "analysis_failed";
+      error?:
+        | "analysis_auth_required"
+        | "analysis_model_unavailable"
+        | "analysis_proposal_required"
+        | "analysis_failed";
     };

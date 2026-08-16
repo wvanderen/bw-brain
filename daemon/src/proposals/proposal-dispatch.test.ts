@@ -5,6 +5,56 @@ import { ProposalDispatch } from "./proposal-dispatch.js";
 import { EditService } from "../runtime/edit-service.js";
 
 describe("ProposalDispatch", () => {
+  it("publishes one exact revision only to its confirmed originating peer", async () => {
+    const approvals = new ApprovalStore(), proposals = new ProposalStore();
+    const scope = { projectId: "project", instanceId: "instance", clipSid: "clip" };
+    const sendTo = vi.fn(() => true);
+    const dispatch = new ProposalDispatch({
+      proposals,
+      approvals,
+      editService: { apply: vi.fn() } as any,
+      requireConfirmedScope: vi.fn(async (candidate) => candidate),
+      requirePublicationScope: vi.fn(async (candidate) => candidate),
+      connectionForScope: vi.fn(() => "connection-a"),
+      sendTo,
+    } as any);
+
+    const proposal = await (dispatch as any).publish({
+      proposalId: "live",
+      kind: "live_midi",
+      scope,
+      rationale: "audition",
+      assumptions: [],
+      material: {
+        phraseId: "phrase",
+        launch: "next_bar",
+        lengthBeats: 1,
+        notes: [{ ordinal: 0, startBeats: 0, durationBeats: 1, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: -1 }],
+      },
+    });
+
+    expect(proposal).toMatchObject({ proposalId: "live", revision: 1, scope });
+    expect(sendTo).toHaveBeenCalledTimes(1);
+    expect(sendTo).toHaveBeenCalledWith("connection-a", { type: "proposal.publish", ...proposal });
+  });
+
+  it("refuses publication scope drift or a disconnected target before storing", async () => {
+    const input = { proposalId: "p", kind: "existing_edit" as const, scope: { projectId: "project", instanceId: "instance", clipSid: "clip" }, rationale: "inspect", assumptions: [], material: { patchId: "pt_1" } };
+    for (const failure of ["scope", "connection"] as const) {
+      const approvals = new ApprovalStore(), proposals = new ProposalStore(), sendTo = vi.fn(() => true);
+      const dispatch = new ProposalDispatch({
+        proposals, approvals, editService: { apply: vi.fn() } as any,
+        requireConfirmedScope: async (candidate) => candidate,
+        requirePublicationScope: async (candidate) => failure === "scope" ? { ...candidate, clipSid: "other" } : candidate,
+        connectionForScope: () => failure === "connection" ? undefined : "connection-a",
+        sendTo,
+      });
+      await expect(dispatch.publish(input)).rejects.toThrow(failure === "scope" ? "scope_mismatch" : "disconnected");
+      expect(proposals.get("p")).toBeUndefined();
+      expect(sendTo).not.toHaveBeenCalled();
+    }
+  });
+
   it("delegates existing edits once to EditService with proposal scope", async () => {
     const approvals = new ApprovalStore();
     const proposals = new ProposalStore({ invalidateProposal: (id) => approvals.invalidateProposal(id) });

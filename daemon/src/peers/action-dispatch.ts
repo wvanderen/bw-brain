@@ -3,9 +3,9 @@ import type { ProposalRevision, ProposalScope } from "../proposals/proposal-stor
 import { PiRuntimeFailure } from "../sessions/pi-runtime.js";
 
 type DispatchResult = { ok: true; armedPhrase?: object } | { ok: false; error: string } | object;
-type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_failed";
+type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_proposal_required" | "analysis_failed";
 type Dependencies = {
-  requireConfirmedScope(scope: ProposalScope): Promise<ProposalScope>;
+  requireConfirmedScope(connectionId: string, scope: ProposalScope): Promise<ProposalScope>;
   analyze(request: ProposalScope & { prompt: string }): Promise<void>;
   getProposal(proposalId: string, revision?: number): ProposalRevision | undefined;
   issueApproval(proposal: ProposalRevision): object;
@@ -19,6 +19,7 @@ const analysisErrorCode = (error: unknown): AnalysisErrorCode => {
   if (!(error instanceof PiRuntimeFailure)) return "analysis_failed";
   if (error.code === "pi_auth_required") return "analysis_auth_required";
   if (error.code === "pi_model_unavailable") return "analysis_model_unavailable";
+  if (error.code === "pi_proposal_required") return "analysis_proposal_required";
   return "analysis_failed";
 };
 
@@ -33,7 +34,7 @@ export class ActionDispatch {
     const scope = message.scope as ProposalScope | undefined;
     if (!scope) return false;
     let confirmed: ProposalScope;
-    try { confirmed = await this.deps.requireConfirmedScope(scope); }
+    try { confirmed = await this.deps.requireConfirmedScope(connectionId, scope); }
     catch { return this.deps.sendTo(connectionId, { type: "action.error", error: "scope_not_confirmed" }); }
     if (!sameScope(confirmed, scope)) return this.deps.sendTo(connectionId, { type: "action.error", error: "scope_mismatch" });
 
@@ -52,17 +53,25 @@ export class ActionDispatch {
     const proposalId = String(message.proposalId ?? ""), revision = Number(message.revision);
     const proposal = this.deps.getProposal(proposalId, revision);
     if (!proposal || !sameScope(proposal.scope, scope)) return this.deps.sendTo(connectionId, { type: "action.error", error: "revision_mismatch" });
-    if (message.type === "proposal.inspect") return this.deps.sendTo(connectionId, { type: "proposal.snapshot", proposal });
+    if (message.type === "proposal.inspect") return this.deps.sendTo(connectionId, { type: "proposal.publish", ...proposal });
     if (message.type === "proposal.approval.request") {
       const grant = this.deps.issueApproval(proposal) as Record<string, unknown>;
-      return this.deps.sendTo(connectionId, { type: "approval.pending", ...grant });
+      return this.deps.sendTo(connectionId, {
+        type: "approval.issue",
+        token: grant.token,
+        proposalId: grant.proposalId,
+        revision: grant.revision,
+        scope: grant.scope,
+        digest: grant.digest,
+        expiresAt: grant.expiresAt,
+      });
     }
-    if (message.type === "proposal.approve" || message.type === "approval.consume") {
+    if (message.type === "approval.consume") {
       const result = await this.deps.consumeApproval(message as unknown as ApprovalRequest);
       if (!(result as { ok?: boolean }).ok) return this.deps.sendTo(connectionId, { type: "approval.result", proposalId, ok: false, error: (result as { error: string }).error });
       const armed = (result as { armedPhrase?: object }).armedPhrase;
-      if (armed) { this.deps.sendTo(connectionId, armed); return this.deps.sendTo(connectionId, { type: "scheduler.status", status: "countdown", scope }); }
-      return this.deps.sendTo(connectionId, { type: "approval.result", proposalId, ok: true });
+      const acknowledged = this.deps.sendTo(connectionId, { type: "approval.result", proposalId, ok: true });
+      return armed ? acknowledged && this.deps.sendTo(connectionId, armed) : acknowledged;
     }
     return false;
   }
