@@ -10,15 +10,21 @@ describe("SessionActions", () => it("requires exact one-shot fork confirmation a
   const projects = new ProjectRegistry(await mkdtemp(join(tmpdir(), "actions-"))); await projects.confirmLink("source", "i1");
   const focus = new FocusRegistry(); focus.set({ projectId: "source", instanceId: "i1" });
   const sent: any[] = [], events: any[] = [];
+  const rekeys = [{ connectionId: "c", oldInstanceId: "i1", newInstanceId: "i2" }];
   const actions = new SessionActions({ projects, focus, correlation: { state: () => ({ status: "unconfirmed" }) } as any,
     resolveLinkScope: async () => { throw new Error("unused"); }, markLinkPending: () => undefined, markLinkConfirmed: () => undefined,
-    sendTo: (_id, m) => (sent.push(m), true), emit: (e) => events.push(e) });
+    sendTo: (_id, m) => (sent.push(m), true), emit: (e) => { events.push(e); },
+    planForkInstances: () => rekeys, commitForkInstances: (_projectId, _rekeys, event) => { sent.push(event); } });
   await actions.dispatch("c", { type: "session.fork.request", sourceProjectId: "source", newProjectId: "fork" });
   const request = sent.at(-1); await actions.dispatch("c", { type: "session.fork.confirm", sourceProjectId: "source", newProjectId: "fork", token: "wrong" });
   expect(events).toHaveLength(0);
   await actions.dispatch("c", { type: "session.fork.confirm", sourceProjectId: "source", newProjectId: "fork", token: request.token });
-  expect(events[0]).toMatchObject({ type: "ProjectForkCommitted", sourceProjectId: "source", newProjectId: "fork", instanceIds: ["i1"] });
+  expect(events[0]).toMatchObject({ type: "ProjectForkCommitted", sourceProjectId: "source", newProjectId: "fork", instanceIds: ["i2"] });
   expect(focus.get()?.projectId).toBe("fork");
+  expect(focus.get()?.instanceId).toBe("i2");
+  await expect(projects.requireConfirmedScope("source", "i1")).resolves.toBeDefined();
+  await expect(projects.requireConfirmedScope("fork", "i1")).rejects.toThrow("scope_not_confirmed");
+  await expect(projects.requireConfirmedScope("fork", "i2")).resolves.toBeDefined();
   await actions.dispatch("c", { type: "session.fork.confirm", sourceProjectId: "source", newProjectId: "fork", token: request.token });
   expect(events).toHaveLength(1);
 }));
@@ -38,7 +44,8 @@ describe("SessionActions identity link", () => it("derives a pending scope and c
   const sent: any[] = [];
   const markLinkPending = vi.fn(), markLinkConfirmed = vi.fn();
   const actions = new SessionActions({ projects, focus, correlation, resolveLinkScope: async () => scope,
-    markLinkPending, markLinkConfirmed, sendTo: (_id, message) => (sent.push(message), true) });
+    markLinkPending, markLinkConfirmed, sendTo: (_id, message) => (sent.push(message), true), emit: () => undefined,
+    planForkInstances: () => { throw new Error("unused"); }, commitForkInstances: () => { throw new Error("unused"); } });
 
   await actions.dispatch("connection-1", { type: "link.confirm.request" });
   expect(correlation.requestConfirmation).toHaveBeenCalledWith({ projectId: scope.projectId, instanceId: scope.instanceId, trackSid: scope.trackSid, trackSlot: scope.trackSlot, trackHint: scope.trackHint, deviceHint: scope.deviceHint });

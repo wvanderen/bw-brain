@@ -336,6 +336,28 @@ function nextPeerLine(socket: net.Socket): Promise<Record<string, any>> {
   });
 }
 
+function nextPeerLines(socket: net.Socket, count: number): Promise<Record<string, any>[]> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    const lines: Record<string, any>[] = [];
+    const onData = (chunk: Buffer | string): void => {
+      buffer += chunk.toString();
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        lines.push(JSON.parse(buffer.slice(0, newline)) as Record<string, any>);
+        buffer = buffer.slice(newline + 1);
+        if (lines.length === count) {
+          socket.off("data", onData);
+          resolve(lines);
+          return;
+        }
+      }
+    };
+    socket.on("data", onData);
+    socket.once("error", reject);
+  });
+}
+
 describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
   // Two distinct TCP ports so the two boot() instances (assertion 4 restart
   // + Major 2 soft-fallback) don't clash with each other or a real bridge
@@ -660,6 +682,53 @@ describe("daemon boot smoke (fake bridge — NO live Bitwig required)", () => {
           path.join(env.dir, "projects", pending.scope.projectId, "project-registry.json"), "utf8",
         ));
         expect(persisted.links["instance-product"]).toMatchObject({ status: "confirmed", trackSid: pending.scope.trackSid });
+
+        const forkProjectId = "project-fork-product";
+        const forkPendingLine = nextPeerLine(peer);
+        peer.write(JSON.stringify({ type: "session.fork.request", sourceProjectId: pending.scope.projectId, newProjectId: forkProjectId }) + "\n");
+        const forkPending = await forkPendingLine;
+        expect(forkPending).toMatchObject({ type: "session.fork.confirmation_required", sourceProjectId: pending.scope.projectId, newProjectId: forkProjectId, instanceIds: ["instance-product"] });
+
+        const forkResultLines = nextPeerLines(peer, 2);
+        peer.write(JSON.stringify({ type: "session.fork.confirm", sourceProjectId: pending.scope.projectId, newProjectId: forkProjectId, token: forkPending.token }) + "\n");
+        const [forkCommitted, forkRekey] = await forkResultLines;
+        expect(forkCommitted).toMatchObject({ type: "ProjectForkCommitted", sourceProjectId: pending.scope.projectId, newProjectId: forkProjectId, lineageVersion: 2 });
+        expect(forkRekey).toMatchObject({ type: "instance.rekey", oldInstanceId: "instance-product", reason: "project_fork" });
+        expect(forkCommitted.instanceIds).toEqual([forkRekey.newInstanceId]);
+
+        const forkPersisted = JSON.parse(await fs.promises.readFile(
+          path.join(env.dir, "projects", forkProjectId, "project-registry.json"), "utf8",
+        ));
+        expect(forkPersisted.links["instance-product"]).toBeUndefined();
+        expect(forkPersisted.links[forkRekey.newInstanceId]).toMatchObject({ status: "confirmed", trackSid: pending.scope.trackSid });
+
+        peer.destroy();
+        await new Promise<void>((resolve) => peer!.once("close", resolve));
+        peer = net.createConnection({ host: "127.0.0.1", port: handle.peerPort });
+        await new Promise<void>((resolve, reject) => { peer!.once("connect", resolve); peer!.once("error", reject); });
+        const reopenedSourceAccepted = nextPeerLine(peer);
+        peer.write(JSON.stringify({
+          type: "clap.hello", protocol: "1.0", instanceId: "instance-product", capabilities: ["identity.link"],
+          limits: { maxLineBytes: 65_536, maxQueueMessages: 32, maxQueueBytes: 262_144 },
+        }) + "\n");
+        expect(await reopenedSourceAccepted).toMatchObject({ type: "clap.accept", instanceId: "instance-product" });
+        const reopenedSourcePending = nextPeerLine(peer);
+        peer.write('{"type":"link.confirm.request"}\n');
+        expect(await reopenedSourcePending).toMatchObject({ type: "link.confirm.pending", scope: { projectId: pending.scope.projectId, instanceId: "instance-product" } });
+
+        peer.destroy();
+        await new Promise<void>((resolve) => peer!.once("close", resolve));
+        peer = net.createConnection({ host: "127.0.0.1", port: handle.peerPort });
+        await new Promise<void>((resolve, reject) => { peer!.once("connect", resolve); peer!.once("error", reject); });
+        const reopenedForkAccepted = nextPeerLine(peer);
+        peer.write(JSON.stringify({
+          type: "clap.hello", protocol: "1.0", instanceId: forkRekey.newInstanceId, capabilities: ["identity.link"],
+          limits: { maxLineBytes: 65_536, maxQueueMessages: 32, maxQueueBytes: 262_144 },
+        }) + "\n");
+        expect(await reopenedForkAccepted).toMatchObject({ type: "clap.accept", instanceId: forkRekey.newInstanceId });
+        const reopenedForkPending = nextPeerLine(peer);
+        peer.write('{"type":"link.confirm.request"}\n');
+        expect(await reopenedForkPending).toMatchObject({ type: "link.confirm.pending", scope: { projectId: forkProjectId, instanceId: forkRekey.newInstanceId } });
       } finally {
         peer?.destroy();
         fakeBridge.close();

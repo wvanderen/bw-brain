@@ -38,7 +38,7 @@
     "Rekey": {
       "type": "object", "additionalProperties": false,
       "required": ["type", "oldInstanceId", "newInstanceId", "reason"],
-      "properties": { "type": { "const": "instance.rekey" }, "oldInstanceId": { "$ref": "#/$defs/Id" }, "newInstanceId": { "$ref": "#/$defs/Id" }, "reason": { "const": "simultaneous_claim" } }
+      "properties": { "type": { "const": "instance.rekey" }, "oldInstanceId": { "$ref": "#/$defs/Id" }, "newInstanceId": { "$ref": "#/$defs/Id" }, "reason": { "enum": ["simultaneous_claim", "project_fork"] } }
     },
     "Health": {
       "type": "object", "additionalProperties": false,

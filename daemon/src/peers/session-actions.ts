@@ -4,6 +4,7 @@ import type { FocusRegistry } from "../sessions/focus-registry.js";
 import type { ProjectRegistry } from "../sessions/project-registry.js";
 
 export interface ProjectForkCommitted { type: "ProjectForkCommitted"; sourceProjectId: string; newProjectId: string; instanceIds: string[]; lineageVersion: number; }
+export interface ForkInstanceRekey { connectionId: string; oldInstanceId: string; newInstanceId: string; }
 export interface LinkScope extends CorrelationScope { clipSid?: string; }
 type Sender = (connectionId: string, message: object) => boolean;
 
@@ -18,7 +19,9 @@ export class SessionActions {
     markLinkPending: (scope: LinkScope) => void;
     markLinkConfirmed: (scope: LinkScope) => void;
     sendTo: Sender;
-    emit?: (event: ProjectForkCommitted) => void;
+    emit: (event: ProjectForkCommitted) => void | Promise<void>;
+    planForkInstances: (connectionId: string, sourceProjectId: string, instanceIds: string[]) => ForkInstanceRekey[];
+    commitForkInstances: (newProjectId: string, rekeys: ForkInstanceRekey[], event: ProjectForkCommitted) => void;
   }) {}
 
   async dispatch(connectionId: string, message: Record<string, unknown>): Promise<boolean> {
@@ -74,7 +77,7 @@ export class SessionActions {
       const sourceProjectId = String(message.sourceProjectId ?? ""), newProjectId = String(message.newProjectId ?? "");
       const source = await this.deps.projects.open(sourceProjectId);
       const token = randomBytes(24).toString("base64url");
-      const pending = { token, sourceProjectId, newProjectId, instanceIds: Object.keys(source.links) };
+      const pending = { token, sourceProjectId, newProjectId, instanceIds: Object.entries(source.links).filter(([, link]) => link.status === "confirmed").map(([instanceId]) => instanceId).sort() };
       this.pendingForks.set(connectionId, pending);
       return this.deps.sendTo(connectionId, { type: "session.fork.confirmation_required", ...pending });
     }
@@ -84,13 +87,19 @@ export class SessionActions {
         return this.deps.sendTo(connectionId, { type: "action.error", error: "fork_confirmation_mismatch" });
       this.pendingForks.delete(connectionId); // consume before side effects; replay fails closed
       try {
-        const forked = await this.deps.projects.fork(pending.sourceProjectId, pending.newProjectId);
+        const rekeys = this.deps.planForkInstances(connectionId, pending.sourceProjectId, pending.instanceIds);
+        const forked = await this.deps.projects.fork(pending.sourceProjectId, pending.newProjectId, rekeys);
         await this.deps.projects.setActiveProjectId(pending.newProjectId);
         const focused = this.deps.focus.get();
-        if (focused?.projectId === pending.sourceProjectId) this.deps.focus.set({ ...focused, projectId: pending.newProjectId });
-        const event: ProjectForkCommitted = { type: "ProjectForkCommitted", sourceProjectId: pending.sourceProjectId, newProjectId: pending.newProjectId, instanceIds: pending.instanceIds, lineageVersion: forked.lineageVersion };
-        this.deps.emit?.(event);
-        return this.deps.sendTo(connectionId, event);
+        if (focused?.projectId === pending.sourceProjectId) {
+          const replacement = rekeys.find((rekey) => rekey.oldInstanceId === focused.instanceId)?.newInstanceId;
+          if (!replacement) throw new Error("fork_focus_not_connected");
+          this.deps.focus.set({ ...focused, projectId: pending.newProjectId, instanceId: replacement });
+        }
+        const event: ProjectForkCommitted = { type: "ProjectForkCommitted", sourceProjectId: pending.sourceProjectId, newProjectId: pending.newProjectId, instanceIds: rekeys.map((rekey) => rekey.newInstanceId), lineageVersion: forked.lineageVersion };
+        await this.deps.emit(event);
+        this.deps.commitForkInstances(pending.newProjectId, rekeys, event);
+        return true;
       } catch { return this.deps.sendTo(connectionId, { type: "action.error", error: "fork_failed" }); }
     }
     return false;

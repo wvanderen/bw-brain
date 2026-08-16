@@ -59,6 +59,13 @@ int main() {
   check(peerStore.snapshot()->analysis == "error: analysis_failed", "Analyze failure must be visible");
   check(reducePeerMessage(peerStore, "{\"type\":\"analysis.complete\",\"requestId\":\"analysis-2\",\"status\":\"error\",\"error\":\"analysis_auth_required\"}"), "analysis auth response reducer");
   check(peerStore.snapshot()->analysis == "error: analysis_auth_required", "actionable Analyze auth failure must be visible");
+  check(reducePeerMessage(peerStore, "{\"type\":\"session.fork.confirmation_required\",\"token\":\"fork-token\",\"sourceProjectId\":\"project-a\",\"newProjectId\":\"project-b\",\"instanceIds\":[\"inst-a\"]}"), "fork confirmation response reducer");
+  check(peerStore.snapshot()->fork == "confirmation pending" && peerStore.snapshot()->forkConfirmation.has_value(), "fork confirmation must become visible pending state");
+  const auto pendingFork = *peerStore.snapshot()->forkConfirmation;
+  check(encodePeerAction(UiAction::forkConfirm(pendingFork.sourceProjectId, pendingFork.newProjectId, pendingFork.token), peerMessage), "pending fork must encode its exact confirmation");
+  check(peerMessage == "{\"type\":\"session.fork.confirm\",\"sourceProjectId\":\"project-a\",\"newProjectId\":\"project-b\",\"token\":\"fork-token\"}", "fork confirmation wire mismatch");
+  check(reducePeerMessage(peerStore, "{\"type\":\"ProjectForkCommitted\",\"sourceProjectId\":\"project-a\",\"newProjectId\":\"project-b\",\"instanceIds\":[\"inst-a\"],\"lineageVersion\":2}"), "fork commit response reducer");
+  check(peerStore.snapshot()->scope.projectId == "project-b" && peerStore.snapshot()->fork == "committed" && !peerStore.snapshot()->forkConfirmation, "fork commit must rebind visible project and consume pending confirmation");
 
   UiActionQueue actions;
   check(actions.enqueue(UiAction::analyze()), "Analyze must be hosted action");

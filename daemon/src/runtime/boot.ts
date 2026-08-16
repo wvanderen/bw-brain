@@ -459,7 +459,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
         selection: { ...(lastState?.selection ?? {}), trackSid, ...(clipSid ? { clipSid } : {}) },
       };
       schedulePersist(lastState);
-      const projectId = await projects.getOrCreateActiveProjectId();
+      const projectId = await projects.findConfirmedProjectId(lease.instanceId) ?? await projects.getOrCreateActiveProjectId();
       return {
         projectId,
         instanceId: lease.instanceId,
@@ -473,6 +473,9 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     markLinkPending: (scope) => peers.registry.setLeaseScope(scope.instanceId, scope.projectId, "pending"),
     markLinkConfirmed: (scope) => peers.registry.setLeaseScope(scope.instanceId, scope.projectId, "confirmed"),
     sendTo: (connectionId, message) => peers.registry.sendTo(connectionId, message),
+    emit: (event) => sessions.onProjectForkCommitted(event),
+    planForkInstances: (connectionId, sourceProjectId, instanceIds) => peers.registry.planProjectFork(connectionId, sourceProjectId, instanceIds),
+    commitForkInstances: (newProjectId, rekeys, event) => peers.registry.commitProjectFork(newProjectId, rekeys, event),
   });
   routePeerAction = (connectionId, message) => {
     void (async () => {

@@ -20,10 +20,14 @@ describe("ProjectRegistry", () => {
     await expect(registry.requireConfirmedScope("source", "i1")).rejects.toThrow("scope_not_confirmed");
     await registry.confirmLink("source", "i1", { trackSid: "t1" });
     await registry.appendHistory("source", "before");
-    const fork = await registry.fork("source", "fork");
+    const fork = await registry.fork("source", "fork", [{ oldInstanceId: "i1", newInstanceId: "i2" }]);
+    await expect(registry.requireConfirmedScope("fork", "i1")).rejects.toThrow("scope_not_confirmed");
+    await expect(registry.requireConfirmedScope("fork", "i2")).resolves.toMatchObject({ trackSid: "t1" });
     await registry.appendHistory("fork", "fork-only"); await registry.appendHistory("source", "source-only");
     expect((await registry.open("source")).history).toEqual(["before", "source-only"]);
     expect((await registry.open("fork")).history).toEqual(["before", "fork-only"]);
+    expect(await new ProjectRegistry(dir).findConfirmedProjectId("i1")).toBe("source");
+    expect(await new ProjectRegistry(dir).findConfirmedProjectId("i2")).toBe("fork");
     expect(fork.lineageVersion).toBe(2);
     expect(JSON.parse(await readFile(join(dir, "fork", "project-registry.json"), "utf8")).parentProjectId).toBe("source");
   });

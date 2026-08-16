@@ -2,6 +2,7 @@ import { PeerConnection } from "./peer-connection.js";
 import { randomUUID } from "node:crypto";
 
 export interface InstanceLease { connectionId: string; projectId?: string; instanceId: string; status: "unconfirmed" | "pending" | "confirmed" | "stale" | "unlinked"; }
+export interface PeerForkRekey { connectionId: string; oldInstanceId: string; newInstanceId: string; }
 
 /** Accepted peer connections. Targeted send is deliberately the only write API. */
 export class PeerRegistry {
@@ -52,6 +53,38 @@ export class PeerRegistry {
   }
   projectPeers(projectId: string): InstanceLease[] { return [...this.leases.values()].filter((lease) => lease.projectId === projectId && lease.status === "confirmed").map((lease) => ({ ...lease })); }
   projectIds(): string[] { return [...new Set([...this.leases.values()].flatMap((lease) => lease.projectId ? [lease.projectId] : []))]; }
+
+  planProjectFork(connectionId: string, projectId: string, expectedInstanceIds: string[]): PeerForkRekey[] {
+    const requester = this.getConnectionLease(connectionId);
+    if (!requester || requester.projectId !== projectId || requester.status !== "confirmed") throw new Error("fork_scope_not_confirmed");
+    const peers = this.projectPeers(projectId).sort((a, b) => a.instanceId.localeCompare(b.instanceId));
+    const expected = [...new Set(expectedInstanceIds)].sort();
+    if (expected.length !== expectedInstanceIds.length || peers.length !== expected.length ||
+        peers.some((lease, index) => lease.instanceId !== expected[index])) throw new Error("fork_instances_not_connected");
+    const reserved = new Set(this.leases.keys());
+    return peers.map((lease) => {
+      let newInstanceId: string;
+      do newInstanceId = `inst-${randomUUID()}`; while (reserved.has(newInstanceId));
+      reserved.add(newInstanceId);
+      return { connectionId: lease.connectionId, oldInstanceId: lease.instanceId, newInstanceId };
+    });
+  }
+
+  commitProjectFork(projectId: string, rekeys: PeerForkRekey[], event: object): void {
+    for (const rekey of rekeys) {
+      const lease = this.leases.get(rekey.oldInstanceId);
+      if (!lease || lease.connectionId !== rekey.connectionId || lease.status !== "confirmed") throw new Error("fork_lease_changed");
+    }
+    for (const rekey of rekeys) {
+      if (!this.sendTo(rekey.connectionId, event) || !this.sendTo(rekey.connectionId, {
+        type: "instance.rekey", oldInstanceId: rekey.oldInstanceId, newInstanceId: rekey.newInstanceId, reason: "project_fork",
+      })) throw new Error("fork_peer_rekey_failed");
+    }
+    for (const rekey of rekeys) {
+      this.leases.delete(rekey.oldInstanceId);
+      this.leases.set(rekey.newInstanceId, { connectionId: rekey.connectionId, projectId, instanceId: rekey.newInstanceId, status: "confirmed" });
+    }
+  }
 
   sendTo(connectionId: string, envelope: object): boolean {
     if (!this.validateEnvelope(envelope)) return false;

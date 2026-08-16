@@ -185,7 +185,7 @@ export type ClapPeerMessage =
       type: "instance.rekey";
       oldInstanceId: string;
       newInstanceId: string;
-      reason: "simultaneous_claim";
+      reason: "simultaneous_claim" | "project_fork";
     }
   | {
       type: "peer.health";

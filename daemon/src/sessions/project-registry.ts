@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { atomicWriteJson } from "../store/atomic-write.js";
@@ -17,6 +17,7 @@ export interface ProjectRecord {
 }
 
 export interface ConfirmedScope { projectId: string; instanceId: string; trackSid?: string; }
+export interface ForkInstanceRekey { oldInstanceId: string; newInstanceId: string; }
 
 const validId = (id: string) => /^[A-Za-z0-9._:-]{1,64}$/.test(id);
 
@@ -96,18 +97,52 @@ export class ProjectRegistry {
     return { projectId, instanceId, trackSid: link.trackSid };
   }
 
+  async findConfirmedProjectId(instanceId: string): Promise<string | undefined> {
+    if (!validId(instanceId)) throw new Error("invalid instanceId");
+    const projectIds = new Set(this.records.keys());
+    try {
+      for (const entry of await readdir(this.storageDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && validId(entry.name)) projectIds.add(entry.name);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    const matches: string[] = [];
+    for (const projectId of [...projectIds].sort()) {
+      if ((await this.open(projectId)).links[instanceId]?.status === "confirmed") matches.push(projectId);
+    }
+    if (matches.length > 1) throw new Error("ambiguous_instance_project");
+    return matches[0];
+  }
+
   async appendHistory(projectId: string, entry: string): Promise<void> {
     const record = await this.open(projectId); record.history.push(entry); await this.persist(record);
   }
 
   /** Persist the complete fork before publishing it in memory. Source is never changed. */
-  async fork(sourceProjectId: string, newProjectId: string): Promise<ProjectRecord> {
+  async fork(sourceProjectId: string, newProjectId: string, instanceRekeys: ForkInstanceRekey[] = []): Promise<ProjectRecord> {
     if (!validId(newProjectId) || sourceProjectId === newProjectId) throw new Error("invalid fork target");
     const source = await this.open(sourceProjectId);
     try { await readFile(this.path(newProjectId), "utf8"); throw new Error("fork target exists"); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    const rekeys = new Map<string, string>();
+    const newInstanceIds = new Set<string>();
+    for (const { oldInstanceId, newInstanceId } of instanceRekeys) {
+      if (!validId(oldInstanceId) || !validId(newInstanceId) || oldInstanceId === newInstanceId ||
+          rekeys.has(oldInstanceId) || newInstanceIds.has(newInstanceId)) throw new Error("invalid fork instance rekey");
+      rekeys.set(oldInstanceId, newInstanceId); newInstanceIds.add(newInstanceId);
+    }
+    const links: ProjectRecord["links"] = {};
+    for (const [instanceId, link] of Object.entries(source.links)) {
+      if (link.status === "confirmed") {
+        const newInstanceId = rekeys.get(instanceId);
+        if (!newInstanceId) throw new Error("fork instance rekey mismatch");
+        links[newInstanceId] = structuredClone(link);
+      } else links[instanceId] = structuredClone(link);
+    }
+    if ([...rekeys.keys()].some((instanceId) => source.links[instanceId]?.status !== "confirmed")) throw new Error("fork instance rekey mismatch");
     const forked: ProjectRecord = {
-      ...structuredClone(source), projectId: newProjectId, parentProjectId: sourceProjectId,
+      ...structuredClone(source), projectId: newProjectId, parentProjectId: sourceProjectId, links,
       lineageVersion: source.lineageVersion + 1,
     };
     await atomicWriteJson(this.path(newProjectId), forked);
