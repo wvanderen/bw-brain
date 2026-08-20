@@ -56,6 +56,8 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
     const managerDiagnostics: Record<string, unknown>[] = [];
     const proposalCalls: { projectId: string; scope: unknown }[] = [];
     let providerSchema: Record<string, unknown> | undefined;
+    let providerPreviewSchema: Record<string, unknown> | undefined;
+    const previewCalls: unknown[] = [];
     const proposals = new ProposalStore();
     const published: object[] = [];
     const proposalDispatch = new ProposalDispatch({
@@ -75,7 +77,10 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
     const manager = new ProjectSessionManager(adapter, projectId => createRestrictedPiTools({
       readConfirmedScope: async () => ({ projectId }),
       readContext: async () => null,
-      preview: async () => null,
+      preview: async input => {
+        previewCalls.push(input);
+        return { ok: true, payload: { patchId: "pt_12345678-1234-1234-1234-123456789abc" } };
+      },
       createProposal: async input => {
         proposalCalls.push({ projectId, scope: input.scope });
         return proposalDispatch.publish(input as unknown as ProposalInput);
@@ -109,6 +114,31 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
     ]);
     await expect(manager.analyze({ projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool", prompt: "Analyze tool-call" })).resolves.toBeUndefined();
 
+    await manager.connect("p-edit", "i-edit");
+    faux.setResponses([
+      context => {
+        providerPreviewSchema = context.tools?.find(tool => tool.name === "preview_edit")?.parameters as Record<string, unknown> | undefined;
+        return fauxAssistantMessage(fauxToolCall("preview_edit", {
+          scope: { clipSid: "clip_0123456789abcdef" },
+          operations: [{ op: "update_note_field", before: { key: "n:60:0", pitch: 60, start: 0, length: 1, velocity: 100 }, after: { key: "n:60:0", pitch: 60, start: 0, length: 0.5, velocity: 96 } }],
+          rationale: "Shorten the selected note",
+          reversibility: "self-inverse",
+          risk: "low",
+          undoLabel: "bw-brain: shorten note",
+        }));
+      },
+      fauxAssistantMessage(fauxToolCall("create_proposal", {
+        proposalId: "proposal-existing-edit",
+        kind: "existing_edit",
+        scope: { projectId: "p-edit", instanceId: "i-edit", clipSid: "clip_0123456789abcdef" },
+        rationale: "Apply the grounded preview",
+        assumptions: [],
+        material: { patchId: "pt_12345678-1234-1234-1234-123456789abc" },
+      })),
+      fauxAssistantMessage("grounded edit proposed"),
+    ]);
+    await expect(manager.analyze({ projectId: "p-edit", instanceId: "i-edit", clipSid: "clip_0123456789abcdef", prompt: "Analyze and edit" })).resolves.toBeUndefined();
+
     await manager.connect("p-wrong", "i-wrong");
     faux.setResponses([
       fauxAssistantMessage(fauxToolCall("create_proposal", {
@@ -128,13 +158,23 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
     await expect(manager.analyze({ projectId: "p-none", instanceId: "i-none", clipSid: "c-none", prompt: "Analyze no-call again" }))
       .rejects.toMatchObject({ name: "PiRuntimeFailure", code: "pi_proposal_required" });
 
-    expect(proposalCalls).toEqual([{ projectId: "p-tool", scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" } }]);
+    expect(proposalCalls).toEqual([
+      { projectId: "p-tool", scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" } },
+      { projectId: "p-edit", scope: { projectId: "p-edit", instanceId: "i-edit", clipSid: "clip_0123456789abcdef" } },
+    ]);
     expect(providerSchema).toMatchObject({
       type: "object",
       additionalProperties: false,
       required: ["proposalId", "kind", "scope", "rationale", "assumptions", "material"],
       properties: expect.objectContaining({ proposalId: expect.any(Object), kind: expect.any(Object), scope: expect.any(Object), rationale: expect.any(Object), assumptions: expect.any(Object), material: expect.any(Object) }),
     });
+    expect(providerPreviewSchema).toMatchObject({
+      type: "object",
+      additionalProperties: false,
+      required: ["scope", "operations", "rationale", "reversibility", "risk"],
+      properties: expect.objectContaining({ scope: expect.any(Object), operations: expect.any(Object), rationale: expect.any(Object), reversibility: expect.any(Object), risk: expect.any(Object) }),
+    });
+    expect(previewCalls).toEqual([expect.objectContaining({ scope: { clipSid: "clip_0123456789abcdef" }, operations: [expect.objectContaining({ op: "update_note_field" })] })]);
     expect(proposals.get("proposal-real-sdk")).toMatchObject({ revision: 1, kind: "live_midi", scope: { projectId: "p-tool", instanceId: "i-tool", clipSid: "c-tool" } });
     expect(proposals.get("proposal-wrong-scope")).toBeUndefined();
     expect(published).toContainEqual(expect.objectContaining({ type: "proposal.publish", proposalId: "proposal-real-sdk", revision: 1 }));
@@ -149,11 +189,17 @@ describe("PiSdkAdapter real 0.84.0 contract", () => {
       prompt: expect.stringContaining('Confirmed scope (authoritative; use exactly this JSON): {"projectId":"p-tool","instanceId":"i-tool","clipSid":"c-tool"}'),
       promptTruncated: false,
     }));
+    expect(sdkDiagnostics).toContainEqual(expect.objectContaining({
+      event: "pi.prompt.start",
+      projectId: "p-edit",
+      prompt: expect.stringContaining("Approval applies that immutable preview exactly; it never expands a sample or pattern clip-wide."),
+    }));
     expect(sdkDiagnostics).toContainEqual(expect.objectContaining({ event: "pi.tool.call", projectId: "p-tool", tool: "create_proposal" }));
     expect(sdkDiagnostics).toContainEqual(expect.objectContaining({ event: "pi.tool.complete", projectId: "p-wrong", tool: "create_proposal", ok: false, rejection: "proposal_scope_mismatch" }));
     expect(managerDiagnostics.filter(event => event.event === "pi.analysis.complete")).toEqual([
       expect.objectContaining({ projectId: "p-none", instanceId: "i-none", created: 0, outcome: "proposal_required" }),
       expect.objectContaining({ projectId: "p-tool", instanceId: "i-tool", created: 1, outcome: "ok" }),
+      expect.objectContaining({ projectId: "p-edit", instanceId: "i-edit", created: 1, outcome: "ok" }),
       expect.objectContaining({ projectId: "p-wrong", instanceId: "i-wrong", created: 0, outcome: "proposal_required" }),
       expect.objectContaining({ projectId: "p-none", instanceId: "i-none", created: 0, outcome: "proposal_required" }),
     ]);

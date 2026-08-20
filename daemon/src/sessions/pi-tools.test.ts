@@ -7,6 +7,19 @@ describe("restricted Pi tools", () => {
     const tools = createRestrictedPiTools(deps);
     expect(tools.map(t => t.name)).toEqual(["read_confirmed_scope", "read_context", "preview_edit", "create_proposal"]);
     expect(tools.map(t => t.name).join(" ")).not.toMatch(/apply|arm|socket|file|audio/);
+    const previewEdit = tools.find(tool => tool.name === "preview_edit")!;
+    expect((previewEdit as PiToolWithParameters).parameters).toMatchObject({
+      type: "object",
+      additionalProperties: false,
+      required: ["scope", "operations", "rationale", "reversibility", "risk"],
+      properties: {
+        scope: { type: "object", additionalProperties: false, required: ["clipSid"] },
+        operations: { type: "array", minItems: 1, maxItems: 64, items: { oneOf: expect.any(Array) } },
+        rationale: { type: "string" },
+        reversibility: { enum: ["self-inverse", "manual-inverse", "irreversible"] },
+        risk: { enum: ["low", "medium", "high"] },
+      },
+    });
     const createProposal = tools.find(tool => tool.name === "create_proposal")!;
     expect((createProposal as PiToolWithParameters).parameters).toMatchObject({
       type: "object",

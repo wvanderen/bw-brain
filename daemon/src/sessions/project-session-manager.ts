@@ -45,6 +45,7 @@ function analyzePrompt(request: AnalyzeRequest, scope: ProposalScope): string {
     "Required completion contract: Before completing this turn, you MUST call create_proposal exactly once.",
     "Call create_proposal with proposalId, kind, the exact confirmed scope, rationale, assumptions, and material.",
     "Use either existing_edit material with a preview_edit patchId, or bounded live_midi material with phraseId, launch, lengthBeats, and 1-16 notes.",
+    "For existing_edit, describe only the exact operations stored in the returned patchId. Approval applies that immutable preview exactly; it never expands a sample or pattern clip-wide.",
     "Do not apply edits or arm playback. Approval and mutation occur outside Pi after the user inspects the proposal.",
   ].join("\n");
 }
