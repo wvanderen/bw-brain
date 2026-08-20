@@ -29,6 +29,14 @@
 - [x] **D-15**: Make approval one-shot and exact-revision/project/instance/clip scoped; invalidate it on content or target change.
 - [x] **D-16**: Make global Stop cancel generated behavior and disarm instances without altering original signal or reverting journaled edits.
 
+## Phase 04.3 Rebaseline Requirements
+
+- [ ] **RB-01**: Reconcile PROJECT, ROADMAP, REQUIREMENTS, STATE, and user-facing documentation around the verified CLAP-first architecture and responsibility boundaries.
+- [ ] **RB-02**: Make the hosted CLAP editor the primary producer workflow while preserving the CLI as a stable automation, diagnostic, testing, and recovery contract; Pi remains daemon-managed and headless.
+- [ ] **RB-03**: Surface existing arrangement intelligence through a CLAP-native review/proposal flow and replace the obsolete external Pi `/review` pane acceptance contract with focused in-Bitwig UAT.
+- [ ] **RB-04**: Reframe Phase 5 device/automation work around the CLAP proposal drawer, confirmed scope, and existing controller/candidate/pre-flight/journal authority path.
+- [ ] **RB-05**: Define local-first provider policy: all DAW authority, state, persistence, and mutation stay local; inference may be local or explicitly configured remote using bounded confirmed context, with no raw-audio transmission.
+
 ## v1 Requirements
 
 Requirements for initial release across all 4 milestones (M1 read-only context → M2 reversible patching → M3 arrangement intelligence → M4 automation/devices). Each maps to roadmap phases (phase assignment finalized during roadmap creation).
@@ -92,8 +100,8 @@ Requirements for initial release across all 4 milestones (M1 read-only context �
 
 - [x] **UX-01**: Pi `/analyze` skill reads selection/section/intent and produces critique + 2–4 next actions (M1)
 - [x] **UX-02**: Pi `/vary`, `/apply` skills drive the edit pipeline and a diff pane renders patch diffs (M2)
-- [ ] **UX-03**: Pi `/review` skill + arrangement pane render section timeline + energy sparkline (M3)
-- [ ] **UX-04**: Pi `/device` skill + device pane render chain summary + macro opportunities (M4)
+- [ ] **UX-03**: CLAP arrangement workspace renders section timeline, energy/repetition evidence, assumptions, and inspectable transition proposals (M3; supersedes the external Pi `/review` pane wording)
+- [ ] **UX-04**: CLAP device workspace renders confirmed chain context, automation salience, macro opportunities, and inspectable bounded automation proposals (M4; supersedes the external Pi `/device` pane wording)
 - [x] **UX-05**: State pane renders selected track/clip/device + section label (M1)
 - [x] **UX-06**: Every suggestion/transform output includes an `assumptions[]` field stating its assumptions
 - [x] **ARCH-01**: Genre-pluggable profile interface is designed in M2; electronic/techno ships as the first profile, expanded in M4
@@ -132,7 +140,7 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). Phase 1 is a de-risk spike leading with the Bitwig capability probe + IPC spike; Phases 2–5 map to milestones M1–M4.
+Phase assignments reflect the current roadmap (including inserted phases; see ROADMAP.md). Phase 1 is the de-risk spike, Phases 2–4 deliver M1–M3, Phases 04.1–04.3 establish and rebaseline the CLAP product, and Phase 5 delivers M4.
 
 | Requirement | Milestone | Phase | Status |
 |-------------|-----------|-------|--------|
@@ -156,6 +164,11 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 | D-14 | CLAP Product | Phase 04.2 | Complete |
 | D-15 | CLAP Product | Phase 04.2 | Complete |
 | D-16 | CLAP Product | Phase 04.2 | Complete |
+| RB-01 | Rebaseline | Phase 04.3 | Pending |
+| RB-02 | Rebaseline | Phase 04.3 | Pending |
+| RB-03 | Rebaseline | Phase 04.3 | Pending |
+| RB-04 | Rebaseline | Phase 04.3 | Pending |
+| RB-05 | Rebaseline | Phase 04.3 | Pending |
 | BRIDGE-01 | M1 | Phase 2 | Pending |
 | BRIDGE-02 | M1 | Phase 2 | Pending |
 | BRIDGE-03 | M1 | Phase 2 | Pending |
@@ -192,7 +205,7 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 | ARRANGE-03 | M3 | Phase 4 | Pending |
 | ARRANGE-04 | M3 | Phase 4 | Pending |
 | ARRANGE-05 | M3 | Phase 4 | Pending |
-| UX-03 | M3 | Phase 4 | Pending |
+| UX-03 | M3 | Phase 04.3 | Pending |
 | AUTO-01 | M4 | Phase 5 | Pending |
 | AUTO-02 | M4 | Phase 5 | Pending |
 | AUTO-03 | M4 | Phase 5 | Pending |
@@ -204,8 +217,9 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 - existing v1 milestone requirements: 42
 - Phase 04.1 gate requirements: 4
 - Phase 04.2 product requirements: 16
-- Total requirements: 62
-- Mapped to phases: 62
+- Phase 04.3 rebaseline requirements: 5
+- Total requirements: 67
+- Mapped to phases: 67
 - Unmapped: 0 ✓
 - Orphaned/duplicated: 0 ✓
 
@@ -214,11 +228,12 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 - Phase 1 (Schema & IPC Spike): 2 — PROBE-01, PROBE-02
 - Phase 2 (Read-Only Context Foundation / M1): 15 — BRIDGE ×3, STATE ×4, CLI ×3, MEM ×2, UX-01, UX-05, UX-06
 - Phase 3 (Reversible MIDI Patching / M2): 14 — EDIT ×6, MIDI ×5, UX-02, ARCH-01, ARCH-02
-- Phase 4 (Arrangement Intelligence / M3): 6 — ARRANGE ×5, UX-03
+- Phase 4 (Arrangement Intelligence / M3): 5 — ARRANGE ×5
 - Phase 04.1 (CLAP Capability & Host Evidence Gate): 4 — GATE-01 through GATE-04
 - Phase 04.2 (Hybrid CLAP Companion Product): 16 — D-01 through D-16
+- Phase 04.3 (CLAP-First Product Rebaseline): 6 — RB-01 through RB-05, UX-03
 - Phase 5 (Automation & Device Workflows / M4): 5 — AUTO ×4, UX-04
 
 ---
 *Requirements defined: 2026-06-25*
-*Last updated: 2026-08-06 after Phase 04.1/04.2 split and traceability update*
+*Last updated: 2026-08-20 after Phase 04.2 verification and CLAP-first product rebaseline*

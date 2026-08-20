@@ -2,7 +2,7 @@
 
 ## Overview
 
-bw-brain is a local-first intelligence layer for Bitwig, built as a dumb Java `.bwextension` bridge + smart TypeScript daemon + stable CLI contract + Pi/OpenClaw UX shell. The roadmap follows the seed's strict **accurate-first, creative-later** sequencing across five phases: a thin de-risk spike that proves Bitwig TCP access and freezes the JSON-Lines contract, then four vertical-slice milestones (M1 read-only context → M2 reversible patching → M3 arrangement intelligence → M4 automation/devices). Every mutation in the system flows through `scope → operations → rationale → reversibility → risk → preview → apply`; every derived claim carries a confidence; the trust model (no background edits, no edit without a patch object, daemon-authoritative undo) is the spine the whole project lives or dies on. The CLI is the stable interface — Pi gets the best UX, but any agent or shell can drive the same commands.
+bw-brain is a local-first intelligence layer for Bitwig, now centered on a verified hybrid CLAP companion. The Java controller bridge remains the authoritative Bitwig reader/mutator; the TypeScript daemon owns normalized state, policy, sessions, proposals, and the bounded Pi reasoning runtime; the CLAP editor is the primary producer-facing workspace; and the CLI remains the stable secondary automation/diagnostic contract. Every mutation still flows through `scope → operations → rationale → reversibility → risk → preview → apply`, and raw audio never leaves the plug-in.
 
 ## Phases
 
@@ -19,7 +19,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
 - [x] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Complete with direct live MIDI sample-offset evidence and reconciled gate traceability
 - [x] **Phase 04.2: Hybrid CLAP Companion Product** - Complete thin CLAP companion with two-mode macOS host evidence for D-01–D-16 (completed 2026-08-20)
-- [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
+- [ ] **Phase 04.3: CLAP-First Product Rebaseline** - Reconcile product ownership, bring arrangement review into CLAP, retire obsolete external-Pi UX assumptions, and prepare Phase 5
+- [ ] **Phase 5: Automation & Device Workflows (M4)** - CLAP-native device/automation inspection and proposals across native and third-party chains
 
 ## Phase Details
 
@@ -156,14 +157,14 @@ Plans:
 **Goal**: The assistant delivers genuinely useful project-level arrangement critique — sections, repetition, energy, transitions, and track roles — as observation/suggestion only (Bitwig's API cannot edit the arranger, so edits route through launcher clips or remain advisory).
 **Mode**: mvp
 **Depends on**: Phase 2 (raw model stable); enriched by Phase 3 (suggestions emit reversible patches) — can partially overlap Phase 3 if resourcing allows
-**Requirements**: ARRANGE-01, ARRANGE-02, ARRANGE-03, ARRANGE-04, ARRANGE-05, UX-03
+**Requirements**: ARRANGE-01, ARRANGE-02, ARRANGE-03, ARRANGE-04, ARRANGE-05
 **Success Criteria** (what must be TRUE):
 
   1. `bw-arrange sections` performs bottom-up temporal segmentation with confidence scores, and every derived section label carries its confidence to the user (below-threshold = refuse rather than guess).
   2. `bw-arrange repetition-report` produces a self-similarity report and `bw-arrange energy-curve` produces a per-bar energy curve over the project.
   3. Transition suggestions detect energy mismatches and repetition gaps between sections and propose small reversible patches — routing through launcher clips or remaining advisory, never touching the arranger directly.
   4. Track-role classification labels tracks (kick/bass/lead/pad/fx/hats/percussion) with confidence, persisted to `roles.json` (gates automation salience in Phase 5).
-  5. Pi `/review` + arrangement pane render a section timeline + energy sparkline for project-level critique.
+  5. The legacy Pi `/review` skill contract is retained as historical/CLI coverage; its unverified external arrangement-pane acceptance is superseded by Phase 04.3's CLAP-native UX-03.
 
 **Plans**: 6/6 plans complete
 **UI hint**: yes
@@ -211,7 +212,7 @@ Plans:
 **Goal:** Deliver the thin CLAP companion specified by locked decisions D-01–D-16: an in-Bitwig focused workspace, aggregate-only real-time context, exact approved live-MIDI playback, confirmed multi-instance/project sessions, and controller/journal-preserving approval flows.
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16
 **Depends on:** Phase 04.1
-**Status:** Planned — ready for execution
+**Status:** Complete — verified 2026-08-20
 **Plans:** 11/11 plans complete
 
 Plans:
@@ -253,19 +254,40 @@ Plans:
 
 - [x] 04.2-11-PLAN.md — Cross-platform CI/validator and blocking macOS live UAT (Wave 9)
 
+### Phase 04.3: CLAP-First Product Rebaseline (INSERTED)
+
+**Goal:** Reconcile the product around the verified CLAP-first architecture, move the remaining arrangement-review acceptance surface into Bitwig, explicitly retire obsolete external Pi/TUI assumptions, define provider privacy, and leave Phase 5 with an implementation-ready CLAP-native contract.
+**Requirements:** RB-01, RB-02, RB-03, RB-04, RB-05, UX-03
+**Depends on:** Phase 04.2
+**Success Criteria:**
+
+  1. Project, roadmap, requirements, state, and operator documentation agree that CLAP is the primary UX, Pi is daemon-managed, the bridge owns Bitwig authority, and CLI is a supported secondary contract.
+  2. Existing arrangement analyzers are reachable from confirmed CLAP scope and render bounded, readable section/repetition/energy/transition evidence and proposals in the hosted editor.
+  3. The legacy Phase 4 external Pi `/review` UAT is classified as superseded or retained as CLI coverage; a focused CLAP arrangement UAT replaces it without rewriting completed history.
+  4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
+  5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
+
+**Plans:** TBD
+**UI hint:** yes
+**Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
+
+Plans:
+
+- [ ] TBD (run `$gsd-plan-phase 04.3` to break down)
+
 ### Phase 5: Automation & Device Workflows (M4)
 
-**Goal**: The assistant helps with sound design and movement — automation inspection, macro/XY exposure proposals, and bounded automation generation across native Bitwig and third-party (VST/AU) device chains.
+**Goal**: The CLAP companion helps with sound design and movement through confirmed device context, automation salience, macro/XY opportunities, and bounded automation proposals across native Bitwig and third-party device chains.
 **Mode**: mvp
-**Depends on**: Phase 2 (device/automation raw model), Phase 3 (patch model + risk gating), Phase 4 (energy/section signals + track roles inform salience)
+**Depends on**: Phase 04.3 (CLAP-first product contract), Phase 3 (patch model + risk gating), Phase 4 (energy/section signals + track roles inform salience)
 **Requirements**: AUTO-01, AUTO-02, AUTO-03, AUTO-04, UX-04
 **Success Criteria** (what must be TRUE):
 
-  1. `bw-automation inspect` reports per-track automation salience (most expressive parameters), with salience informed by track-role classification from Phase 4.
-  2. `bw-device macros-suggest` proposes macro/XY assignments ranked by observed expressiveness — ranked candidates with disambiguation, never a single "best" target.
-  3. `bw-automation propose` generates a bounded automation curve patch for a selected parameter/region, always as a medium-risk patch requiring preview and explicit confirmation.
+  1. Confirmed CLAP scope exposes the selected native or third-party device chain and reports per-track automation salience, with CLI inspection retained for diagnostics and scripting.
+  2. The proposal drawer presents ranked macro/XY assignments with disambiguation and assumptions, never an unexplained single “best” target.
+  3. Bounded automation curves are inspectable proposals and always use the existing candidate/pre-flight/controller/journal path as medium-risk edits requiring explicit confirmation.
   4. Device inspection and automation workflows cover third-party VST/AU plugins loaded in the chain, not just native Bitwig devices.
-  5. Pi `/device` + device pane render a chain summary + macro opportunities.
+  5. The CLAP device workspace renders chain summary, parameter targets, macro opportunities, and mutation outcome; Pi remains behind the daemon and the CLI remains a secondary contract.
 
 **Plans**: TBD
 **UI hint**: yes
@@ -274,7 +296,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 → 04.3 → 5
 (Phase 4 may partially overlap Phase 3 — see its Depends-on note — but the default ordering is sequential.)
 
 | Phase | Plans Complete | Status | Completed |
@@ -285,4 +307,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
+| 04.3. CLAP-First Product Rebaseline | 0/TBD | Not started | - |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

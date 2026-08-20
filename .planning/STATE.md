@@ -2,38 +2,38 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04.2
-current_phase_name: Hybrid CLAP Companion Product
-status: phase_complete
-stopped_at: Completed 04.2-11-PLAN.md
-last_updated: "2026-08-20T21:19:52.464Z"
-last_activity: 2026-08-10
-last_activity_desc: Plan 04.2-04 controller correlation authority complete
+status: ready_for_planning
+stopped_at: Phase 04.3 inserted and CLAP-first context locked
+last_updated: "2026-08-20T21:34:01.421Z"
+last_activity: 2026-08-20
+last_activity_desc: Product rebaseline approved after Phase 04.2 verification
 progress:
-  total_phases: 8
-  completed_phases: 6
+  total_phases: 9
+  completed_phases: 7
   total_plans: 44
   completed_plans: 43
   percent: 98
+current_phase: 04.3
+current_phase_name: CLAP-First Product Rebaseline
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-29)
+See: .planning/PROJECT.md (updated 2026-08-20)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product complete (11/11 plans)
+**Current focus:** Phase 04.3 — CLAP-First Product Rebaseline
 
 ## Current Position
 
-Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 11 of 11
-Status: Complete
-Last activity: 2026-08-20 — Plan 04.2-11 product validation and two-mode Bitwig UAT complete
+Phase: 04.3 — CLAP-First Product Rebaseline
+Plan: 0 of TBD
+Status: Ready for planning
+Last activity: 2026-08-20 — Product rebaseline approved after Phase 04.2 verification
 
-Progress: [██████████] 43/44 plans complete (Phase 04.2: 11/11)
+Progress: [█████████░] 43/44 defined plans complete; Phase 04.3 and Phase 5 unplanned
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [██████████] 43/44 plans complete (Phase 04.2: 11/
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
 | 04.1 CLAP Capability & Host Evidence Gate | 4/4 | 4 days elapsed across gated sessions | — |
 | 04.2 Hybrid CLAP Companion Product | 11/11 | ~2h plus live UAT | — |
+| 04.3 CLAP-First Product Rebaseline | 0/TBD | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
 | 03.1 | 6 | - | - |
@@ -184,13 +185,16 @@ Recent decisions affecting current work:
 - *(Phase 2 — resolved 2026-06-29 UAT):* STATE-04 fingerprint-mapping implemented + verified live (reload-reconcile smoke passed). The deferred behavioral probes (BRIDGE-02 5th event clip.name_changed, SC#3 reload-reconcile, Pi /analyze runtime) all PASSED in the end-of-phase UAT — 5/5 bridge events now live, /analyze produces grounded output + assumptions[] + stateFreshness surfacing.
 - [Phase 3 — RESOLVED 2026-07-06]: M2 introduces the patch/preview/apply flow + MIDI transforms. The edit trust-spine (patch object w/ undoLabel + risk-gated apply) is the critical invariant — Phase 3 must not let any mutation bypass it. VST param enumeration (A1 NEGATED) stays out of scope until Phase 5. Trust-spine verified end-to-end in Phase 03.1 UAT (D-04/D-05 wrong-clip-targeting gates fire before bridge round-trip; D-06 surface reaches the CLI via DaemonReplyError + printResultOrDisconnect — Plan 06).
 - [Phase 03.1 — RESOLVED 2026-07-06]: Phase 03 UAT pending items (M1–M5 manual checkpoints) — closed by Phase 03.1 work + the 2026-07-06 end-of-phase UAT (Tests 3/4/5 all pass; VERIFICATION 28/28; 03.1 6/6 plans complete). docs/bitwig-capabilities.md §1/§2 PENDING slots can now be updated with the live-verified clipSid behavior.
-- [Phase 4 — to watch]: M3 arrangement intelligence will exercise project-level analysis (sections, repetition, energy). The bridge's launcher-cursor-clip limitation (BridgeExtension.java:67 — `createLauncherCursorClip`) makes producer-driven selection changes brittle for UAT (arranger timeline + scene clicks do NOT fire `clip.name_changed`). Candidate future-phase work: arranger cursor clip OR test-driver CLI. See `03.1-UAT.md §Observations`.
+- [Phase 04.3]: The CLAP editor is the primary producer UX; Pi is daemon-managed and headless; the CLI remains the stable secondary automation, diagnostic, and recovery contract.
+- [Phase 04.3]: Local-first means DAW authority, raw state, persistence, and mutation remain local; explicit reasoning may use a local or remote provider with bounded confirmed context, never raw audio.
+- [Phase 04.3]: Phase 4 arrangement analyzers are retained, while external Pi `/review` UI acceptance is superseded by a CLAP-native arrangement review and proposal flow.
 
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 3: Gap closure: clip-identity scope, apply pre-flight, bridge auto-reconnect, skill-prompt stale update (URGENT)
 - Phase 04.1 inserted after Phase 4: Hybrid CLAP Integration Foundation — thin CLAP companion for in-Bitwig UI and real-time MIDI/audio; controller/daemon/CLI trust spine and external Pi remain authoritative (URGENT)
 - Phase 04.1 narrowed to the CLAP capability/host evidence gate; Phase 04.2 inserted as the blocked Hybrid CLAP Companion Product owner for D-01–D-16.
+- Phase 04.3 inserted after Phase 04.2: CLAP-first product rebaseline and roadmap reconciliation (URGENT)
 
 ## Deferred Items
 
@@ -202,6 +206,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-20T21:19:52.457Z
-Stopped at: Completed 04.2-11-PLAN.md
+Last session: 2026-08-20T21:34:01.421Z
+Stopped at: Phase 04.3 inserted and CLAP-first context locked
 Resume file: None
