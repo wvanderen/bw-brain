@@ -4,26 +4,27 @@ import { ActionDispatch } from "./action-dispatch.js";
 
 describe("confirmed hosted actions", () => {
   const scope = { projectId: "p", instanceId: "i", clipSid: "clip" };
+  const context = { selectedClip: { clipSid: "clip", notes: [{ key: "n:60:0", pitch: 60, start: 0, length: 1, velocity: 100 }] } };
   it("authorizes Analyze against visible confirmed scope and never auto-analyzes", async () => {
     let finish!: () => void;
     const analyze = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; })), sent: object[] = [];
-    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze,
+    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), resolveAnalysisContext: vi.fn(async () => context), analyze,
       getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject: vi.fn(),
       sendTo: (_id, message) => (sent.push(message), true) });
     expect(analyze).not.toHaveBeenCalled();
     const dispatched = dispatch.dispatch("c", { type: "analysis.request", requestId: "analysis-1", scope, prompt: "Analyze arrangement" });
-    await Promise.resolve();
+    await vi.waitFor(() => expect(analyze).toHaveBeenCalledTimes(1));
     const beforeCompletion = sent.at(-1);
     finish();
     await dispatched;
-    expect(analyze).toHaveBeenCalledWith({ ...scope, prompt: "Analyze arrangement" });
+    expect(analyze).toHaveBeenCalledWith({ ...scope, prompt: "Analyze arrangement", context });
     expect(beforeCompletion).toEqual({ type: "analysis.status", requestId: "analysis-1", status: "running", scope });
     expect(sent.at(-1)).toEqual({ type: "analysis.complete", requestId: "analysis-1", status: "ok" });
   });
 
   it("returns a bounded visible refusal when Analyze fails", async () => {
     const sent: object[] = [];
-    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze: vi.fn(async () => { throw new Error("remote details"); }),
+    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), resolveAnalysisContext: vi.fn(async () => context), analyze: vi.fn(async () => { throw new Error("remote details"); }),
       getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject: vi.fn(),
       sendTo: (_id, message) => (sent.push(message), true) });
     await expect(dispatch.dispatch("c", { type: "analysis.request", requestId: "analysis-2", scope })).resolves.toBe(true);
@@ -41,6 +42,7 @@ describe("confirmed hosted actions", () => {
     const sent: object[] = [], reportAnalysisFailure = vi.fn();
     const dispatch = new ActionDispatch({
       requireConfirmedScope: vi.fn(async () => scope),
+      resolveAnalysisContext: vi.fn(async () => context),
       analyze: vi.fn(async () => { throw new PiRuntimeFailure(piCode); }),
       getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject: vi.fn(),
       sendTo: (_id, message) => (sent.push(message), true), reportAnalysisFailure,
@@ -55,7 +57,7 @@ describe("confirmed hosted actions", () => {
 
   it("refuses changed or omitted clip focus without weakening exact comparison", async () => {
     const analyze = vi.fn(async () => undefined), sent: object[] = [];
-    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze,
+    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), resolveAnalysisContext: vi.fn(async () => context), analyze,
       getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject: vi.fn(),
       sendTo: (_id, message) => (sent.push(message), true) });
 
@@ -75,7 +77,7 @@ describe("confirmed hosted actions", () => {
       if (connectionId !== "connection-a") throw new Error("scope_not_confirmed");
       return scope;
     });
-    const dispatch = new ActionDispatch({ requireConfirmedScope, analyze: vi.fn(), getProposal, issueApproval,
+    const dispatch = new ActionDispatch({ requireConfirmedScope, resolveAnalysisContext: vi.fn(async () => context), analyze: vi.fn(), getProposal, issueApproval,
       consumeApproval: vi.fn(), stopProject: vi.fn(), sendTo: (_id, message) => (sent.push(message), true) });
 
     await dispatch.dispatch("connection-b", { type: "proposal.approval.request", proposalId: "pr", revision: 2, scope });
@@ -90,7 +92,7 @@ describe("confirmed hosted actions", () => {
     const digest = "d".repeat(64);
     const proposal: any = { proposalId: "pr", revision: 2, digest, kind: "live_midi", scope, rationale: "bounded", assumptions: [], material: { phraseId: "phrase", launch: "next_beat", lengthBeats: 1, notes: [{ ordinal: 0, startBeats: 0, durationBeats: 1, port: 0, channel: 0, key: 60, velocity: 0.8, noteId: -1 }] } };
     const sent: object[] = [];
-    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), analyze: vi.fn(), getProposal: vi.fn(() => proposal),
+    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(async () => scope), resolveAnalysisContext: vi.fn(async () => context), analyze: vi.fn(), getProposal: vi.fn(() => proposal),
       issueApproval: vi.fn(() => ({ ...proposal, token: "token", expiresAt: 1 })),
       consumeApproval: vi.fn(async () => ({ ok: true, armedPhrase: { type: "phrase.arm", scope, proposalId: "pr", revision: 2 } })),
       stopProject: vi.fn(), sendTo: (_id, message) => (sent.push(message), true) });
@@ -105,7 +107,7 @@ describe("confirmed hosted actions", () => {
 
   it("routes Stop globally without requiring current focus", async () => {
     const stopProject = vi.fn(async () => ({ ok: true, targeted: 2 }));
-    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(), analyze: vi.fn(), getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject, sendTo: vi.fn(() => true) });
+    const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(), resolveAnalysisContext: vi.fn(async () => context), analyze: vi.fn(), getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject, sendTo: vi.fn(() => true) });
     await dispatch.dispatch("c", { type: "generation.stop", projectId: "p" });
     expect(stopProject).toHaveBeenCalledWith("p");
   });

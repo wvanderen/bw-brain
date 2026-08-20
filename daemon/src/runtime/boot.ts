@@ -111,6 +111,31 @@ const BASELINE_RAW_STATE: RawState = {
   devices: [],
 };
 
+type SelectedClipNote = { key: string; pitch: number; start: number; length: number; velocity: number };
+
+/**
+ * Convert the live controller pull into a bounded, exact-scope model context.
+ * A cursor move between authorization and pull fails closed instead of feeding
+ * Pi notes from a different clip.
+ */
+export function selectedClipAnalysisContext(expectedClipSid: string | undefined, response: unknown): { selectedClip: { clipSid: string; notes: SelectedClipNote[] } } {
+  if (!expectedClipSid || !response || typeof response !== "object") throw new Error("analysis_context_unavailable");
+  const value = response as Record<string, unknown>;
+  if (value.clipSid !== expectedClipSid || !Array.isArray(value.notes) || value.notes.length > 512) throw new Error("analysis_context_scope_mismatch");
+  const notes = value.notes.map((raw): SelectedClipNote => {
+    if (!raw || typeof raw !== "object") throw new Error("analysis_context_invalid");
+    const note = raw as Record<string, unknown>;
+    const valid = typeof note.key === "string" && note.key.length > 0 && note.key.length <= 128
+      && Number.isInteger(note.pitch) && Number(note.pitch) >= 0 && Number(note.pitch) <= 127
+      && typeof note.start === "number" && Number.isFinite(note.start) && note.start >= 0 && note.start <= 4096
+      && typeof note.length === "number" && Number.isFinite(note.length) && note.length > 0 && note.length <= 4096
+      && typeof note.velocity === "number" && Number.isFinite(note.velocity) && note.velocity >= 1 && note.velocity <= 127;
+    if (!valid) throw new Error("analysis_context_invalid");
+    return { key: note.key as string, pitch: note.pitch as number, start: note.start as number, length: note.length as number, velocity: note.velocity as number };
+  });
+  return { selectedClip: { clipSid: expectedClipSid, notes } };
+}
+
 /** Options for {@link boot}. */
 export interface BootOptions {
   /** UDS socket path (default {@link DEFAULT_SOCKET}). */
@@ -433,6 +458,10 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       peers.registry.requireConfirmed(connectionId, scope.projectId, scope.instanceId);
       return requireConfirmedFocusedScope(projects, focus, scope);
     },
+    resolveAnalysisContext: async (scope) => ({
+      project: lastState?.project ?? { ...DEFAULT_PROJECT },
+      ...selectedClipAnalysisContext(scope.clipSid, await correlator.send("get.selected_clip")),
+    }),
     analyze: async (request) => { await sessions.connect(request.projectId, request.instanceId); await sessions.analyze(request); },
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),

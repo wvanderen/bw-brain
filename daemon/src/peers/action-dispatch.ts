@@ -6,7 +6,8 @@ type DispatchResult = { ok: true; armedPhrase?: object } | { ok: false; error: s
 type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_proposal_required" | "analysis_failed";
 type Dependencies = {
   requireConfirmedScope(connectionId: string, scope: ProposalScope): Promise<ProposalScope>;
-  analyze(request: ProposalScope & { prompt: string }): Promise<void>;
+  resolveAnalysisContext(scope: ProposalScope): Promise<unknown>;
+  analyze(request: ProposalScope & { prompt: string; context: unknown }): Promise<void>;
   getProposal(proposalId: string, revision?: number): ProposalRevision | undefined;
   issueApproval(proposal: ProposalRevision): object;
   consumeApproval(request: ApprovalRequest): Promise<DispatchResult>;
@@ -42,7 +43,8 @@ export class ActionDispatch {
       const requestId = String(message.requestId ?? "");
       this.deps.sendTo(connectionId, { type: "analysis.status", requestId, status: "running", scope });
       try {
-        await this.deps.analyze({ ...scope, prompt: String(message.prompt ?? "Analyze the confirmed musical context") });
+        const context = await this.deps.resolveAnalysisContext(scope);
+        await this.deps.analyze({ ...scope, prompt: String(message.prompt ?? "Analyze the confirmed musical context"), context });
         return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "ok" });
       } catch (error) {
         const code = analysisErrorCode(error);

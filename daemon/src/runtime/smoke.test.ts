@@ -25,7 +25,23 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { rm } from "node:fs/promises";
-import { boot, type BootHandle } from "./boot.js";
+import { boot, selectedClipAnalysisContext, type BootHandle } from "./boot.js";
+
+describe("selected clip analysis context", () => {
+  const note = { key: "n:60:0.0000", pitch: 60, start: 0, length: 0.5, velocity: 100 };
+
+  it("forwards only bounded notes from the exact confirmed clip", () => {
+    expect(selectedClipAnalysisContext("clip_exact", { clipSid: "clip_exact", notes: [note] })).toEqual({
+      selectedClip: { clipSid: "clip_exact", notes: [note] },
+    });
+  });
+
+  it("fails closed on cursor drift, malformed notes, or an oversized clip", () => {
+    expect(() => selectedClipAnalysisContext("clip_exact", { clipSid: "clip_other", notes: [note] })).toThrow("analysis_context_scope_mismatch");
+    expect(() => selectedClipAnalysisContext("clip_exact", { clipSid: "clip_exact", notes: [{ ...note, pitch: 200 }] })).toThrow("analysis_context_invalid");
+    expect(() => selectedClipAnalysisContext("clip_exact", { clipSid: "clip_exact", notes: Array.from({ length: 513 }, () => note) })).toThrow("analysis_context_scope_mismatch");
+  });
+});
 
 /** Ephemeral dir + paths for one boot() instance. */
 interface Env {
