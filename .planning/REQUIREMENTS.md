@@ -140,22 +140,22 @@ Phase assignments finalized during roadmap creation (5 phases; see ROADMAP.md). 
 | GATE-02 | Gate | Phase 04.1 | Complete |
 | GATE-03 | Gate | Phase 04.1 | Complete |
 | GATE-04 | Gate | Phase 04.1 | Complete |
-| D-01 | CLAP Product | Phase 04.2 | Pending |
-| D-02 | CLAP Product | Phase 04.2 | Pending |
-| D-03 | CLAP Product | Phase 04.2 | Pending |
-| D-04 | CLAP Product | Phase 04.2 | Pending |
-| D-05 | CLAP Product | Phase 04.2 | Pending |
-| D-06 | CLAP Product | Phase 04.2 | Pending |
-| D-07 | CLAP Product | Phase 04.2 | Pending |
-| D-08 | CLAP Product | Phase 04.2 | Pending |
-| D-09 | CLAP Product | Phase 04.2 | Pending |
-| D-10 | CLAP Product | Phase 04.2 | Pending |
-| D-11 | CLAP Product | Phase 04.2 | Pending |
-| D-12 | CLAP Product | Phase 04.2 | Pending |
-| D-13 | CLAP Product | Phase 04.2 | Pending |
-| D-14 | CLAP Product | Phase 04.2 | Pending |
-| D-15 | CLAP Product | Phase 04.2 | Pending |
-| D-16 | CLAP Product | Phase 04.2 | Pending |
+| D-01 | CLAP Product | Phase 04.2 | Complete |
+| D-02 | CLAP Product | Phase 04.2 | Complete |
+| D-03 | CLAP Product | Phase 04.2 | Complete |
+| D-04 | CLAP Product | Phase 04.2 | Complete |
+| D-05 | CLAP Product | Phase 04.2 | Complete |
+| D-06 | CLAP Product | Phase 04.2 | Complete |
+| D-07 | CLAP Product | Phase 04.2 | Complete |
+| D-08 | CLAP Product | Phase 04.2 | Complete |
+| D-09 | CLAP Product | Phase 04.2 | Complete |
+| D-10 | CLAP Product | Phase 04.2 | Complete |
+| D-11 | CLAP Product | Phase 04.2 | Complete |
+| D-12 | CLAP Product | Phase 04.2 | Complete |
+| D-13 | CLAP Product | Phase 04.2 | Complete |
+| D-14 | CLAP Product | Phase 04.2 | Complete |
+| D-15 | CLAP Product | Phase 04.2 | Complete |
+| D-16 | CLAP Product | Phase 04.2 | Complete |
 | BRIDGE-01 | M1 | Phase 2 | Pending |
 | BRIDGE-02 | M1 | Phase 2 | Pending |
 | BRIDGE-03 | M1 | Phase 2 | Pending |

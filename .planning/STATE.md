@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04.2
 current_phase_name: Hybrid CLAP Companion Product
-status: executing
-stopped_at: Completed 04.2-08-PLAN.md
-last_updated: "2026-08-11T01:14:11.473Z"
+status: phase_complete
+stopped_at: Completed 04.2-11-PLAN.md
+last_updated: "2026-08-20T21:19:52.464Z"
 last_activity: 2026-08-10
 last_activity_desc: Plan 04.2-04 controller correlation authority complete
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 44
-  completed_plans: 42
-  percent: 75
+  completed_plans: 43
+  percent: 98
 ---
 
 # Project State
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-29)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product execution (4/11 plans complete)
+**Current focus:** Phase 04.2 — Hybrid CLAP Companion Product complete (11/11 plans)
 
 ## Current Position
 
 Phase: 04.2 — Hybrid CLAP Companion Product
-Plan: 10 of 11
-Status: Ready to execute
-Last activity: 2026-08-10 — Plan 04.2-04 controller correlation authority complete
+Plan: 11 of 11
+Status: Complete
+Last activity: 2026-08-20 — Plan 04.2-11 product validation and two-mode Bitwig UAT complete
 
-Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/11)
+Progress: [██████████] 43/44 plans complete (Phase 04.2: 11/11)
 
 ## Performance Metrics
 
@@ -53,7 +53,7 @@ Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/1
 | 03.1 Gap Closure | 6/6 | — | — |
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
 | 04.1 CLAP Capability & Host Evidence Gate | 4/4 | 4 days elapsed across gated sessions | — |
-| 04.2 Hybrid CLAP Companion Product | 0/TBD | — | — |
+| 04.2 Hybrid CLAP Companion Product | 11/11 | ~2h plus live UAT | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
 | 03.1 | 6 | - | - |
@@ -89,6 +89,7 @@ Progress: [████████░░] 36/44 plans complete (Phase 04.2: 4/1
 | Phase 04.2 P08 | 5min | 1 tasks | 6 files |
 | Phase 04.2 P09 | 16min | 2 tasks | 12 files |
 | Phase 04.2 P10 | 20min | 2 tasks | 16 files |
+| Phase 04.2 P11 | 1h + live UAT | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -169,6 +170,9 @@ Recent decisions affecting current work:
 - [Phase 04.2]: Authority queues refuse on pressure and lifecycle disarm uses a non-droppable atomic latch. — Stop and cleanup authority must never inherit observational telemetry drop behavior.
 - [Phase 04.2]: Analyze and Stop are hosted commands only; device-panel parameters contain read-only status/pending values and continuous Generated Mix. — Preserves the live-host D-03 supersession and avoids recording actions as automation.
 - [Phase 04.2]: Global Stop receives cancellation-only dependencies and cannot access PatchHistory, revert, or conversation deletion APIs. — Generated behavior stops without altering journaled edits or conversation lineage.
+- [Phase 04.2]: Product validation uses clap/build while capability evidence remains isolated in clap/build-capability. — Prevents product caches and artifacts from contaminating capability evidence.
+- [Phase 04.2]: macOS is live verified from dated two-mode Bitwig evidence; Windows and Linux remain live-host unverified. — Support labels must not exceed observed host evidence.
+- [Phase 04.2]: JUCE 8 licensing remains a blocking release decision independent of technical validation. — A green build does not select AGPLv3 or a commercial license.
 
 ### Pending Todos
 
@@ -198,6 +202,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-11T01:13:46.104Z
-Stopped at: Completed 04.2-08-PLAN.md
+Last session: 2026-08-20T21:19:52.457Z
+Stopped at: Completed 04.2-11-PLAN.md
 Resume file: None

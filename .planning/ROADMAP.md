@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Reversible MIDI Patching (M2)** - Patch/diff/preview/apply/risk backbone + daemon-authoritative undo + motif signature + MIDI transforms + Pi /vary /apply (all 5 plans executed; BLOCKING end-of-phase UAT M1–M5 pending human — status: verifying)
 - [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
 - [x] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Complete with direct live MIDI sample-offset evidence and reconciled gate traceability
-- [ ] **Phase 04.2: Hybrid CLAP Companion Product** - Unblocked/unplanned; owns D-01–D-16
+- [x] **Phase 04.2: Hybrid CLAP Companion Product** - Complete thin CLAP companion with two-mode macOS host evidence for D-01–D-16 (completed 2026-08-20)
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - Automation salience + macro proposals + bounded automation generation (incl. VST/AU) + Pi /device
 
 ## Phase Details
@@ -212,7 +212,7 @@ Plans:
 **Requirements**: D-01, D-02, D-03, D-04, D-05, D-06, D-07, D-08, D-09, D-10, D-11, D-12, D-13, D-14, D-15, D-16
 **Depends on:** Phase 04.1
 **Status:** Planned — ready for execution
-**Plans:** 10/11 plans executed
+**Plans:** 11/11 plans complete
 
 Plans:
 **Wave 1**
@@ -251,7 +251,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 04.2-11-PLAN.md — Cross-platform CI/validator and blocking macOS live UAT (Wave 9)
+- [x] 04.2-11-PLAN.md — Cross-platform CI/validator and blocking macOS live UAT (Wave 9)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
@@ -284,5 +284,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 3. Reversible MIDI Patching (M2) | 5/5 | Complete   | 2026-06-30 |
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
-| 04.2. Hybrid CLAP Companion Product | 10/11 | In Progress|  |
+| 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
