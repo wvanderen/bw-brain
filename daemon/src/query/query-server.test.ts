@@ -869,3 +869,70 @@ describe("refreshArrangementSnapshot (04.3-07 DEFECT B — validated write gate)
     }
   });
 });
+
+// ============================================================================
+// 04.3 Plan 04.3-07 Task 2 — DEFECT C: an INVALID arrangement-snapshot.json on
+// disk yields a bounded, visible snapshot_invalid refusal on the arrange query
+// surfaces — the exact scenario that process-exited the daemon during the
+// 2026-08-21 live UAT (loadArrangementSnapshot throw unhandled at
+// prepareArrangeDispatch/handleArrangeCurrentSection). A refresh:true request
+// still proceeds past the corrupted file (a fresh pull replaces it).
+// ============================================================================
+
+/** Build query-server deps wired to a tmpdir snapshot file (contents up to the caller). */
+async function makeArrangeDeps(snapshotText: string | null): Promise<{ deps: QueryServerDeps; transport: CapturingTransport; dir: string }> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-arrange-"));
+  const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+  if (snapshotText !== null) await fs.writeFile(snapshotPath, snapshotText, "utf8");
+  const transport = makeCapturingTransport();
+  const deps: QueryServerDeps = {
+    transport,
+    watchdog: makeFakeWatchdog("live"),
+    getState: () => fixtureRaw(),
+    getIntent: () => fixtureIntent(),
+    pullLauncherGrid: vi.fn(),
+    arrangementSnapshotPath: snapshotPath,
+  };
+  startQueryServer(deps);
+  return { deps, transport, dir };
+}
+
+describe("arrange.* over an INVALID snapshot file (04.3-07 DEFECT C — bounded snapshot_invalid refusals)", () => {
+  it("arrange.review over '{ not json' RESOLVES with ok:false error 'snapshot_invalid' (never a daemon crash)", async () => {
+    const { deps, dir } = await makeArrangeDeps("{ not json");
+    try {
+      const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "arrange.review" }) + "\n");
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe("snapshot_invalid");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("arrange.current_section over the same invalid file refuses 'snapshot_invalid' instead of throwing", async () => {
+    const { deps, dir } = await makeArrangeDeps("{ not json");
+    try {
+      const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "arrange.current_section" }) + "\n");
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe("snapshot_invalid");
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("arrange.review refresh:true over the invalid file + a FAILING pull returns the honest no-snapshot ok:true empty-evidence response (pulledAt null)", async () => {
+    const { deps, dir } = await makeArrangeDeps("{ not json");
+    deps.pullLauncherGrid = async () => { throw new Error("bridge gone"); };
+    try {
+      const res = await driveAsync(deps, JSON.stringify({ version: "1.0", type: "query", op: "arrange.review", payload: { refresh: true } }) + "\n");
+      // Refresh proceeds past the corrupted load; the failed pull degrades to
+      // the honest no-snapshot empty-evidence response — never a crash.
+      expect(res.ok).toBe(true);
+      const payload = res.payload as { pulledAt: string | null; sections: unknown[] };
+      expect(payload.pulledAt).toBeNull();
+      expect(payload.sections).toEqual([]);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});

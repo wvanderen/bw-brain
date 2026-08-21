@@ -138,6 +138,46 @@ describe("createArrangementReviewDependency (04.3-02 injected review dependency)
     const outcome = await review({ scope: { projectId: "p", instanceId: "i" }, refresh: false });
     expect(outcome).toEqual({ kind: "refusal", reason: "not_implemented" });
   });
+
+  // ==========================================================================
+  // 04.3 Plan 04.3-07 Task 2 — DEFECT C (peer half): an INVALID snapshot file
+  // must refuse visibly with the bounded snapshot_invalid code — never the
+  // degrade-to-no-snapshot masquerade (an invalid file is not "no snapshot,
+  // run refresh") and never a crash across the peer boundary. Refresh:true
+  // still proceeds past the corrupted file (a fresh pull replaces it).
+  // ==========================================================================
+
+  it("DEFECT C: invalid file without refresh returns refusal snapshot_invalid (visible, bounded, no masquerade)", async () => {
+    await withTmp(async (dir) => {
+      const path = join(dir, "arrangement-snapshot.json");
+      await writeFile(path, "{ not json", "utf8");
+      const review = createArrangementReviewDependency({
+        arrangementSnapshotPath: path,
+        intent: () => null,
+        freshness: () => "live",
+        pullLauncherGrid: vi.fn(),
+      });
+      const outcome = await review({ scope: { projectId: "p", instanceId: "i" }, refresh: false });
+      expect(outcome).toEqual({ kind: "refusal", reason: "snapshot_invalid" });
+    });
+  });
+
+  it("DEFECT C: refresh:true over an invalid file proceeds to the pull and returns evidence (corrupted file never blocks a refresh)", async () => {
+    await withTmp(async (dir) => {
+      const path = join(dir, "arrangement-snapshot.json");
+      await writeFile(path, "{ not json", "utf8");
+      const pullLauncherGrid = vi.fn(async () => liveGrid);
+      const review = createArrangementReviewDependency({
+        arrangementSnapshotPath: path,
+        intent: () => null,
+        freshness: () => "live",
+        pullLauncherGrid,
+      });
+      const outcome = await review({ scope: { projectId: "p", instanceId: "i" }, refresh: true });
+      expect(pullLauncherGrid).toHaveBeenCalledTimes(1);
+      expect(outcome.kind).toBe("evidence");
+    });
+  });
 });
 
 describe("loadArrangementAnalysisEvidence (04.3-02 Analyze-context enrichment)", () => {
