@@ -267,7 +267,7 @@ Plans:
   4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
   5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
 
-**Plans:** 1/5 plans executed
+**Plans:** 2/5 plans executed
 **UI hint:** yes
 **Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
 
@@ -275,7 +275,7 @@ Plans:
 **Wave 1** *(parallel — zero file overlap)*
 
 - [x] 04.3-01-PLAN.md — Documentation/operator reconciliation: regenerate generated agent instructions from rebaselined sources (incl. STACK.md source-row supersession), pi-pack README dated supersession, provider-policy + arrangement operator notes, historical-seed annotation, wired stale-phrase doc gate, CLI regression proof (RB-01, RB-02, RB-05 docs)
-- [ ] 04.3-02-PLAN.md — Daemon arrangement review path: additive arrangement.review frozen-schema member + golden negatives, pure bounded chunk-text render module (pure + advisory), transport-free evidence assembly extraction (CLI wire unchanged), confirmed-scope dispatch branch emitting conversation.chunk with zero Pi involvement, resolveAnalysisContext enrichment (RB-03, RB-05, UX-03 daemon half)
+- [x] 04.3-02-PLAN.md — Daemon arrangement review path: additive arrangement.review frozen-schema member + golden negatives, pure bounded chunk-text render module (pure + advisory), transport-free evidence assembly extraction (CLI wire unchanged), confirmed-scope dispatch branch emitting conversation.chunk with zero Pi involvement, resolveAnalysisContext enrichment (RB-03, RB-05, UX-03 daemon half)
 - [ ] 04.3-05-PLAN.md — Phase 5 implementation contract: code-grounded DOWNSTREAM-PLAN-NOTES naming the patch-schema automation-operation gap, device-chain reads, preview-edit enums, and mandatory reuse of verified authority seams (RB-04)
 
 **Wave 2** *(blocked on Wave 1 — C++ encoder consumes the 04.3-02 schema contract)*
@@ -318,5 +318,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
-| 04.3. CLAP-First Product Rebaseline | 1/5 | In Progress|  |
+| 04.3. CLAP-First Product Rebaseline | 2/5 | In Progress|  |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
