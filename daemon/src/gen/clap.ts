@@ -4344,4 +4344,14 @@ export type ClapTelemetryMessage =
         | "analysis_model_unavailable"
         | "analysis_proposal_required"
         | "analysis_failed";
+    }
+  | {
+      type: "arrangement.review";
+      requestId: string;
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+      refresh?: boolean;
     };

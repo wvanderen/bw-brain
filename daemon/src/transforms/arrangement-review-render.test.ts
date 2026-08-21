@@ -109,13 +109,17 @@ describe("renderArrangementReview (04.3-02 bounded text render)", () => {
     expect(first).toBeGreaterThanOrEqual(0);
     expect(last).toBeGreaterThan(first);
     // Line integrity: every rendered cluster line is a COMPLETE line (no mid-line cut).
-    expect(lines).toContain("  - scenes [0, 5] (intro, drop) similarity=0.80 matchedOn=[density, velocity]");
+    // Scene 5 is uncovered by any section → the honest "—" label (never a guess).
+    expect(lines).toContain("  - scenes [0, 5] (intro, —) similarity=0.80 matchedOn=[density, velocity]");
   });
 
   it("renders an explicit no-snapshot honesty marker when pulledAt is null", () => {
     const input = fullInput();
     input.pulledAt = null;
     input.currentSection = null;
+    // Realistic no-snapshot evidence carries the no-snapshot assumption claim
+    // (mirrors pulledAtAssumption(null)) — never a fabricated timestamp.
+    input.assumptions = [{ claim: "no arrangement snapshot loaded — run `bw-arrange refresh` to pull the grid", confidence: 1.0, source: "default" }];
     const joined = renderArrangementReview(input).join("\n");
     expect(joined).toContain("NO ARRANGEMENT SNAPSHOT");
     expect(joined).not.toContain(`pulled at ${PULLED_AT}`);
@@ -131,12 +135,12 @@ describe("renderArrangementReview (04.3-02 bounded text render)", () => {
 
   it("maps per-scene energy 0-1 onto the eight unicode block steps, one char per scene", () => {
     const stepped = fullInput();
-    stepped.sections = [section(0, 0, "a", 0), section(1, 1, "b", 0.5), section(2, 2, "c", 1)];
+    stepped.sections = [section(0, 0, "a", 0), section(1, 1, "b", 0.4), section(2, 2, "c", 1)];
     const steppedLines = renderArrangementReview(stepped).join("\n").split("\n");
     expect(steppedLines).toContain("  ▁ ▄ █");
     // One char per scene: the 4-scene input renders four sparkline tokens.
     const fourSceneLines = renderArrangementReview(fullInput()).join("\n").split("\n");
-    const spark = fourSceneLines.find((l) => /^[ ▁▂▃▄▅▆▇█]+$/.test(l) && l.trim().length === 4);
+    const spark = fourSceneLines.find((l) => /^[ ▁▂▃▄▅▆▇█]+$/.test(l) && l.trim().split(/\s+/).length === 4);
     expect(spark, JSON.stringify(fourSceneLines)).toBeDefined();
   });
 
