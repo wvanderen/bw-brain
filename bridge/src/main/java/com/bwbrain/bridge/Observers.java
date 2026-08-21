@@ -115,6 +115,33 @@ public final class Observers {
     // the next cell.
     private final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CountDownLatch> walkerReadyLatch =
             new java.util.concurrent.atomic.AtomicReference<>(null);
+    // Phase 4 Plan 04.3-06 (04.3 gap closure / DEFECT A) — bank-observation
+    // activity tracking for the bounded BankSyncWait settle wait. The three
+    // BANK observer groups (TrackBank track names, SceneBank scene names,
+    // ClipLauncherSlot hasContent) fire in a burst while Bitwig populates the
+    // banks after project load; PullHandlers.handleLauncherGrid blocks on
+    // BankSyncWait.awaitSettled until that burst settles (threshold met OR
+    // quiet) BEFORE the cursor walk reads the caches. Root cause being closed:
+    // during the 2026-08-21 live UAT the FIRST get.launcher_clips pull raced
+    // the bank sync, walked still-empty banks (empty trackSids for tracks
+    // 4-7, all 128 cells hasContent:false), and poisoned
+    // arrangement-snapshot.json, while later populated-but-slower walks
+    // exceeded the daemon's 3000ms pull timeout and were dropped.
+    //
+    // WHY cursor-track/cursor-clip observers are deliberately EXCLUDED: they
+    // fire on SELECTION changes (which track/clip the user pointed at), not
+    // on bank population — they carry no signal about whether the
+    // TrackBank/SceneBank/ClipLauncherSlotBank caches are synced, so counting
+    // them would let the threshold-met early return fire against unsynced
+    // banks.
+    //
+    // Concurrency: written from the Bitwig controller thread (observer
+    // callbacks), read from the pull-handler thread via the package-private
+    // accessors below — atomics mirror the walkerReadyLatch precedent.
+    private final java.util.concurrent.atomic.AtomicLong lastBankObservationAt =
+            new java.util.concurrent.atomic.AtomicLong(0L);
+    private final java.util.concurrent.atomic.AtomicInteger bankObservationCount =
+            new java.util.concurrent.atomic.AtomicInteger(0);
 
     public Observers(final Outbox outbox, final int bankSize) {
         this.outbox = outbox;
@@ -296,6 +323,9 @@ public final class Observers {
             t.name().addValueObserver((StringValueChangedCallback) (String name) -> {
                 if (skip.getAndSet(false)) { return; }
                 bankTrackNames.put(slot, name);
+                // 04.3 gap closure / DEFECT A — bank-activity instrumentation.
+                lastBankObservationAt.set(System.currentTimeMillis());
+                bankObservationCount.incrementAndGet();
                 final Map<String, Object> payload = mapOf("slot", slot);
                 payload.put("name", name);
                 outbox.offer(LineJson.event("track.name_changed", payload, ts()));
@@ -333,6 +363,9 @@ public final class Observers {
             sceneNames.put(idx, ""); // initialize so a pull before the boot fire returns "" not null
             s.name().addValueObserver((StringValueChangedCallback) (String name) -> {
                 sceneNames.put(idx, name == null ? "" : name);
+                // 04.3 gap closure / DEFECT A — bank-activity instrumentation.
+                lastBankObservationAt.set(System.currentTimeMillis());
+                bankObservationCount.incrementAndGet();
             });
         }
     }
@@ -377,6 +410,11 @@ public final class Observers {
                     slotBank.getItemAt(sceneIdx).hasContent().addValueObserver(
                             (BooleanValueChangedCallback) (boolean has) -> {
                                 hasContentCache.put(hasContentKey(trackIdx, sceneIdx), has);
+                                // 04.3 gap closure / DEFECT A — bank-activity
+                                // instrumentation (the densest population signal:
+                                // 128 observers fire as the grid syncs).
+                                lastBankObservationAt.set(System.currentTimeMillis());
+                                bankObservationCount.incrementAndGet();
                                 host.println("[bw-brain]   hasContent fired t=" + trackIdx
                                         + " s=" + sceneIdx + " has=" + has);
                             });
@@ -417,6 +455,21 @@ public final class Observers {
     /** Phase 4 Plan 04-01 — scene-name cache snapshot for the D-12 grid response. */
     public Map<Integer, String> getSceneNames() { return sceneNames; }
     public int getSceneBankSize() { return sceneBankSize; }
+    /**
+     * Phase 4 Plan 04.3-06 (04.3 gap closure / DEFECT A) — total bank
+     * observations fired across the three instrumented bank observer groups
+     * (track names + scene names + hasContent). Read by the production
+     * suppliers of {@link BankSyncWait#awaitSettled} as its observedCount.
+     */
+    int getBankObservationCount() { return bankObservationCount.get(); }
+    /**
+     * Phase 4 Plan 04.3-06 (04.3 gap closure / DEFECT A) — wall-clock ms of
+     * the most recent bank observation, 0 when none has fired yet. Read by
+     * the production suppliers of {@link BankSyncWait#awaitSettled} as its
+     * lastObservationAtMs (0 = "no observation yet" = quiet-settle cannot
+     * fire, only threshold or cap can).
+     */
+    long getLastBankObservationAt() { return lastBankObservationAt.get(); }
     /**
      * Phase 4 Plan 04-01 Task 2 fix — read the cached
      * {@code ClipLauncherSlot.hasContent()} value for (trackIdx, sceneIdx).
