@@ -162,4 +162,36 @@ describe("saveArrangementSnapshot (atomic, round-trip)", () => {
     expect(text).toMatch(/^{[\s\S]*\n}/);
     expect(text).toMatch(/\n  "version"/);
   });
+
+  // ==========================================================================
+  // 04.3 Plan 04.3-07 Task 1 — DEFECT B: the write path is a schema gate. A
+  // snapshot that fails the module's compiled validator is NEVER written to
+  // disk; the previous file (if any) survives atomically. These regress the
+  // live-UAT failure where a raced launcher grid (empty trackSids) was
+  // persisted unvalidated and poisoned every detection dimension.
+  // ==========================================================================
+
+  it("DEFECT B: rejects a schema-invalid snapshot (empty trackSid) and writes NOTHING (target absent)", async () => {
+    const path = join(tmpRoot, "arrangement-snapshot.json");
+    const bad = minimalSnapshot();
+    bad.grid.tracks[0]!.trackSid = ""; // violates trackSid minLength:1
+    await expect(saveArrangementSnapshot(path, bad)).rejects.toThrow(/save rejected|invalid/i);
+    // Nothing was written — the gate refused BEFORE atomicWriteJson.
+    await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("DEFECT B: a rejected save leaves the previously persisted VALID file untouched (atomic survivor)", async () => {
+    const path = join(tmpRoot, "arrangement-snapshot.json");
+    const good = minimalSnapshot();
+    await saveArrangementSnapshot(path, good);
+    const bad = minimalSnapshot();
+    // Tamper: hasContent must be boolean, not string (schema boundary).
+    (bad.grid.tracks[0] as unknown as { scenes: Array<{ hasContent: unknown }> }).scenes[0].hasContent = "yes";
+    await expect(saveArrangementSnapshot(path, bad)).rejects.toThrow(/save rejected|invalid/i);
+    // The prior valid file survives with its original pulledAt — a rejected
+    // save never leaves a half-written or overwritten-bad file behind.
+    const survivor = await loadArrangementSnapshot(path);
+    expect(survivor!.pulledAt).toBe(good.pulledAt);
+    expect(survivor!.grid.tracks[0]!.trackSid).toBe("trk_abc123def4567890");
+  });
 });

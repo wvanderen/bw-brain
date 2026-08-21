@@ -13,8 +13,9 @@
 // op-dispatch + schema-validity are exercised without real socket I/O (uds.test
 // covers the transport layer end-to-end).
 
-import { describe, it, expect } from "vitest";
-import { startQueryServer, safeSendErr, type QueryServerDeps } from "./query-server.js";
+import { describe, it, expect, vi } from "vitest";
+import { startQueryServer, safeSendErr, refreshArrangementSnapshot, type QueryServerDeps } from "./query-server.js";
+import { loadArrangementSnapshot } from "../state/arrangement-snapshot.js";
 import { CandidateStore } from "../patch/candidate-store.js";
 import { PatchHistory, type PatchHistoryEntry } from "../patch/patch-history.js";
 import type { StaleWatchdog } from "../state/stale-watchdog.js";
@@ -816,6 +817,55 @@ describe("D-05 revert pre-flight gate (wrong_clip_targeted)", () => {
       });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});
+
+// ============================================================================
+// 04.3 Plan 04.3-07 Task 1 — DEFECT B: a refresh that cannot persist an
+// honest (schema-valid) snapshot is a FAILED refresh — refreshArrangementSnapshot
+// returns null (no in-memory fallback render of an invalid grid) and writes no
+// snapshot file nor roles.json. Drives the exported core with a tmpdir path +
+// vi.fn pull, mirroring boot-arrangement.test.ts's fake style.
+// ============================================================================
+
+describe("refreshArrangementSnapshot (04.3-07 DEFECT B — validated write gate)", () => {
+  it("returns null AND writes no snapshot/roles files when the pulled grid is schema-invalid (empty trackSid)", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-refresh-"));
+    try {
+      const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+      const rolesPath = path.join(dir, "roles.json");
+      const snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: vi.fn(async () => ({ tracks: [{ trackSid: "", name: "bass", scenes: [] }], sceneNames: [] })),
+        arrangementSnapshotPath: snapshotPath,
+        rolesPath,
+        intent: null,
+      });
+      expect(snap).toBeNull();
+      // A failed refresh persists NOTHING — neither the invalid snapshot nor
+      // roles derived from it.
+      await expect(fs.readFile(snapshotPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(fs.readFile(rolesPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("persists and returns the snapshot when the pulled grid is valid (write gate passes through)", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-refresh-"));
+    try {
+      const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+      const snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: vi.fn(async () => ({ tracks: [{ trackSid: "t1", name: "bass", scenes: [] }], sceneNames: [] })),
+        arrangementSnapshotPath: snapshotPath,
+        intent: null,
+      });
+      expect(snap).not.toBeNull();
+      expect(snap!.trackCount).toBe(1);
+      const loaded = await loadArrangementSnapshot(snapshotPath);
+      expect(loaded!.pulledAt).toBe(snap!.pulledAt);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   });
 });
