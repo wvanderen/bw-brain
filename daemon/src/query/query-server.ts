@@ -922,9 +922,15 @@ export interface ArrangementReviewEvidence {
  * The arrangement review outcome the dispatch layer consumes: a bounded
  * refusal reason (action.error surface), the honest no-snapshot case (hint
  * path), or the full five-dimension evidence.
+ *
+ * 04.3-07 (DEFECT C): the refusal reason union widens with the bounded
+ * invalid-snapshot code — an invalid snapshot file without refresh refuses
+ * visibly on the peer path (boot's createArrangementReviewDependency). The
+ * peer action.error schema already accepts the pattern-legal string; zero
+ * schemas/ churn.
  */
 export type ArrangementReviewOutcome =
-  | { kind: "refusal"; reason: "state_disconnected" | "not_implemented" }
+  | { kind: "refusal"; reason: "state_disconnected" | "not_implemented" | "snapshot_invalid" }
   | { kind: "no-snapshot" }
   | { kind: "evidence"; evidence: ArrangementReviewEvidence };
 
@@ -1116,9 +1122,26 @@ async function prepareArrangeDispatch(
     return null;
   }
   const wantRefresh = msg.payload?.refresh === true;
-  let snap = await loadArrangementSnapshot(deps.arrangementSnapshotPath);
+  // 04.3-07 (DEFECT C): a corrupted/invalid snapshot file on disk is untrusted
+  // input at the load boundary — catch the throw and refuse visibly. The
+  // daemon NEVER exits over a bad snapshot file (the live-UAT crash path).
+  let loadFailed = false;
+  let snap: ArrangementSnapshot | null = null;
+  try {
+    snap = await loadArrangementSnapshot(deps.arrangementSnapshotPath);
+  } catch (e) {
+    console.error("[query-server] arrange snapshot load failed:", (e as Error).message);
+    loadFailed = true;
+  }
   if (wantRefresh) {
+    // A refresh proceeds past a corrupted file — the fresh pull replaces it
+    // (never refuse a refresh because of a bad disk file).
     snap = await refreshSnapshot(deps, intent);
+  } else if (loadFailed) {
+    // Without refresh an invalid file refuses with the bounded code — it must
+    // not masquerade as "no snapshot" (the producer repairs via refresh).
+    safeSendErr(deps.transport, freshness, "snapshot_invalid");
+    return null;
   }
   const assumptions: Assumption[] = [...liveAssumptions(state, intent), pulledAtAssumption(snap)];
   if (snap === null) {
@@ -1268,7 +1291,16 @@ async function handleArrangeCurrentSection(
     safeSendErr(deps.transport, freshness, "not_implemented");
     return;
   }
-  const snap = await loadArrangementSnapshot(deps.arrangementSnapshotPath);
+  // 04.3-07 (DEFECT C): bounded refusal over an invalid snapshot file — the
+  // same loadFailed discipline as prepareArrangeDispatch (never a crash).
+  let snap: ArrangementSnapshot | null = null;
+  try {
+    snap = await loadArrangementSnapshot(deps.arrangementSnapshotPath);
+  } catch (e) {
+    console.error("[query-server] arrange snapshot load failed:", (e as Error).message);
+    safeSendErr(deps.transport, freshness, "snapshot_invalid");
+    return;
+  }
   const sceneIdx = (state.selection as { sceneIdx?: number }).sceneIdx;
   const assumptions: Assumption[] = [
     ...liveAssumptions(state, intent),

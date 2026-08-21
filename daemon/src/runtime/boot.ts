@@ -179,20 +179,30 @@ export function createArrangementReviewDependency(
     // possibly-stale grid while disconnected (T-04.3-05 / Pitfall 5).
     if (freshness === "disconnected" && request.refresh) return { kind: "refusal", reason: "state_disconnected" };
     let snap: ArrangementSnapshot | null = null;
+    // 04.3-07 (DEFECT C): distinguish INVALID from ABSENT. An invalid file
+    // (without refresh) refuses visibly with the bounded snapshot_invalid code
+    // — it must not masquerade as the honest no-snapshot outcome ("no
+    // snapshot, run refresh" would lie about a file that EXISTS and is bad);
+    // an absent file keeps the no-snapshot outcome via snap null below.
+    let loadFailed = false;
     try {
       snap = await loadArrangementSnapshot(options.arrangementSnapshotPath);
     } catch (e) {
-      // An unreadable snapshot degrades to the honest no-snapshot outcome —
-      // the deterministic review path never throws across the peer boundary.
+      // The deterministic review path never throws across the peer boundary.
       console.error("[boot] arrangement snapshot load failed:", (e as Error).message);
+      loadFailed = true;
     }
     if (request.refresh) {
+      // A refresh proceeds past a corrupted file — the fresh pull replaces it
+      // (and lands in the 04.3-07 validated write gate on save).
       snap = await refreshArrangementSnapshot({
         pullLauncherGrid: options.pullLauncherGrid,
         arrangementSnapshotPath: options.arrangementSnapshotPath,
         rolesPath: options.rolesPath,
         intent: options.intent(),
       });
+    } else if (loadFailed) {
+      return { kind: "refusal", reason: "snapshot_invalid" };
     }
     return assembleArrangementReviewEvidence({
       snap,
