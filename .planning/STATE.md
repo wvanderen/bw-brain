@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 04.3
-current_phase_name: CLAP-First Product Rebaseline (INSERTED
+current_phase_name: clap-first-product-rebaseline-and-roadmap-reconciliation
 status: executing
-stopped_at: "Completed 04.3-04-PLAN.md (live UAT verdict recorded: detection failed, defects A/B/C to gap closure)"
-last_updated: "2026-08-21T22:44:05.962Z"
+stopped_at: "Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)"
+last_updated: "2026-08-21T22:51:46.344Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 04.3 execution started
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 50
+  total_plans: 53
   completed_plans: 48
   percent: 67
 ---
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-20)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.3 — CLAP-First Product Rebaseline (INSERTED)
+**Current focus:** Phase 04.3 — clap-first-product-rebaseline-and-roadmap-reconciliation
 
 ## Current Position
 
-Phase: 04.3 (CLAP-First Product Rebaseline (INSERTED)) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-08-21 — Phase 04.3 execution started
+Phase: 04.3 (clap-first-product-rebaseline-and-roadmap-reconciliation) — EXECUTING
+Plan: 7 of 8 (next: 04.3-07 daemon halves of DEFECT A/B/C; 01–06 complete)
+Status: Executing Phase 04.3
+Last activity: 2026-08-21 — Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
 
-Progress: [█████████░] 43/44 defined plans complete; Phase 04.3 and Phase 5 unplanned
+Progress: [█████████░] 48/53 defined plans complete; Phase 5 unplanned
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Progress: [█████████░] 43/44 defined plans complete; Phase 0
 | Phase 04.3 P05 | 8min | 1 tasks | 1 files |
 | Phase 04.3 P03 | 12 min | 2 tasks | 5 files |
 | Phase 04.3 P04 | 2h 45m | 2 tasks | 3 files |
+| Phase 04.3 P06 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.3 P04] UAT verdict recorded honestly as failed (11/12 rows pass; detection row failed): RB-03/UX-03 stay open until defects A/B/C are gap-closed and row 1 re-run live — approval withheld, platform discipline intact.
 - [Phase ?]: [Phase 04.3 P04] Detection failure attributed to pre-existing bridge/daemon defect chain (A: launcher grid pull race/3000ms timeout with dropped late responses; B: schema-invalid snapshot persisted unvalidated; C: unhandled loadArrangementSnapshot throw crashes daemon on arrange.review) — NOT the new CLAP path; clip-level Analyze through the same editor produced a correct existing_edit proposal.
 - [Phase ?]: [Phase 04.3 P04] Legacy 04-UAT.md classified additive-only (rows 1-4, 6-14 retained-CLI; row 5 superseded-UI; zero product-gap) and committed — acceptance history classified, never falsified; 04.3-UAT.md replaces the obsolete external-Pi /review acceptance surface.
+- [Phase ?]: [Phase 04.3 P06] BankSyncWait.Sleeper declares InterruptedException (not java.util.function.LongConsumer) so production binds Thread::sleep verbatim — LongConsumer accept() is throws-incompatible with Thread.sleep (would not compile); interruption restores the flag and returns waited (honest proceed, never busy-spin).
+- [Phase ?]: [Phase 04.3 P06] RB-03/UX-03 deliberately left unchecked after 04.3-06 — this plan closes only DEFECT A bridge half; acceptance requires daemon halves (04.3-07) + live re-run (04.3-08).
 
 ### Pending Todos
 
@@ -225,6 +228,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-21T22:20:29.835Z
-Stopped at: Completed 04.3-04-PLAN.md (live UAT verdict recorded: detection failed, defects A/B/C to gap closure)
+Last session: 2026-08-21T22:51:23.780Z
+Stopped at: Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
 Resume file: None
