@@ -179,4 +179,76 @@ describe("RequestCorrelator (get.* request/response by id with timeout)", () => 
     // invocation from a leaked timer.
     expect(handled).toHaveBeenCalledTimes(1);
   });
+
+  // ==========================================================================
+  // 04.3 Plan 04.3-07 Task 3 — DEFECT A (daemon half): per-request timeoutMs
+  // override on send(). The launcher-grid walk's documented worst case
+  // (5000ms BankSyncWait cap + 128 cells × 500ms D-22 ceiling ≈ 69s + margin)
+  // exceeds the 3000ms default — a populated-but-slow first walk must no
+  // longer be dropped as a timeout while a fast-empty predecessor poisons the
+  // snapshot. Every other get.* pull keeps the default (per-REQUEST override
+  // only — T-04.3-23).
+  // ==========================================================================
+
+  it("per-request timeoutMs SHORTER than the default rejects at the overridden deadline; message carries the effective value", async () => {
+    const t = new FakeTransport();
+    const c = new RequestCorrelator(t as unknown as Transport);
+    const p: Promise<Error> = c.send("get.launcher_clips", {}, { timeoutMs: 100 }).then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
+    await vi.advanceTimersByTimeAsync(100 + 1);
+    const err = await p;
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toMatch(/get\.launcher_clips timed out after 100ms/);
+    expect(c.outstanding()).toBe(0);
+  });
+
+  it("per-request timeoutMs LONGER than the default EXTENDS the deadline (pending at 3000ms, rejects only at the override)", async () => {
+    const t = new FakeTransport();
+    const c = new RequestCorrelator(t as unknown as Transport);
+    const p: Promise<Error> = c.send("get.launcher_clips", {}, { timeoutMs: 10_000 }).then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
+    let settled = false;
+    void p.then(() => { settled = true; });
+    // Still pending past the 3000ms default — the override extends, never caps.
+    await vi.advanceTimersByTimeAsync(DEFAULT_CORRELATOR_TIMEOUT_MS + 1);
+    expect(settled).toBe(false);
+    expect(c.outstanding()).toBe(1);
+    // Rejects only at the overridden deadline, with the effective value.
+    await vi.advanceTimersByTimeAsync(10_000 - DEFAULT_CORRELATOR_TIMEOUT_MS + 1);
+    const err = await p;
+    expect(err.message).toMatch(/get\.launcher_clips timed out after 10000ms/);
+    expect(c.outstanding()).toBe(0);
+  });
+
+  it("NO per-request opts keeps the instance-configured deadline (backward compatibility — existing message shape)", async () => {
+    const t = new FakeTransport();
+    const c = new RequestCorrelator(t as unknown as Transport, { timeoutMs: 4_500 });
+    const p: Promise<Error> = c.send("get.project_summary").then(
+      () => new Error("unexpected resolve"),
+      (e: unknown) => e as Error,
+    );
+    await vi.advanceTimersByTimeAsync(4_500 + 1);
+    const err = await p;
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toMatch(/get\.project_summary timed out after 4500ms/);
+    expect(c.outstanding()).toBe(0);
+  });
+
+  it("resolve() within the extended window settles the promise (a populated-but-slow grid walk completes instead of being dropped)", async () => {
+    const t = new FakeTransport();
+    const c = new RequestCorrelator(t as unknown as Transport);
+    const payload = { tracks: [{ trackSid: "t1", name: "bass", scenes: [] }] };
+    const p = c.send("get.launcher_clips", {}, { timeoutMs: 10_000 });
+    // 5000ms in: past the 3000ms default but inside the override. The
+    // late-but-legit response now RESOLVES instead of arriving after the
+    // deadline and being dropped as unsolicited.
+    await vi.advanceTimersByTimeAsync(5_000);
+    c.resolve(lastId(t), payload);
+    await expect(p).resolves.toEqual(payload);
+    expect(c.outstanding()).toBe(0);
+  });
 });
