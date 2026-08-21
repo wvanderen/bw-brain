@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_for_planning
-stopped_at: Phase 04.3 inserted and CLAP-first context locked
-last_updated: "2026-08-20T21:34:01.421Z"
-last_activity: 2026-08-20
-last_activity_desc: Product rebaseline approved after Phase 04.2 verification
+current_phase: 04.3
+current_phase_name: CLAP-First Product Rebaseline (INSERTED
+status: executing
+stopped_at: Completed 04.3-01-PLAN.md
+last_updated: "2026-08-21T18:41:16.876Z"
+last_activity: 2026-08-21
+last_activity_desc: Phase 04.3 execution started
 progress:
   total_phases: 9
-  completed_phases: 7
-  total_plans: 44
-  completed_plans: 43
-  percent: 98
-current_phase: 04.3
-current_phase_name: CLAP-First Product Rebaseline
+  completed_phases: 6
+  total_plans: 49
+  completed_plans: 44
+  percent: 67
 ---
 
 # Project State
@@ -24,14 +24,14 @@ current_phase_name: CLAP-First Product Rebaseline
 See: .planning/PROJECT.md (updated 2026-08-20)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.3 — CLAP-First Product Rebaseline
+**Current focus:** Phase 04.3 — CLAP-First Product Rebaseline (INSERTED)
 
 ## Current Position
 
-Phase: 04.3 — CLAP-First Product Rebaseline
-Plan: 0 of TBD
-Status: Ready for planning
-Last activity: 2026-08-20 — Product rebaseline approved after Phase 04.2 verification
+Phase: 04.3 (CLAP-First Product Rebaseline (INSERTED)) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-08-21 — Phase 04.3 execution started
 
 Progress: [█████████░] 43/44 defined plans complete; Phase 04.3 and Phase 5 unplanned
 
@@ -91,6 +91,7 @@ Progress: [█████████░] 43/44 defined plans complete; Phase 0
 | Phase 04.2 P09 | 16min | 2 tasks | 12 files |
 | Phase 04.2 P10 | 20min | 2 tasks | 16 files |
 | Phase 04.2 P11 | 1h + live UAT | 2 tasks | 7 files |
+| Phase 04.3 P01 | 1h 40m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,9 @@ Recent decisions affecting current work:
 - [Phase 04.2]: Product validation uses clap/build while capability evidence remains isolated in clap/build-capability. — Prevents product caches and artifacts from contaminating capability evidence.
 - [Phase 04.2]: macOS is live verified from dated two-mode Bitwig evidence; Windows and Linux remain live-host unverified. — Support labels must not exceed observed host evidence.
 - [Phase 04.2]: JUCE 8 licensing remains a blocking release decision independent of technical validation. — A green build does not select AGPLv3 or a commercial license.
+- [Phase 04.3 P01]: AGENTS.md is regenerated from sources only — STACK.md's two contradictory rows carry dated 2026-08-20 supersession notes so regeneration imports the rebaselined story; the wired check:docs gate (scripts/check-docs-rebaseline.mjs) mechanically blocks the drift class (RB-01)
+- [Phase 04.3 P01]: Provider policy is grounded in the inspected Pi 0.84.0 agentDir surface — ~/.pi/agent/{models.json, auth.json, settings.json} with defaultProvider/defaultModel, outside the repo; daemon passes no model/modelRuntime; provider absence/auth failure stays a bounded visible analysis_auth_required / analysis_model_unavailable state (RB-05)
+- [Phase 04.3 P01]: pi-pack is classified as a CLI-wrapping asset for alternate agents and headless workflows (dated supersession of the pack-primary-UX claim); Pi version wording reads 0.84.0 daemon-managed; M4 /device row points at the CLAP workspace per superseded UX-04 (RB-02)
 
 ### Pending Todos
 
@@ -206,6 +210,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-20T21:34:01.421Z
-Stopped at: Phase 04.3 inserted and CLAP-first context locked
+Last session: 2026-08-21T18:40:53.758Z
+Stopped at: Completed 04.3-01-PLAN.md
 Resume file: None
