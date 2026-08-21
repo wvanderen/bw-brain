@@ -1,6 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { PiRuntimeFailure } from "../sessions/pi-runtime.js";
 import { ActionDispatch } from "./action-dispatch.js";
+import type { ArrangementReviewEvidence, ArrangementReviewOutcome } from "../query/query-server.js";
+
+const reviewEvidence: ArrangementReviewEvidence = {
+  sections: [
+    { startScene: 0, endScene: 1, label: "intro", avgSimilarity: 0.8, energy: 0.3, confidence: 0.9 },
+    { startScene: 2, endScene: 3, label: "drop", avgSimilarity: 0.7, energy: 0.9, confidence: 0.85 },
+  ],
+  energyCurve: [{ bar: 0, value: 0.2 }, { bar: 1, value: 0.9 }],
+  repetition: [{ group: [0, 2], similarity: 0.82, matchedOn: ["density"] }],
+  trackRoles: { "track:1": { role: "bass", confidence: 0.9 } },
+  transitionObservations: [],
+  pulledAt: "2026-08-21T10:00:00.000Z",
+  assumptions: [{ claim: "derived from snapshot pulled at 2026-08-21T10:00:00.000Z", confidence: 1.0, source: "default" }],
+};
 
 describe("confirmed hosted actions", () => {
   const scope = { projectId: "p", instanceId: "i", clipSid: "clip" };
@@ -110,5 +124,87 @@ describe("confirmed hosted actions", () => {
     const dispatch = new ActionDispatch({ requireConfirmedScope: vi.fn(), resolveAnalysisContext: vi.fn(async () => context), analyze: vi.fn(), getProposal: vi.fn(), issueApproval: vi.fn(), consumeApproval: vi.fn(), stopProject, sendTo: vi.fn(() => true) });
     await dispatch.dispatch("c", { type: "generation.stop", projectId: "p" });
     expect(stopProject).toHaveBeenCalledWith("p");
+  });
+});
+
+describe("arrangement.review (04.3-02 deterministic provider-free path)", () => {
+  const scope = { projectId: "p", instanceId: "i", clipSid: "clip" };
+  const context = { selectedClip: { clipSid: "clip", notes: [] } };
+  const baseDeps = (reviewArrangement?: (request: { scope: unknown; refresh: boolean }) => Promise<ArrangementReviewOutcome>) => ({
+    requireConfirmedScope: vi.fn(async () => scope),
+    resolveAnalysisContext: vi.fn(async () => context),
+    analyze: vi.fn(async () => undefined),
+    getProposal: vi.fn(),
+    issueApproval: vi.fn(),
+    consumeApproval: vi.fn(),
+    stopProject: vi.fn(),
+    sendTo: (_id: string, message: object) => true,
+    ...(reviewArrangement ? { reviewArrangement } : {}),
+  });
+
+  it("streams bounded contiguous chunks from confirmed scope with zero Pi involvement", async () => {
+    const sent: object[] = [];
+    const analyze = vi.fn(async () => undefined);
+    const reviewArrangement = vi.fn(async () => ({ kind: "evidence", evidence: reviewEvidence }) as ArrangementReviewOutcome);
+    const dispatch = new ActionDispatch({ ...baseDeps(reviewArrangement), analyze, sendTo: (_id, message) => (sent.push(message), true) });
+    await dispatch.dispatch("c", { type: "arrangement.review", requestId: "review-1", scope });
+
+    // The deterministic path NEVER touches the Pi analyze dependency (RB-05).
+    expect(analyze).not.toHaveBeenCalled();
+    expect(reviewArrangement).toHaveBeenCalledWith({ scope, refresh: false });
+
+    const status = sent[0];
+    expect(status).toEqual({ type: "analysis.status", requestId: "review-1", status: "running", scope });
+    const complete = sent.at(-1);
+    expect(complete).toEqual({ type: "analysis.complete", requestId: "review-1", status: "ok" });
+    const chunks = sent.slice(1, -1) as Array<{ type: string; requestId: string; sequence: number; text: string }>;
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.type === "conversation.chunk" && chunk.requestId === "review-1" && chunk.text.length <= 512)).toBe(true);
+    expect(chunks.map((chunk) => chunk.sequence)).toEqual(chunks.map((_, index) => index));
+    expect(chunks.some((chunk) => chunk.text.includes("pulled at 2026-08-21T10:00:00.000Z"))).toBe(true);
+  });
+
+  it("refuses unconfirmed scope via the shared gate before any review work", async () => {
+    const sent: object[] = [];
+    const reviewArrangement = vi.fn();
+    const dispatch = new ActionDispatch({
+      ...baseDeps(reviewArrangement as unknown as () => Promise<ArrangementReviewOutcome>),
+      requireConfirmedScope: vi.fn(async () => { throw new Error("scope_not_confirmed"); }),
+      sendTo: (_id, message) => (sent.push(message), true),
+    });
+    await dispatch.dispatch("c", { type: "arrangement.review", requestId: "review-2", scope });
+    expect(sent).toEqual([{ type: "action.error", error: "scope_not_confirmed" }]);
+    expect(reviewArrangement).not.toHaveBeenCalled();
+  });
+
+  it("hard-refuses disconnected + refresh with exactly one action.error and zero chunks", async () => {
+    const sent: object[] = [];
+    const reviewArrangement = vi.fn(async () => ({ kind: "refusal", reason: "state_disconnected" }) as ArrangementReviewOutcome);
+    const dispatch = new ActionDispatch({ ...baseDeps(reviewArrangement), sendTo: (_id, message) => (sent.push(message), true) });
+    await dispatch.dispatch("c", { type: "arrangement.review", requestId: "review-3", scope, refresh: true });
+    expect(reviewArrangement).toHaveBeenCalledWith({ scope, refresh: true });
+    expect(sent.filter((message) => (message as { type: string }).type === "action.error"))
+      .toEqual([{ type: "action.error", error: "state_disconnected" }]);
+    expect(sent.filter((message) => (message as { type: string }).type === "conversation.chunk")).toEqual([]);
+  });
+
+  it("answers a missing snapshot with the honest hint and ok completion (no fabricated evidence)", async () => {
+    const sent: object[] = [];
+    const reviewArrangement = vi.fn(async () => ({ kind: "no-snapshot" }) as ArrangementReviewOutcome);
+    const dispatch = new ActionDispatch({ ...baseDeps(reviewArrangement), sendTo: (_id, message) => (sent.push(message), true) });
+    await dispatch.dispatch("c", { type: "arrangement.review", requestId: "review-4", scope });
+    const chunks = sent.slice(1, -1) as Array<{ type: string; text: string }>;
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]!.type).toBe("conversation.chunk");
+    expect(chunks[0]!.text).toMatch(/no arrangement snapshot/i);
+    expect(chunks[0]!.text).toMatch(/refresh/);
+    expect(sent.at(-1)).toEqual({ type: "analysis.complete", requestId: "review-4", status: "ok" });
+  });
+
+  it("refuses not_implemented when the review dependency is unwired", async () => {
+    const sent: object[] = [];
+    const dispatch = new ActionDispatch({ ...baseDeps(), sendTo: (_id, message) => (sent.push(message), true) });
+    await dispatch.dispatch("c", { type: "arrangement.review", requestId: "review-5", scope });
+    expect(sent).toEqual([{ type: "action.error", error: "not_implemented" }]);
   });
 });
