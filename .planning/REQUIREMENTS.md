@@ -34,7 +34,7 @@
 - [x] **RB-01**: Reconcile PROJECT, ROADMAP, REQUIREMENTS, STATE, and user-facing documentation around the verified CLAP-first architecture and responsibility boundaries.
 - [x] **RB-02**: Make the hosted CLAP editor the primary producer workflow while preserving the CLI as a stable automation, diagnostic, testing, and recovery contract; Pi remains daemon-managed and headless.
 - [ ] **RB-03**: Surface existing arrangement intelligence through a CLAP-native review/proposal flow and replace the obsolete external Pi `/review` pane acceptance contract with focused in-Bitwig UAT.
-- [ ] **RB-04**: Reframe Phase 5 device/automation work around the CLAP proposal drawer, confirmed scope, and existing controller/candidate/pre-flight/journal authority path.
+- [x] **RB-04**: Reframe Phase 5 device/automation work around the CLAP proposal drawer, confirmed scope, and existing controller/candidate/pre-flight/journal authority path.
 - [x] **RB-05**: Define local-first provider policy: all DAW authority, state, persistence, and mutation stay local; inference may be local or explicitly configured remote using bounded confirmed context, with no raw-audio transmission.
 
 ## v1 Requirements
