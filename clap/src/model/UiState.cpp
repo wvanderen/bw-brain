@@ -101,6 +101,7 @@ bool copyId(const std::string& value, std::array<char, Size>& destination) {
 }
 
 std::atomic<std::uint64_t> analysisSequence{0};
+std::atomic<std::uint64_t> reviewSequence{0};
 
 }  // namespace
 
@@ -129,8 +130,14 @@ void UiStateStore::reduce(const UiEvent& event) {
       next->forkConfirmation.reset(); next->fork = "committed";
     } else if constexpr (std::is_same_v<T, ForkFailed>) {
       next->forkConfirmation.reset(); next->fork = "error: " + value.error;
-    } else if constexpr (std::is_same_v<T, SessionChanged>) next->session = value.value;
+    }     else if constexpr (std::is_same_v<T, SessionChanged>) next->session = value.value;
     else if constexpr (std::is_same_v<T, AnalysisChanged>) next->analysis = value.value;
+    else if constexpr (std::is_same_v<T, ConversationChunkReceived>) {
+      if (next->lastChunkRequestId == value.requestId && value.sequence == next->lastChunkSequence + 1)
+        next->analysis += "\n" + value.text;
+      else next->analysis = value.text;
+      next->lastChunkRequestId = value.requestId; next->lastChunkSequence = value.sequence;
+    }
     else if constexpr (std::is_same_v<T, ProposalChanged>) {
       next->proposal = value.value; next->showProposalDrawer = value.value.has_value();
       next->approvalGrant.reset(); next->approval = "none";
@@ -153,6 +160,14 @@ UiAction UiAction::analyze(std::string projectId, std::string instanceId, std::s
   action.projectId = std::move(projectId); action.instanceId = std::move(instanceId);
   action.clipSid = std::move(clipSid);
   action.token = "analysis-" + std::to_string(analysisSequence.fetch_add(1, std::memory_order_relaxed) + 1);
+  return action;
+}
+
+UiAction UiAction::arrangementReview(std::string projectId, std::string instanceId, std::string clipSid, bool refresh) {
+  UiAction action{.kind = Kind::arrangementReview};
+  action.projectId = std::move(projectId); action.instanceId = std::move(instanceId);
+  action.clipSid = std::move(clipSid); action.refresh = refresh;
+  action.token = "review-" + std::to_string(reviewSequence.fetch_add(1, std::memory_order_relaxed) + 1);
   return action;
 }
 
@@ -250,6 +265,13 @@ bool encodePeerAction(const UiAction& action, std::string& message) {
                 std::to_string(action.revision) + ",\"scope\":" + scope + ",\"digest\":\"" + action.digest + "\"}";
       return true;
     }
+    case UiAction::Kind::arrangementReview:
+      if (!validPeerId(action.token) || !validPeerId(action.projectId) || !validPeerId(action.instanceId) ||
+          (!action.clipSid.empty() && !validPeerId(action.clipSid))) return false;
+      message = "{\"type\":\"arrangement.review\",\"requestId\":\"" + action.token + "\",\"scope\":" +
+                scopeJson(action.projectId, action.instanceId, action.clipSid) +
+                ",\"refresh\":" + (action.refresh ? "true" : "false") + "}";
+      return true;
   }
   return false;
 }
@@ -300,12 +322,17 @@ bool reducePeerMessage(UiStateStore& store, const std::string& message) {
     store.reduce(SessionChanged{"open"}); store.reduce(AnalysisChanged{status}); return true;
   }
   if (type == "conversation.chunk") {
-    std::string text; if (!stringProperty(object, "text", text) || text.size() > 512) return false;
-    store.reduce(AnalysisChanged{text}); return true;
+    std::string requestId, text; std::int64_t sequence{};
+    if (!stringProperty(object, "requestId", requestId) || requestId.empty() ||
+        !integerProperty(object, "sequence", sequence) || sequence < 0 || sequence > 65'535 ||
+        !stringProperty(object, "text", text) || text.size() > 512) return false;
+    store.reduce(ConversationChunkReceived{std::move(requestId), sequence, std::move(text)}); return true;
   }
   if (type == "analysis.complete") {
-    std::string status, error; if (!stringProperty(object, "status", status)) return false;
+    std::string status, error, requestId; if (!stringProperty(object, "status", status)) return false;
     stringProperty(object, "error", error);
+    stringProperty(object, "requestId", requestId);
+    if (status == "ok" && !requestId.empty() && requestId == store.snapshot()->lastChunkRequestId) return true;
     store.reduce(AnalysisChanged{status == "error" ? "error: " + (error.empty() ? "analysis_failed" : error) : status}); return true;
   }
   if (type == "proposal.publish") {
