@@ -1,6 +1,6 @@
 # bw-brain pi-pack
 
-A [Pi](https://docs.openclaw.ai/) (OpenClaw) skill pack for **bw-brain** — a local-first intelligence layer for Bitwig Studio. This pack is the first-class UX surface; the stable contract it wraps is the `bw-*` CLI (D-12 — Pi gets the best UX, but any coding agent or shell script can drive the same commands, files, and docs).
+A [Pi](https://docs.openclaw.ai/) (OpenClaw) skill pack for **bw-brain** — a local-first intelligence layer for Bitwig Studio. **Superseded 2026-08-20 (CLAP-first rebaseline, RB-02): the hosted CLAP editor inside Bitwig is the primary producer surface — live-verified in Phase 04.2 — and Pi 0.84.0 is the daemon-managed headless reasoning runtime. This pack is no longer the primary UX; it remains a CLI-wrapping asset for alternate agents and headless workflows.** The stable contract it wraps is the `bw-*` CLI (D-12 — any coding agent or shell script can drive the same commands, files, and docs).
 
 ## Install
 
@@ -8,7 +8,7 @@ A [Pi](https://docs.openclaw.ai/) (OpenClaw) skill pack for **bw-brain** — a l
 pi install ./pi-pack
 ```
 
-Pi 0.79.10+ is required (`pi --help` confirms the `pi install <source>` path). After install, `pi list` shows the `analyze` skill registered as the `/analyze` slash command (auto-registered via `user-invocable: true` in the SKILL.md frontmatter).
+The reasoning runtime is Pi 0.84.0, daemon-managed (exact integrity-locked dependency of the bw-brain daemon; the `pi install` flow above remains for the skill assets only). After install, `pi list` shows the `analyze` skill registered as the `/analyze` slash command (auto-registered via `user-invocable: true` in the SKILL.md frontmatter).
 
 ## Skills shipped (M1 — read-only context)
 
@@ -22,8 +22,8 @@ Pi 0.79.10+ is required (`pi --help` confirms the `pi install <source>` path). A
 |-------|---------------|----------|
 | `vary` | `/vary` | M2 (Phase 3 — Reversible MIDI Patching) |
 | `apply` | `/apply` | M2 (Phase 3 — Reversible MIDI Patching) |
-| `review` | `/review` | M3 (Phase 4 — Arrangement Intelligence) |
-| `device` | `/device` | M4 (Phase 5 — Automation & Device Workflows) |
+| `review` | `/review` | M3 (Phase 4 — Arrangement Intelligence; superseded 2026-08-20: the producer-facing arrangement review flow is CLAP-native, see `docs/clap-product-support.md`) |
+| `device` | `/device` | M4 (Phase 5 — Automation & Device Workflows; per the superseded UX-04 wording, device/automation workflows land in the CLAP workspace, not an external Pi pane — this skill remains a CLI-wrapping secondary asset) |
 
 M1 scope is **read-only**: the assistant reliably understands and describes the selected Bitwig context. Editing, arrangement critique, and automation workflows land in their respective phases.
 

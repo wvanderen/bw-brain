@@ -4,16 +4,17 @@
 
 **bw-brain**
 
-`bw-brain` is a local-first intelligence layer for Bitwig — not a chatbot feature, but a copilot runtime. A Java `.bwextension` bridge mirrors live project state to a TypeScript daemon, which normalizes it into a composition-state model, runs analysis and reversible transforms, and serves a stable CLI contract (JSON in/out). A Pi/OpenClaw package is the first-class UX (slash commands, skills, TUI panes). The stable interface is the CLI, not the agent: Pi gets the best UX, but any coding agent or shell script can drive the same commands, files, and docs. Built for a single producer composing in Bitwig (initially electronic/techno-leaning), designed to be composable and genre-pluggable.
+`bw-brain` is a local-first intelligence layer for Bitwig — a hybrid CLAP companion, controller bridge, and daemon-managed reasoning runtime. The CLAP plug-in is the primary producer-facing workspace inside Bitwig: it shows confirmed scope, analysis, proposals, approval, and bounded generated MIDI. A dumb Java `.bwextension` remains the authoritative reader/mutator for Bitwig project state, while the TypeScript daemon owns normalization, sessions, policy, proposals, and the exact Pi runtime. The CLI remains a stable JSON automation, diagnostic, and recovery contract rather than the primary interface.
 
 **Core Value:** The assistant reliably understands and describes the selected Bitwig context (clip/device/region/arrangement) and can only change the project through small, previewable, reversible, undo-labelled patches — so it never wrecks the song. Accurate first; creative later.
 
 ### Constraints
 
 - **Tech stack — Bitwig bridge:** Java `.bwextension` — matches Bitwig's official extension path and gives a sturdier long-running bridge than scripts (JS prototyping permitted, harden in Java later).
-- **Tech stack — daemon + CLI + Pi package:** TypeScript — matches Pi/OpenClaw ecosystem and lowers friction for the Pi package.
+- **Tech stack — CLAP:** C++17/CMake with the verified JUCE/free-audio CLAP adapter path; release licensing remains an explicit gate.
+- **Tech stack — daemon + CLI + Pi runtime:** TypeScript.
 - **IPC:** localhost TCP or stdio relay, JSON Lines, version every message. No MCP.
-- **Local-first:** no cloud/remote model calls; bridge + daemon run offline.
+- **Local-first:** all DAW integration, raw project state, authorization, persistence, and mutation remain local. Reasoning may use a locally configured model or an explicitly configured remote provider; only bounded confirmed context is sent on explicit Analyze, never raw audio.
 - **Edit model:** all mutations go through patch objects with scope/operations/rationale/reversibility/risk; preview before apply; undo labels mandatory.
 - **Trust model:** low-risk edits only may be one-step; medium and high require explicit confirmation.
 
@@ -132,9 +133,9 @@
 | **`tone.js`** | Full Web Audio synthesis runtime. The daemon is a *DAW bridge*, not an audio engine. Pulling tone.js bloats the bundle and tempts scope creep into sound generation | If MIDI-file I/O ever becomes a feature, pull `@tonejs/midi` (the lightweight parser) — not `tone` |
 | **`@tonejs/midi` for the hot path** | It's a MIDI *file* parser. bw-brain exchanges note arrays as JSON over the wire, never as `.mid` files. Pulling it for the core note-clip path adds a pointless translation layer | Model notes as JSON directly (`{pitch, start, length, velocity}`) in the patch schema |
 | **Zod as the schema source of truth** | Zod is TS-first — JSON Schema is a *derived* output. The contract here must be cross-language (Java bridge can't read Zod). Using Zod inverts the dependency and forces you to keep two sources in sync | Hand-authored JSON Schema files → `json2ts` → TS types → Ajv validates at the boundary |
-| **AWT/Swing/JavaFX in the bridge** | Bitwig bundles its own JRE and does not expose a UI toolkit to extensions. Any UI work happens in the Pi TUI, not in Java | `host.showPopupNotification(String)` + `host.println(...)` for bridge→user feedback; all real UI is in the Pi package |
+| **AWT/Swing/JavaFX in the bridge** | Bitwig bundles its own JRE and does not expose a UI toolkit to extensions. Any UI work happens in the Pi TUI, not in Java. **Superseded 2026-08-20 (CLAP-first rebaseline, verified live in Phase 04.2): the hosted CLAP editor inside Bitwig is the product UI surface — the no-UI-in-Java guidance stands, but the "real UI lives in the Pi package" claim is retired.** | `host.showPopupNotification(String)` + `host.println(...)` for bridge→user feedback; all real UI is in the Pi package |
 | **Native image / GraalVM** for the bridge | Bitwig loads `.bwextension` jars into its own hosted JVM. A native image won't load | Plain JVM bytecode, Java 21 target |
-| **Cloud model calls from daemon or bridge** | Explicit project constraint (local-first). No remote model calls | All reasoning is local: Pi/agent inferences happen on the host where the user already has their model API; the daemon itself is deterministic transforms + schema validation |
+| **Cloud model calls from daemon or bridge** | Explicit project constraint (local-first). No remote model calls. **Superseded 2026-08-20 (CLAP-first rebaseline): local authority is the invariant — an explicitly configured reasoning provider (local or remote, selected in the Pi SDK agentDir outside this repo) receiving only bounded confirmed context after explicit Analyze is permitted per PROJECT.md Constraints; raw audio never leaves the plug-in.** | All reasoning is local: Pi/agent inferences happen on the host where the user already has their model API; the daemon itself is deterministic transforms + schema validation |
 | **Spring / Quarkus / any app framework** | The bridge is a single extension class with `init()`/`exit()`. A framework is dead weight | Plain Java + Jackson + the Bitwig extension lifecycle |
 | **Auto-edits without a patch object** | Violates the trust model (PROJECT.md guardrail). Even "obvious" cleanup must flow through `scope → operations → rationale → reversible` | Every mutation is a patch; the bridge refuses `apply.patch` without a valid patch object |
 
