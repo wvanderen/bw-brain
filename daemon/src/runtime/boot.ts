@@ -106,6 +106,23 @@ export const DEFAULT_ARRANGEMENT_SNAPSHOT_PATH: string = join(process.cwd(), ".b
  */
 export const DEFAULT_ROLES_PATH: string = join(process.cwd(), ".bw-brain", "roles.json");
 
+/**
+ * 04.3 / 04.3-07 (DEFECT A daemon half) — per-request correlator deadline for
+ * the get.launcher_clips pull (all three send sites). Derivation:
+ *   5000ms  BankSyncWait settle-wait cap (Plan 04.3-06, BANK_SYNC_MAX_WAIT_MS)
+ * + 64000ms 128 cells × 500ms D-22 per-cell ceiling
+ *           (LauncherGridWalker.DEFAULT_PER_CELL_TIMEOUT_MS over
+ *            BridgeExtension BANK_SIZE 8 × SCENE_COUNT 16 = 8×16=128 cells)
+ * + margin  serialization/reply overhead
+ * ≈ 90s. Empty cells return from the observers cache in microseconds, so
+ * typical pulls finish FAR below this ceiling — the deadline exists so the
+ * documented worst case can never be misreported as a bridge failure (the
+ * 2026-08-21 live UAT dropped a populated-but-slow first walk at the 3000ms
+ * default while its fast-empty predecessor poisoned the snapshot). Every
+ * other get.* pull keeps the 3000ms correlator default.
+ */
+const LAUNCHER_GRID_PULL_TIMEOUT_MS = 90_000;
+
 /** M1 LIMITATION (Minor 3 fix): the bridge does not pull project metadata. */
 const DEFAULT_PROJECT = { name: "", tempo: 120, timeSignature: "4/4" } as const;
 
@@ -472,8 +489,11 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       // Saves the raw grid to arrangement-snapshot.json (derived fields populate
       // lazily on `bw-arrange refresh` running the M3 analyzers). Failure does
       // NOT block daemon startup — the snapshot populates on demand.
+      // 04.3-07: the pull waits honestly for the walk's documented worst case
+      // (90s per-request deadline) and the save lands in the validated write
+      // gate (DEFECT B) — a raced/incomplete grid is refused, prior file kept.
       try {
-        const gridResp = (await correlator.send("get.launcher_clips")) as {
+        const gridResp = (await correlator.send("get.launcher_clips", {}, { timeoutMs: LAUNCHER_GRID_PULL_TIMEOUT_MS })) as {
           tracks?: Array<{ scenes?: unknown[] }>;
           sceneNames?: string[];
         };
@@ -640,12 +660,13 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     // and the query-server shared evidence assembly. Validated arrangement.review
     // peer messages reach this branch through the existing routing chain
     // (sessionActions fallthrough → actions.dispatch).
+    // 04.3-07: the grid pull carries the 90s per-request deadline (DEFECT A).
     reviewArrangement: createArrangementReviewDependency({
       arrangementSnapshotPath,
       rolesPath,
       intent: () => intent,
       freshness: () => watchdog.tick(),
-      pullLauncherGrid: () => correlator.send("get.launcher_clips"),
+      pullLauncherGrid: () => correlator.send("get.launcher_clips", {}, { timeoutMs: LAUNCHER_GRID_PULL_TIMEOUT_MS }),
     }),
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),
@@ -728,7 +749,8 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     applyPatchOverBridge,
     editService,
     // Phase 4 Plan 04-05 — arrangement intelligence deps.
-    pullLauncherGrid: () => correlator.send("get.launcher_clips"),
+    // 04.3-07: the grid pull carries the 90s per-request deadline (DEFECT A).
+    pullLauncherGrid: () => correlator.send("get.launcher_clips", {}, { timeoutMs: LAUNCHER_GRID_PULL_TIMEOUT_MS }),
     arrangementSnapshotPath,
     rolesPath,
   });

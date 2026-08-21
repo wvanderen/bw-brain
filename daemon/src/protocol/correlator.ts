@@ -36,6 +36,22 @@ export interface CorrelatorOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Options for a single {@link RequestCorrelator.send} call (04.3-07).
+ *
+ * Per-REQUEST override only: the instance default stays in place for every
+ * send that does not pass `timeoutMs` (T-04.3-23 — an extended launcher-grid
+ * pull must never delay any other response resolution; correlator entries
+ * are id-isolated).
+ */
+export interface SendOptions {
+  /**
+   * Response timeout for THIS request. When absent the instance timeout
+   * (constructor `timeoutMs` or {@link DEFAULT_CORRELATOR_TIMEOUT_MS}) applies.
+   */
+  timeoutMs?: number;
+}
+
 /** A pending request entry: the promise settle pair + the armed timeout timer. */
 interface PendingEntry {
   resolve: (payload: object) => void;
@@ -83,18 +99,27 @@ export class RequestCorrelator {
    * underlying error — the entry MUST NOT leak with a dangling 3s timer
    * (Minor 4 fix).
    *
+   * 04.3-07 (DEFECT A daemon half): `opts.timeoutMs` overrides the instance
+   * deadline for THIS request only. The EFFECTIVE value drives both the armed
+   * timer and the timeout message so daemon logs stay honest about which
+   * budget fired. Used by boot.ts's three get.launcher_clips pull sites — the
+   * grid walk's documented worst case exceeds the 3000ms default (every other
+   * get.* pull keeps it).
+   *
    * @param type    - the request type (e.g. "get.project_summary").
    * @param payload - optional request payload (default `{}`).
+   * @param opts    - optional per-request options ({@link SendOptions}).
    * @returns the response payload, or rejects on timeout / transport error.
    */
-  send(type: string, payload: object = {}): Promise<object> {
+  send(type: string, payload: object = {}, opts: SendOptions = {}): Promise<object> {
     const id = randomUUID();
+    const effectiveTimeoutMs = opts.timeoutMs ?? this.timeout;
     return new Promise<object>((resolve, reject) => {
       const timer = setTimeout(() => {
         if (this.pending.delete(id)) {
-          reject(new Error(`bridge ${type} timed out after ${this.timeout}ms`));
+          reject(new Error(`bridge ${type} timed out after ${effectiveTimeoutMs}ms`));
         }
-      }, this.timeout);
+      }, effectiveTimeoutMs);
 
       this.pending.set(id, { resolve, reject, timer });
 
