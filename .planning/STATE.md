@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 04.3
 current_phase_name: CLAP-First Product Rebaseline (INSERTED
 status: executing
-stopped_at: Completed 04.3-02-PLAN.md
-last_updated: "2026-08-21T19:10:10.826Z"
+stopped_at: Completed 04.3-03-PLAN.md
+last_updated: "2026-08-21T19:29:35.748Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 04.3 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 50
-  completed_plans: 46
+  completed_plans: 47
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-20)
 ## Current Position
 
 Phase: 04.3 (CLAP-First Product Rebaseline (INSERTED)) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-08-21 — Phase 04.3 execution started
 
@@ -94,6 +94,7 @@ Progress: [█████████░] 43/44 defined plans complete; Phase 0
 | Phase 04.3 P01 | 1h 40m | 2 tasks | 7 files |
 | Phase 04.3 P02 | 20 min | 2 tasks | 10 files |
 | Phase 04.3 P05 | 8min | 1 tasks | 1 files |
+| Phase 04.3 P03 | 12 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,9 @@ Recent decisions affecting current work:
 - [Phase 04.3]: [Phase 04.3 P02] reviewArrangement is an optional ActionDispatch dependency (unwired = action.error not_implemented); the deterministic arrangement.review branch reuses analysis.status/conversation.chunk/analysis.complete bracketing and never invokes the Pi analyze dependency (RB-05 code half).
 - [Phase 04.3]: [Phase 04.3 P02] One transport-free evidence assembly (assembleArrangementReviewEvidence + refreshArrangementSnapshot in query-server.ts) serves both the CLI arrange.review wrapper (byte-identical output) and the peer path via a boot-injected dependency — analyzer logic never duplicated; sparkline per-scene energy comes from SectionSummary.energy with the per-bar curve surfaced as bounded stats.
 - [Phase ?]: [Phase 04.3 P05] Phase 5 contract is code-grounded: principal new dependency = patch-schema automation-operation extension (PrimitiveOp is add_note/remove_note/update_note_field only); device-chain reads pair get.selected_device_chain (PullHandlers.java:224/307, empty pages) with the cursorDevice.getParameter(int) A1-NEGATED fallback; binding constraints pin reuse of the verified 04.2 authority seams (RB-04)
+- [Phase ?]: [Phase 04.3 P03] ConversationChunkReceived UiEvent keeps chunk append/reset + lastChunkRequestId/lastChunkSequence bookkeeping atomic inside the copy-on-write reducer — no decoder-side TOCTOU; bounds fail closed (requestId non-empty, sequence 0-65535, text <=512)
+- [Phase ?]: [Phase 04.3 P03] analysis.complete ok preserves accumulated chunk text only when its requestId matches the accumulated chunk request; ok-without-chunks and error/aborted paths keep existing surfacing verbatim
+- [Phase ?]: [Phase 04.3 P03] Review is a hosted button command enqueuing arrangementReview(scope, refresh=true) per the locked local-first decision — never an automatable parameter (T-04.3-12); conversation readability via wrap+scroll in unchanged bounds, never editor widening
 
 ### Pending Todos
 
@@ -216,6 +220,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-21T19:09:58.459Z
-Stopped at: Completed 04.3-02-PLAN.md
+Last session: 2026-08-21T19:29:35.742Z
+Stopped at: Completed 04.3-03-PLAN.md
 Resume file: None

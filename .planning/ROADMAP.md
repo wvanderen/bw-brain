@@ -267,7 +267,7 @@ Plans:
   4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
   5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
 
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 **UI hint:** yes
 **Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
 
@@ -280,7 +280,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 — C++ encoder consumes the 04.3-02 schema contract)*
 
-- [ ] 04.3-03-PLAN.md — CLAP readable presentation: conversation_ Label→TextEditor with the live-verified e8887b4 drawer configuration, diff-guarded scroll-retaining updates, chunk append/reset reducer with fail-closed bounds, hosted Review button + arrangementReview encoder arm (UX-03, RB-03 native half)
+- [x] 04.3-03-PLAN.md — CLAP readable presentation: conversation_ Label→TextEditor with the live-verified e8887b4 drawer configuration, diff-guarded scroll-retaining updates, chunk append/reset reducer with fail-closed bounds, hosted Review button + arrangementReview encoder arm (UX-03, RB-03 native half)
 
 **Wave 3** *(blocked on Waves 1+2 — the joined flow is the acceptance surface)*
 
@@ -318,5 +318,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
-| 04.3. CLAP-First Product Rebaseline | 3/5 | In Progress|  |
+| 04.3. CLAP-First Product Rebaseline | 4/5 | In Progress|  |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
