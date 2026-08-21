@@ -65,6 +65,9 @@ import {
 } from "../state/arrangement-snapshot.js";
 import { loadRoles, saveRoles, type RolesFile } from "../state/roles-store.js";
 import { suggestTransitions, type TransitionObservation } from "../transforms/transition-suggest.js";
+import type { SectionSummary } from "../transforms/section-detector.js";
+import type { EnergyPoint } from "../transforms/energy-curve.js";
+import type { RepetitionCluster } from "../transforms/repetition-report.js";
 import { SECTION_RESERVED } from "../state/describe.js";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
@@ -222,8 +225,12 @@ function deviceInspect(state: RawState): object {
   return { devices: state.devices ?? [] };
 }
 
-/** Grounding assumptions for a result that served live state. */
-function liveAssumptions(state: RawState, intent: ProjectIntent | null): Assumption[] {
+/**
+ * The live-state grounding claims (state-independent — `liveAssumptions`
+ * delegates here; 04.3-02 extracts this so the transport-free arrangement
+ * evidence builder produces byte-identical assumptions without a RawState).
+ */
+function liveAssumptionClaims(intent: ProjectIntent | null): Assumption[] {
   const claims: Assumption[] = [
     { claim: "served from the daemon's normalized live state", confidence: 1.0, source: "selection" },
   ];
@@ -234,9 +241,14 @@ function liveAssumptions(state: RawState, intent: ProjectIntent | null): Assumpt
       source: "intent",
     });
   }
+  return claims;
+}
+
+/** Grounding assumptions for a result that served live state. */
+function liveAssumptions(state: RawState, intent: ProjectIntent | null): Assumption[] {
   // Reference state to satisfy the pure-handler contract + keep the parameter live.
   void state;
-  return claims;
+  return liveAssumptionClaims(intent);
 }
 
 /** Assumptions for the no-state case (bridge not connected). */
@@ -885,6 +897,196 @@ function pulledAtAssumption(snap: ArrangementSnapshot | null): Assumption {
 }
 
 /**
+ * 04.3 / 04.3-02 Task 2 — the transport-free arrangement review evidence
+ * assembly. SINGLE SOURCE for both the CLI (`bw-arrange review --json`) and
+ * the confirmed-scope CLAP peer path (action-dispatch arrangement.review →
+ * boot's injected dependency): analyzer logic is NEVER duplicated. The
+ * builder consumes an already-loaded/refreshed snapshot; loading and the
+ * fresh pull stay at the caller (prepareArrangeDispatch for the CLI, boot for
+ * the peer path — mirroring the CLI refresh semantics exactly, RESEARCH open
+ * question 4).
+ */
+export interface ArrangementReviewEvidence {
+  sections: SectionSummary[];
+  energyCurve: EnergyPoint[];
+  repetition: RepetitionCluster[];
+  trackRoles: Record<string, { role: string; confidence: number; alternatives?: Array<{ role: string; score: number }> }>;
+  /** D-10 ADVISORY — no patch fields (T-04-16). */
+  transitionObservations: TransitionObservation[];
+  /** ISO timestamp of the snapshot the evidence came from; null = no snapshot. */
+  pulledAt: string | null;
+  assumptions: Assumption[];
+}
+
+/**
+ * The arrangement review outcome the dispatch layer consumes: a bounded
+ * refusal reason (action.error surface), the honest no-snapshot case (hint
+ * path), or the full five-dimension evidence.
+ */
+export type ArrangementReviewOutcome =
+  | { kind: "refusal"; reason: "state_disconnected" | "not_implemented" }
+  | { kind: "no-snapshot" }
+  | { kind: "evidence"; evidence: ArrangementReviewEvidence };
+
+/** Input to {@link assembleArrangementReviewEvidence}. */
+export interface AssembleArrangementReviewEvidenceInput {
+  /** The loaded (or freshly pulled) snapshot; null when none exists. */
+  snap: ArrangementSnapshot | null;
+  intent: ProjectIntent | null;
+  freshness: "live" | "stale" | "disconnected";
+  /** Whether the caller requested a fresh pull (already performed when true). */
+  refresh: boolean;
+  /** Whether an arrangement snapshot path is configured at all. */
+  snapshotConfigured: boolean;
+}
+
+/**
+ * Assemble the five-dimension arrangement review evidence from a snapshot.
+ * Pure over its inputs (runs the M3 analyzers fresh against the snapshot
+ * grid — deterministic, "pure + fast for O(10²) scenes").
+ *
+ * Refusals: `state_disconnected` when a fresh pull is needed while
+ * disconnected (hard refusal — mirrors prepareArrangeDispatch's gate for the
+ * peer path); `not_implemented` when no snapshot path is configured. A null
+ * snapshot otherwise is NOT a refusal — it returns the honest `no-snapshot`
+ * outcome (the caller renders the hint; no fabricated evidence, Pitfall 5).
+ */
+export function assembleArrangementReviewEvidence(
+  input: AssembleArrangementReviewEvidenceInput,
+): ArrangementReviewOutcome {
+  if (!input.snapshotConfigured) return { kind: "refusal", reason: "not_implemented" };
+  if (input.freshness === "disconnected" && input.refresh) return { kind: "refusal", reason: "state_disconnected" };
+  const assumptions: Assumption[] = [...liveAssumptionClaims(input.intent), pulledAtAssumption(input.snap)];
+  if (input.snap === null) return { kind: "no-snapshot" };
+  // Run the M3 analyzers fresh against the snapshot grid (same runAll the
+  // prepareArrangeDispatch preamble performs — deterministic, so the CLI wire
+  // payload stays byte-identical when handleArrangeReview consumes this).
+  const fields = getM3Registry().runAll(rawFromSnapshot(input.snap), buildAnalyzeCtx(input.intent, Date.now()));
+  const derived: Record<string, unknown> = {};
+  for (const f of fields) derived[f.field] = f.value;
+  const sections = (derived.sections ?? []) as SectionSummary[];
+  const energyCurve = (derived.energyCurve ?? []) as EnergyPoint[];
+  const repetition = (derived.repetition ?? []) as RepetitionCluster[];
+  const profileName = input.intent?.projectIntent.profile ?? "generic";
+  const repThreshold = 0.7; // ARCH-02 default; the repetition-report analyzer uses the same
+  // D-10: suggestTransitions is ADVISORY ONLY — NO patch fields (T-04-16).
+  const transitionObservations: TransitionObservation[] = suggestTransitions(
+    sections,
+    energyCurve,
+    repetition,
+    {
+      sceneCount: input.snap.sceneCount,
+      repetitionThreshold: repThreshold,
+      profileName,
+      pulledAt: input.snap.pulledAt,
+    },
+  );
+  return {
+    kind: "evidence",
+    evidence: {
+      sections,
+      energyCurve,
+      repetition,
+      trackRoles: (derived.trackRoles ?? {}) as ArrangementReviewEvidence["trackRoles"],
+      transitionObservations,
+      pulledAt: input.snap.pulledAt,
+      assumptions,
+    },
+  };
+}
+
+/** Options for {@link refreshArrangementSnapshot} (04.3-02 — shared by CLI + peer paths). */
+export interface RefreshArrangementSnapshotOptions {
+  pullLauncherGrid: () => Promise<unknown>;
+  arrangementSnapshotPath: string;
+  rolesPath?: string;
+  intent: ProjectIntent | null;
+}
+
+/**
+ * arrange.refresh core (04.3-02 exported): pull get.launcher_clips → build
+ * snapshot → runAll → persist derived + roles.json. Returns the refreshed
+ * snapshot, or null on pull failure. Shared by the CLI arrange.* refresh
+ * paths and boot's peer-path review dependency — one pull implementation.
+ */
+export async function refreshArrangementSnapshot(
+  options: RefreshArrangementSnapshotOptions,
+): Promise<ArrangementSnapshot | null> {
+  const { pullLauncherGrid, arrangementSnapshotPath, rolesPath, intent } = options;
+  let gridResp: unknown;
+  try {
+    gridResp = await pullLauncherGrid();
+  } catch (e) {
+    console.error("[query-server] arrange.refresh get.launcher_clips pull failed:", (e as Error).message);
+    return null;
+  }
+  const grid = gridResp as { tracks?: unknown[]; sceneNames?: string[] };
+  if (!Array.isArray(grid.tracks)) return null;
+  const tracks = grid.tracks as ArrangementSnapshot["grid"]["tracks"];
+  const sceneCount = tracks.reduce((mx, t) => Math.max(mx, t.scenes?.length ?? 0), 0);
+  const trackCount = tracks.length;
+  const profileName = intent?.projectIntent.profile ?? "generic";
+  const pulledAt = new Date().toISOString();
+  const snap: ArrangementSnapshot = {
+    version: "1.0",
+    pulledAt,
+    profile: profileName,
+    sceneCount,
+    trackCount,
+    grid: { tracks, sceneNames: Array.isArray(grid.sceneNames) ? grid.sceneNames! : [] },
+    derived: {},
+  };
+  // Run the M3 analyzers against the fresh grid.
+  const ctx = buildAnalyzeCtx(intent, Date.now());
+  const fields = getM3Registry().runAll(rawFromSnapshot(snap), ctx);
+  const derived: NonNullable<ArrangementSnapshot["derived"]> = {};
+  for (const f of fields) {
+    if (f.field === "sections") derived.sections = f.value as NonNullable<ArrangementSnapshot["derived"]>["sections"];
+    if (f.field === "repetition") derived.repetition = f.value as NonNullable<ArrangementSnapshot["derived"]>["repetition"];
+    if (f.field === "energyCurve") derived.energyCurve = f.value as NonNullable<ArrangementSnapshot["derived"]>["energyCurve"];
+    if (f.field === "trackRoles") derived.trackRoles = f.value as NonNullable<ArrangementSnapshot["derived"]>["trackRoles"];
+  }
+  snap.derived = derived;
+  // Persist the snapshot + roles.json (atomic temp+rename).
+  try {
+    await saveArrangementSnapshot(arrangementSnapshotPath, snap);
+  } catch (e) {
+    console.error("[query-server] arrange.refresh saveArrangementSnapshot failed:", (e as Error).message);
+  }
+  if (rolesPath && derived.trackRoles) {
+    try {
+      const roles: RolesFile = {
+        version: "1.0",
+        classifiedAt: pulledAt,
+        profile: profileName,
+        tracks: derived.trackRoles as RolesFile["tracks"],
+      };
+      await saveRoles(rolesPath, roles);
+    } catch (e) {
+      console.error("[query-server] arrange.refresh saveRoles failed:", (e as Error).message);
+    }
+  }
+  return snap;
+}
+
+/**
+ * Internal wrapper: {@link refreshArrangementSnapshot} from QueryServerDeps
+ * (absent deps → null, matching the pre-04.3-02 shape).
+ */
+async function refreshSnapshot(
+  deps: QueryServerDeps,
+  intent: ProjectIntent | null,
+): Promise<ArrangementSnapshot | null> {
+  if (!deps.pullLauncherGrid || !deps.arrangementSnapshotPath) return null;
+  return refreshArrangementSnapshot({
+    pullLauncherGrid: deps.pullLauncherGrid,
+    arrangementSnapshotPath: deps.arrangementSnapshotPath,
+    rolesPath: deps.rolesPath,
+    intent,
+  });
+}
+
+/**
  * Shared preamble for the analysis ops: watchdog gate, load snapshot (optionally
  * refresh first), load profile, run analyzers, return the context or null when
  * an error result has already been sent.
@@ -927,70 +1129,10 @@ async function prepareArrangeDispatch(
 }
 
 /**
- * arrange.refresh core: pull get.launcher_clips → build snapshot → runAll →
- * persist derived + roles.json. Returns the refreshed snapshot, or null on
- * pull failure.
+ * arrange.refresh — D-19: re-pull the grid + re-run all analyzers + persist.
+ * (The pull/persist core lives in the exported refreshArrangementSnapshot —
+ * 04.3-02 single source shared with boot's peer-path review dependency.)
  */
-async function refreshSnapshot(
-  deps: QueryServerDeps,
-  intent: ProjectIntent | null,
-): Promise<ArrangementSnapshot | null> {
-  if (!deps.pullLauncherGrid || !deps.arrangementSnapshotPath) return null;
-  let gridResp: unknown;
-  try {
-    gridResp = await deps.pullLauncherGrid();
-  } catch (e) {
-    console.error("[query-server] arrange.refresh get.launcher_clips pull failed:", (e as Error).message);
-    return null;
-  }
-  const grid = gridResp as { tracks?: unknown[]; sceneNames?: string[] };
-  if (!Array.isArray(grid.tracks)) return null;
-  const tracks = grid.tracks as ArrangementSnapshot["grid"]["tracks"];
-  const sceneCount = tracks.reduce((mx, t) => Math.max(mx, t.scenes?.length ?? 0), 0);
-  const trackCount = tracks.length;
-  const profileName = intent?.projectIntent.profile ?? "generic";
-  const pulledAt = new Date().toISOString();
-  const snap: ArrangementSnapshot = {
-    version: "1.0",
-    pulledAt,
-    profile: profileName,
-    sceneCount,
-    trackCount,
-    grid: { tracks, sceneNames: Array.isArray(grid.sceneNames) ? grid.sceneNames! : [] },
-    derived: {},
-  };
-  // Run the M3 analyzers against the fresh grid.
-  const ctx = buildAnalyzeCtx(intent, Date.now());
-  const fields = getM3Registry().runAll(rawFromSnapshot(snap), ctx);
-  const derived: NonNullable<ArrangementSnapshot["derived"]> = {};
-  for (const f of fields) {
-    if (f.field === "sections") derived.sections = f.value as NonNullable<ArrangementSnapshot["derived"]>["sections"];
-    if (f.field === "repetition") derived.repetition = f.value as NonNullable<ArrangementSnapshot["derived"]>["repetition"];
-    if (f.field === "energyCurve") derived.energyCurve = f.value as NonNullable<ArrangementSnapshot["derived"]>["energyCurve"];
-    if (f.field === "trackRoles") derived.trackRoles = f.value as NonNullable<ArrangementSnapshot["derived"]>["trackRoles"];
-  }
-  snap.derived = derived;
-  // Persist the snapshot + roles.json (atomic temp+rename).
-  try {
-    await saveArrangementSnapshot(deps.arrangementSnapshotPath, snap);
-  } catch (e) {
-    console.error("[query-server] arrange.refresh saveArrangementSnapshot failed:", (e as Error).message);
-  }
-  if (deps.rolesPath && derived.trackRoles) {
-    try {
-      const roles: RolesFile = {
-        version: "1.0",
-        classifiedAt: pulledAt,
-        profile: profileName,
-        tracks: derived.trackRoles as RolesFile["tracks"],
-      };
-      await saveRoles(deps.rolesPath, roles);
-    } catch (e) {
-      console.error("[query-server] arrange.refresh saveRoles failed:", (e as Error).message);
-    }
-  }
-  return snap;
-}
 
 /** arrange.sections — ARRANGE-01: bottom-up scene segmentation. */
 async function handleArrangeSections(
@@ -1047,9 +1189,14 @@ async function handleArrangeEnergyCurve(
 }
 
 /**
- * arrange.review — UX-03/D-11: the aggregate critique. Runs all 4 analyzers +
- * suggestTransitions (D-10 ADVISORY — NO patch fields). Returns sections,
- * energyCurve, repetition, transitionObservations, pulledAt, assumptions[].
+ * arrange.review — UX-03/D-11: the aggregate critique. Thin wrapper over the
+ * shared transport-free evidence assembly (assembleArrangementReviewEvidence
+ * — 04.3-02 single source; the confirmed-scope CLAP peer path consumes the
+ * same builder, analyzer logic never duplicated). UDS wire output is
+ * byte-identical to the pre-04.3-02 shape: safeSendOk with the same payload
+ * fields + assumptions (the CLI refresh semantics stay in
+ * prepareArrangeDispatch: disconnected → state_disconnected refusal,
+ * unconfigured → not_implemented, refresh flag → fresh pull).
  */
 async function handleArrangeReview(
   deps: QueryServerDeps,
@@ -1060,33 +1207,37 @@ async function handleArrangeReview(
 ): Promise<void> {
   const ctx = await prepareArrangeDispatch(deps, state, intent, freshness, msg);
   if (!ctx) return;
-  const sections = (ctx.derived.sections ?? []) as import("../transforms/section-detector.js").SectionSummary[];
-  const energyCurve = (ctx.derived.energyCurve ?? []) as import("../transforms/energy-curve.js").EnergyPoint[];
-  const repetition = (ctx.derived.repetition ?? []) as import("../transforms/repetition-report.js").RepetitionCluster[];
-  const profileName = intent?.projectIntent.profile ?? "generic";
-  const repThreshold = 0.7; // ARCH-02 default; the repetition-report analyzer uses the same
-  // D-10: suggestTransitions is ADVISORY ONLY — NO patch fields (T-04-16).
-  const transitionObservations: TransitionObservation[] = suggestTransitions(
-    sections,
-    energyCurve,
-    repetition,
-    {
-      sceneCount: ctx.snap?.sceneCount,
-      repetitionThreshold: repThreshold,
-      profileName,
-      pulledAt: ctx.snap?.pulledAt,
-    },
-  );
+  const outcome = assembleArrangementReviewEvidence({
+    snap: ctx.snap,
+    intent,
+    freshness,
+    refresh: msg.payload?.refresh === true,
+    snapshotConfigured: true, // prepareArrangeDispatch already refused not_implemented
+  });
+  if (outcome.kind === "refusal") {
+    safeSendErr(deps.transport, freshness, outcome.reason);
+    return;
+  }
+  if (outcome.kind === "no-snapshot") {
+    // No snapshot — honest empty evidence (the producer must run `bw-arrange refresh` first).
+    safeSendOk(
+      deps.transport,
+      freshness,
+      { sections: [], energyCurve: [], repetition: [], trackRoles: {}, transitionObservations: [], pulledAt: null },
+      ctx.assumptions,
+    );
+    return;
+  }
   safeSendOk(
     deps.transport,
     freshness,
     {
-      sections,
-      energyCurve,
-      repetition,
-      trackRoles: ctx.derived.trackRoles ?? {},
-      transitionObservations,
-      pulledAt: ctx.snap?.pulledAt ?? null,
+      sections: outcome.evidence.sections,
+      energyCurve: outcome.evidence.energyCurve,
+      repetition: outcome.evidence.repetition,
+      trackRoles: outcome.evidence.trackRoles,
+      transitionObservations: outcome.evidence.transitionObservations,
+      pulledAt: outcome.evidence.pulledAt,
     },
     ctx.assumptions,
   );

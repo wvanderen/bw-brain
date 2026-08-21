@@ -1,6 +1,8 @@
 import type { ApprovalRequest } from "../proposals/approval-store.js";
 import type { ProposalRevision, ProposalScope } from "../proposals/proposal-store.js";
 import { PiRuntimeFailure } from "../sessions/pi-runtime.js";
+import { renderArrangementReview, renderArrangementReviewHint } from "../transforms/arrangement-review-render.js";
+import type { ArrangementReviewOutcome } from "../query/query-server.js";
 
 type DispatchResult = { ok: true; armedPhrase?: object } | { ok: false; error: string } | object;
 type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_proposal_required" | "analysis_failed";
@@ -8,6 +10,14 @@ type Dependencies = {
   requireConfirmedScope(connectionId: string, scope: ProposalScope): Promise<ProposalScope>;
   resolveAnalysisContext(scope: ProposalScope): Promise<unknown>;
   analyze(request: ProposalScope & { prompt: string; context: unknown }): Promise<void>;
+  /**
+   * 04.3-02: deterministic arrangement review evidence (RB-03/RB-05/UX-03).
+   * Implemented in boot via assembleArrangementReviewEvidence — the shared
+   * transport-free evidence assembly from query-server.ts (single source;
+   * analyzer logic never duplicated). Optional: an unwired dependency
+   * refuses not_implemented rather than guessing.
+   */
+  reviewArrangement?(request: { scope: ProposalScope; refresh: boolean }): Promise<ArrangementReviewOutcome>;
   getProposal(proposalId: string, revision?: number): ProposalRevision | undefined;
   issueApproval(proposal: ProposalRevision): object;
   consumeApproval(request: ApprovalRequest): Promise<DispatchResult>;
@@ -51,6 +61,31 @@ export class ActionDispatch {
         this.deps.reportAnalysisFailure?.({ requestId, code });
         return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "error", error: code });
       }
+    }
+    if (message.type === "arrangement.review") {
+      // 04.3-02: deterministic, provider-free arrangement review (RB-05 —
+      // the analyze/Pi dependency is NEVER invoked on this path; Pitfall 1).
+      // Mirrors the analysis.request bracketing: analysis.status running →
+      // conversation.chunk 0..N-1 → analysis.complete ok (T-04.3-08: sequences
+      // stay 0..65535 — the render input is the bounded five-dimension payload,
+      // the slice is a defensive cap).
+      const requestId = String(message.requestId ?? "");
+      if (!this.deps.reviewArrangement) return this.deps.sendTo(connectionId, { type: "action.error", error: "not_implemented" });
+      this.deps.sendTo(connectionId, { type: "analysis.status", requestId, status: "running", scope });
+      const outcome = await this.deps.reviewArrangement({ scope, refresh: message.refresh === true });
+      if (outcome.kind === "refusal") {
+        // Disconnected + refresh is a hard refusal (state_disconnected) — one
+        // action.error, zero chunks (T-04.3-05; mirrors handleArrangeCurrentSection).
+        return this.deps.sendTo(connectionId, { type: "action.error", error: outcome.reason });
+      }
+      const texts = outcome.kind === "no-snapshot"
+        ? [renderArrangementReviewHint()]
+        : renderArrangementReview(outcome.evidence);
+      let delivered = true;
+      texts.slice(0, 65_536).forEach((text, sequence) => {
+        delivered = this.deps.sendTo(connectionId, { type: "conversation.chunk", requestId, sequence, text }) && delivered;
+      });
+      return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "ok" }) && delivered;
     }
     const proposalId = String(message.proposalId ?? ""), revision = Number(message.revision);
     const proposal = this.deps.getProposal(proposalId, revision);

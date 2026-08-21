@@ -69,7 +69,15 @@ import { ProposalDispatch } from "../proposals/proposal-dispatch.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
-import { saveArrangementSnapshot } from "../state/arrangement-snapshot.js";
+import { saveArrangementSnapshot, loadArrangementSnapshot, type ArrangementSnapshot } from "../state/arrangement-snapshot.js";
+// Phase 04.3 Plan 04.3-02 — shared arrangement review evidence assembly (single source).
+import {
+  assembleArrangementReviewEvidence,
+  refreshArrangementSnapshot,
+  type ArrangementReviewOutcome,
+} from "../query/query-server.js";
+import type { ProposalScope } from "../proposals/proposal-store.js";
+import type { Assumption } from "../state/analyzer-registry.js";
 
 /** The daemon's protocol version. Matches bridge LineJson.VERSION (LineJson.java:25). */
 export const OUR_VERSION = "1.0";
@@ -134,6 +142,155 @@ export function selectedClipAnalysisContext(expectedClipSid: string | undefined,
     return { key: note.key as string, pitch: note.pitch as number, start: note.start as number, length: note.length as number, velocity: note.velocity as number };
   });
   return { selectedClip: { clipSid: expectedClipSid, notes } };
+}
+
+/** Options for {@link createArrangementReviewDependency} (04.3-02 Task 2). */
+export interface ArrangementReviewDependencyOptions {
+  /** Path to .bw-brain/arrangement-snapshot.json (absent → not_implemented). */
+  arrangementSnapshotPath?: string;
+  /** Path to .bw-brain/roles.json (refresh persists classifications). */
+  rolesPath?: string;
+  intent: () => ProjectIntent | null;
+  /** Freshness source (the watchdog) — drives the disconnected+refresh refusal. */
+  freshness: () => "live" | "stale" | "disconnected";
+  /** The existing daemon→bridge get.launcher_clips pull (CLI refresh semantics). */
+  pullLauncherGrid: () => Promise<unknown>;
+}
+
+/**
+ * 04.3 / 04.3-02 Task 2 — the injected arrangement review dependency consumed
+ * by ActionDispatch's arrangement.review branch (RB-03/RB-05/UX-03 daemon
+ * half). Loads the durable snapshot (or pulls fresh when refresh is requested
+ * while connected — mirroring the CLI arrange.* refresh semantics exactly),
+ * then delegates to assembleArrangementReviewEvidence: the shared
+ * transport-free evidence assembly from query-server.ts (single source).
+ *
+ * Scope gating is NOT repeated here — ActionDispatch's confirmed-scope gate
+ * has already run before this dependency is invoked.
+ */
+export function createArrangementReviewDependency(
+  options: ArrangementReviewDependencyOptions,
+): (request: { scope: ProposalScope; refresh: boolean }) => Promise<ArrangementReviewOutcome> {
+  return async (request) => {
+    void request.scope; // evidence is snapshot-scoped; peer scope gating happened in ActionDispatch
+    if (!options.arrangementSnapshotPath) return { kind: "refusal", reason: "not_implemented" };
+    const freshness = options.freshness();
+    // A fresh pull needs the bridge — hard-refuse instead of guessing from a
+    // possibly-stale grid while disconnected (T-04.3-05 / Pitfall 5).
+    if (freshness === "disconnected" && request.refresh) return { kind: "refusal", reason: "state_disconnected" };
+    let snap: ArrangementSnapshot | null = null;
+    try {
+      snap = await loadArrangementSnapshot(options.arrangementSnapshotPath);
+    } catch (e) {
+      // An unreadable snapshot degrades to the honest no-snapshot outcome —
+      // the deterministic review path never throws across the peer boundary.
+      console.error("[boot] arrangement snapshot load failed:", (e as Error).message);
+    }
+    if (request.refresh) {
+      snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: options.pullLauncherGrid,
+        arrangementSnapshotPath: options.arrangementSnapshotPath,
+        rolesPath: options.rolesPath,
+        intent: options.intent(),
+      });
+    }
+    return assembleArrangementReviewEvidence({
+      snap,
+      intent: options.intent(),
+      freshness,
+      refresh: request.refresh,
+      snapshotConfigured: true,
+    });
+  };
+}
+
+/** The bounded arrangement evidence object resolveAnalysisContext enriches Analyze turns with (04.3-02). */
+export interface ArrangementAnalysisEvidence {
+  sections: Array<{ label: string; startScene: number; endScene: number }>;
+  energy: { bars: number; peak: number };
+  repetitionClusters: number;
+  trackRoles: Record<string, { role: string; confidence: number }>;
+  pulledAt: string | null;
+  assumptions: Assumption[];
+}
+
+/** Options for {@link loadArrangementAnalysisEvidence} (04.3-02 Task 2). */
+export interface ArrangementAnalysisEvidenceOptions {
+  arrangementSnapshotPath?: string;
+  intent: () => ProjectIntent | null;
+}
+
+/** Cap the enrichment so an explicit Analyze turn stays bounded (RB-05: bounded confirmed context only). */
+const MAX_ANALYSIS_EVIDENCE_ENTRIES = 64;
+
+/**
+ * 04.3 / 04.3-02 Task 2 — load a BOUNDED arrangement-derived evidence object
+ * for explicit Analyze turns (resolveAnalysisContext enrichment). Built on
+ * the shared evidence assembly (single source); carries a pulledAt assumption
+ * when a snapshot exists and an explicit no-snapshot assumption when it does
+ * not (UX-06 discipline). Never throws — the Analyze turn is not hostage to
+ * arrangement-file problems; degradation is logged + assumed.
+ *
+ * The Pi create_proposal-per-turn contract is untouched (T-04.3-09): this
+ * only widens the context object the daemon hands to its own Pi runtime.
+ */
+export async function loadArrangementAnalysisEvidence(
+  options: ArrangementAnalysisEvidenceOptions,
+): Promise<{ arrangement: ArrangementAnalysisEvidence }> {
+  const noSnapshot = (claim: string): { arrangement: ArrangementAnalysisEvidence } => ({
+    arrangement: {
+      sections: [],
+      energy: { bars: 0, peak: 0 },
+      repetitionClusters: 0,
+      trackRoles: {},
+      pulledAt: null,
+      assumptions: [{ claim, confidence: 1.0, source: "default" }],
+    },
+  });
+  try {
+    if (!options.arrangementSnapshotPath) {
+      return noSnapshot("arrangement analysis not configured on this daemon");
+    }
+    let snap: ArrangementSnapshot | null = null;
+    try {
+      snap = await loadArrangementSnapshot(options.arrangementSnapshotPath);
+    } catch (e) {
+      console.error("[boot] analysis-context arrangement snapshot load failed:", (e as Error).message);
+    }
+    const outcome = assembleArrangementReviewEvidence({
+      snap,
+      intent: options.intent(),
+      freshness: "live", // enrichment never pulls + never refresh-refuses (refresh: false)
+      refresh: false,
+      snapshotConfigured: true,
+    });
+    if (outcome.kind !== "evidence") {
+      return noSnapshot("no arrangement snapshot loaded — run a review with refresh to pull the grid");
+    }
+    const { evidence } = outcome;
+    const trackRoles: ArrangementAnalysisEvidence["trackRoles"] = {};
+    for (const [trackSid, role] of Object.entries(evidence.trackRoles).slice(0, MAX_ANALYSIS_EVIDENCE_ENTRIES)) {
+      trackRoles[trackSid] = { role: role.role, confidence: role.confidence };
+    }
+    return {
+      arrangement: {
+        sections: evidence.sections
+          .slice(0, MAX_ANALYSIS_EVIDENCE_ENTRIES)
+          .map((s) => ({ label: s.label, startScene: s.startScene, endScene: s.endScene })),
+        energy: {
+          bars: evidence.energyCurve.length,
+          peak: evidence.energyCurve.reduce((max, p) => Math.max(max, p.value), 0),
+        },
+        repetitionClusters: evidence.repetition.length,
+        trackRoles,
+        pulledAt: evidence.pulledAt,
+        assumptions: [evidence.assumptions.at(-1) ?? { claim: "derived from the arrangement snapshot", confidence: 1.0, source: "default" }],
+      },
+    };
+  } catch (e) {
+    console.error("[boot] analysis-context arrangement enrichment failed:", (e as Error).message);
+    return noSnapshot("arrangement evidence unavailable (load failed)");
+  }
 }
 
 /** Options for {@link boot}. */
@@ -461,8 +618,25 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     resolveAnalysisContext: async (scope) => ({
       project: lastState?.project ?? { ...DEFAULT_PROJECT },
       ...selectedClipAnalysisContext(scope.clipSid, await correlator.send("get.selected_clip")),
+      // 04.3-02 (RB-03): explicit Analyze turns gain bounded arrangement
+      // evidence (pulledAt assumption when present, explicit no-snapshot
+      // assumption when absent). The Pi prompt + create_proposal-per-turn
+      // contract are untouched (T-04.3-09).
+      ...(await loadArrangementAnalysisEvidence({ arrangementSnapshotPath, intent: () => intent })),
     }),
     analyze: async (request) => { await sessions.connect(request.projectId, request.instanceId); await sessions.analyze(request); },
+    // 04.3-02 (RB-03/RB-05/UX-03): the deterministic provider-free review —
+    // reuses the already-wired arrangementSnapshotPath + pullLauncherGrid deps
+    // and the query-server shared evidence assembly. Validated arrangement.review
+    // peer messages reach this branch through the existing routing chain
+    // (sessionActions fallthrough → actions.dispatch).
+    reviewArrangement: createArrangementReviewDependency({
+      arrangementSnapshotPath,
+      rolesPath,
+      intent: () => intent,
+      freshness: () => watchdog.tick(),
+      pullLauncherGrid: () => correlator.send("get.launcher_clips"),
+    }),
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),
     consumeApproval: (request) => proposalDispatch.consume(request),
