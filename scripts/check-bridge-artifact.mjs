@@ -83,6 +83,7 @@ const ARTIFACT_PATH = process.env.ARTIFACT_PATH_OVERRIDE
 const SOURCE_PATHS = [
   "bridge/src/main/java/com/bwbrain/bridge/BridgeDefinition.java",
   "bridge/src/main/java/com/bwbrain/bridge/BridgeExtension.java",
+  "bridge/src/main/java/com/bwbrain/bridge/BankSyncWait.java",
   "bridge/src/main/java/com/bwbrain/bridge/ClipSid.java",
   "bridge/src/main/java/com/bwbrain/bridge/LineJson.java",
   "bridge/src/main/java/com/bwbrain/bridge/LauncherGridWalker.java",

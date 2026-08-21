@@ -502,6 +502,47 @@ public final class PullHandlers {
         }
         final TrackBank trackBank = observers.getTrackBank();
 
+        // Phase 4 Plan 04.3-06 (04.3 gap closure / DEFECT A bridge half) —
+        // SYNC-BEFORE-WALK. The 2026-08-21 live UAT proved the FIRST pull
+        // after connect completes fast against UNSYNCED banks (empty
+        // trackSids, all 128 cells hasContent:false → poisoned snapshot),
+        // while later populated-but-slower walks exceeded the daemon's 3000ms
+        // pull timeout and were dropped by the correlator. Block here until
+        // the bank-observation burst settles (threshold OR quiet, capped at
+        // 5s), so walkGrid reads populated caches.
+        //
+        // minExpectedObservations derives from the same constants that size
+        // the banks: BANK_SIZE track-name observers + SCENE_COUNT scene-name
+        // observers + BANK_SIZE×SCENE_COUNT hasContent observers (8+16+128 =
+        // 152 at the BridgeExtension sizing).
+        //
+        // Why post-walk re-stamping of trackSids is deliberately NOT done:
+        // ClipSid.derive pins each cell's clipSid hash to the trackSid
+        // captured when the walker entered the row (used during DRAINING), so
+        // rewriting row trackSids after the walk would desynchronize row
+        // identity from cell clipSids. The honest mechanism is
+        // settle-before-walk (here) plus the daemon-side refuse-to-persist
+        // write gate from Plan 04.3-07 — layered defense: if the sync budget
+        // expires, this walk still proceeds (never hangs, never throws into
+        // the void) and answers an incomplete grid AS-IS for the daemon to
+        // refuse downstream.
+        //
+        // Steady-state cost: on a settled bank the wait returns immediately
+        // (threshold met, or lastBankObservationAt is old so the quiet check
+        // passes on the first poll with 0 waited) — repeated pulls pay no
+        // latency.
+        final int minExpectedBankObservations = observers.getBankSize()
+                + observers.getSceneBankSize()
+                + (observers.getBankSize() * observers.getSceneBankSize());
+        BankSyncWait.awaitSettled(
+                System::currentTimeMillis,
+                observers::getBankObservationCount,
+                observers::getLastBankObservationAt,
+                minExpectedBankObservations,
+                BankSyncWait.BANK_SYNC_SETTLE_MS,
+                BankSyncWait.BANK_SYNC_MAX_WAIT_MS,
+                Thread::sleep);
+
         // Ready-signal: per-cell CountDownLatch published to Observers via
         // setWalkerReadyLatch; the loopLength observer (wired once in register)
         // counts it down on fire. Observers.clearWalkerReadyLatch guards against
