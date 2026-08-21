@@ -252,13 +252,31 @@ export async function loadArrangementSnapshot(path: string): Promise<Arrangement
 /**
  * Atomically save `<project>/.bw-brain/arrangement-snapshot.json`.
  *
- * Writes via {@link atomicWriteJson} (POSIX temp+rename on the same filesystem).
- * A crash mid-write leaves either the old or the new file, NEVER a half-written
- * one (T-04-06 tampering defense). The parent directory is auto-created.
+ * 04.3 / 04.3-07 (DEFECT B): the write path is a SCHEMA GATE — the snapshot is
+ * validated against the module's compile-once {@link validateSnapshot} BEFORE
+ * {@link atomicWriteJson} runs. A schema-invalid snapshot (e.g. a raced
+ * launcher grid with an empty trackSid) is rejected without touching disk, so
+ * the previous file — if any — survives atomically. Callers treat a rejection
+ * as a FAILED refresh/pull (query-server returns null; boot logs and
+ * continues), never as a crash and never as license to render the invalid
+ * grid from memory.
+ *
+ * Valid writes go via {@link atomicWriteJson} (POSIX temp+rename on the same
+ * filesystem): a crash mid-write leaves either the old or the new file, NEVER
+ * a half-written one (T-04-06 tampering defense). The parent directory is
+ * auto-created.
+ *
+ * @throws Error("arrangement-snapshot.json save rejected: ...") when `snap`
+ *   fails schema validation. The thrown message carries the stringified Ajv
+ *   errors + the path (mirroring loadArrangementSnapshot's error shape so both
+ *   surfaces are inspectable).
  *
  * @example
  * await saveArrangementSnapshot(".bw-brain/arrangement-snapshot.json", snap);
  */
 export async function saveArrangementSnapshot(path: string, snap: ArrangementSnapshot): Promise<void> {
+  if (!validateSnapshot(snap)) {
+    throw new Error(`arrangement-snapshot.json save rejected: ${JSON.stringify(validateSnapshot.errors)} (${path})`);
+  }
   await atomicWriteJson(path, snap);
 }

@@ -1047,11 +1047,16 @@ export async function refreshArrangementSnapshot(
     if (f.field === "trackRoles") derived.trackRoles = f.value as NonNullable<ArrangementSnapshot["derived"]>["trackRoles"];
   }
   snap.derived = derived;
-  // Persist the snapshot + roles.json (atomic temp+rename).
+  // Persist the snapshot + roles.json (atomic temp+rename). 04.3-07 (DEFECT B):
+  // the save is a schema gate — a rejected (schema-invalid) grid makes this a
+  // FAILED refresh. Return null immediately (no in-memory fallback render of
+  // the invalid grid) and skip roles.json entirely (a rejected grid must not
+  // leak derived roles either).
   try {
     await saveArrangementSnapshot(arrangementSnapshotPath, snap);
   } catch (e) {
     console.error("[query-server] arrange.refresh saveArrangementSnapshot failed:", (e as Error).message);
+    return null;
   }
   if (rolesPath && derived.trackRoles) {
     try {
@@ -1315,7 +1320,10 @@ async function handleArrangeRefresh(
     safeSendOk(
       deps.transport,
       freshness,
-      { ok: false, sceneCount: 0, trackCount: 0, error: "get.launcher_clips pull failed" },
+      // 04.3-07: broadened from "get.launcher_clips pull failed" — the null
+      // branch now also covers a schema-rejected save (DEFECT B). Failure-path
+      // string only; all ok:true payloads stay byte-identical (04.3-02 parity).
+      { ok: false, sceneCount: 0, trackCount: 0, error: "get.launcher_clips pull failed or snapshot save rejected" },
       assumptions,
     );
     return;
