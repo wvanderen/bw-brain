@@ -267,13 +267,24 @@ Plans:
   4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
   5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
 
-**Plans:** TBD
+**Plans:** 5
 **UI hint:** yes
 **Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
 
 Plans:
+**Wave 1** *(parallel — zero file overlap)*
 
-- [ ] TBD (run `$gsd-plan-phase 04.3` to break down)
+- [ ] 04.3-01-PLAN.md — Documentation/operator reconciliation: regenerate generated agent instructions from rebaselined sources (incl. STACK.md source-row supersession), pi-pack README dated supersession, provider-policy + arrangement operator notes, historical-seed annotation, wired stale-phrase doc gate, CLI regression proof (RB-01, RB-02, RB-05 docs)
+- [ ] 04.3-02-PLAN.md — Daemon arrangement review path: additive arrangement.review frozen-schema member + golden negatives, pure bounded chunk-text render module (pure + advisory), transport-free evidence assembly extraction (CLI wire unchanged), confirmed-scope dispatch branch emitting conversation.chunk with zero Pi involvement, resolveAnalysisContext enrichment (RB-03, RB-05, UX-03 daemon half)
+- [ ] 04.3-05-PLAN.md — Phase 5 implementation contract: code-grounded DOWNSTREAM-PLAN-NOTES naming the patch-schema automation-operation gap, device-chain reads, preview-edit enums, and mandatory reuse of verified authority seams (RB-04)
+
+**Wave 2** *(blocked on Wave 1 — C++ encoder consumes the 04.3-02 schema contract)*
+
+- [ ] 04.3-03-PLAN.md — CLAP readable presentation: conversation_ Label→TextEditor with the live-verified e8887b4 drawer configuration, diff-guarded scroll-retaining updates, chunk append/reset reducer with fail-closed bounds, hosted Review button + arrangementReview encoder arm (UX-03, RB-03 native half)
+
+**Wave 3** *(blocked on Waves 1+2 — the joined flow is the acceptance surface)*
+
+- [ ] 04.3-04-PLAN.md — Legacy 04-UAT classification (additive-only, committed) + focused 04.3-UAT ledger + blocking live Bitwig arrangement UAT (autonomous: false) (RB-03, UX-03 acceptance)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
