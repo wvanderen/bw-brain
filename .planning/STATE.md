@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 04.3
 current_phase_name: CLAP-First Product Rebaseline (INSERTED
-status: executing
-stopped_at: Completed 04.3-03-PLAN.md
-last_updated: "2026-08-21T19:29:35.748Z"
+status: verifying
+stopped_at: "Completed 04.3-04-PLAN.md (live UAT verdict recorded: detection failed, defects A/B/C to gap closure)"
+last_updated: "2026-08-21T22:20:41.693Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 04.3 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 50
-  completed_plans: 47
+  completed_plans: 48
   percent: 67
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-20)
 
 Phase: 04.3 (CLAP-First Product Rebaseline (INSERTED)) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-21 — Phase 04.3 execution started
 
 Progress: [█████████░] 43/44 defined plans complete; Phase 04.3 and Phase 5 unplanned
@@ -95,6 +95,7 @@ Progress: [█████████░] 43/44 defined plans complete; Phase 0
 | Phase 04.3 P02 | 20 min | 2 tasks | 10 files |
 | Phase 04.3 P05 | 8min | 1 tasks | 1 files |
 | Phase 04.3 P03 | 12 min | 2 tasks | 5 files |
+| Phase 04.3 P04 | 2h 45m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.3 P03] ConversationChunkReceived UiEvent keeps chunk append/reset + lastChunkRequestId/lastChunkSequence bookkeeping atomic inside the copy-on-write reducer — no decoder-side TOCTOU; bounds fail closed (requestId non-empty, sequence 0-65535, text <=512)
 - [Phase ?]: [Phase 04.3 P03] analysis.complete ok preserves accumulated chunk text only when its requestId matches the accumulated chunk request; ok-without-chunks and error/aborted paths keep existing surfacing verbatim
 - [Phase ?]: [Phase 04.3 P03] Review is a hosted button command enqueuing arrangementReview(scope, refresh=true) per the locked local-first decision — never an automatable parameter (T-04.3-12); conversation readability via wrap+scroll in unchanged bounds, never editor widening
+- [Phase ?]: [Phase 04.3 P04] UAT verdict recorded honestly as failed (11/12 rows pass; detection row failed): RB-03/UX-03 stay open until defects A/B/C are gap-closed and row 1 re-run live — approval withheld, platform discipline intact.
+- [Phase ?]: [Phase 04.3 P04] Detection failure attributed to pre-existing bridge/daemon defect chain (A: launcher grid pull race/3000ms timeout with dropped late responses; B: schema-invalid snapshot persisted unvalidated; C: unhandled loadArrangementSnapshot throw crashes daemon on arrange.review) — NOT the new CLAP path; clip-level Analyze through the same editor produced a correct existing_edit proposal.
+- [Phase ?]: [Phase 04.3 P04] Legacy 04-UAT.md classified additive-only (rows 1-4, 6-14 retained-CLI; row 5 superseded-UI; zero product-gap) and committed — acceptance history classified, never falsified; 04.3-UAT.md replaces the obsolete external-Pi /review acceptance surface.
 
 ### Pending Todos
 
@@ -202,6 +206,7 @@ Recent decisions affecting current work:
 - [Phase 04.3]: The CLAP editor is the primary producer UX; Pi is daemon-managed and headless; the CLI remains the stable secondary automation, diagnostic, and recovery contract.
 - [Phase 04.3]: Local-first means DAW authority, raw state, persistence, and mutation remain local; explicit reasoning may use a local or remote provider with bounded confirmed context, never raw audio.
 - [Phase 04.3]: Phase 4 arrangement analyzers are retained, while external Pi `/review` UI acceptance is superseded by a CLAP-native arrangement review and proposal flow.
+- [Phase 04.3 — OPEN, routes to /gsd-plan-phase 4.3 --gaps] Live arrangement UAT (2026-08-21) failed row 1: every detection dimension empty. DEFECT A (bridge/daemon): get.launcher_clips walk races bank sync and exceeds the 3000ms pull timeout — snapshot has empty trackSids (tracks 4-7) and all 128 cells hasContent:false; late bridge responses dropped by correlator. DEFECT B (daemon): snapshot write path persists schema-invalid content (no save validation). DEFECT C (daemon): loadArrangementSnapshot throw unhandled on the arrange.review path — one bad snapshot file crashes the daemon (arrangement-snapshot.ts:246, query-server.ts:1114/1208; boot resilient, query fatal). RB-03/UX-03 acceptance blocked on closure + live re-run.
 
 ### Roadmap Evolution
 
@@ -220,6 +225,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-21T19:29:35.742Z
-Stopped at: Completed 04.3-03-PLAN.md
+Last session: 2026-08-21T22:20:29.835Z
+Stopped at: Completed 04.3-04-PLAN.md (live UAT verdict recorded: detection failed, defects A/B/C to gap closure)
 Resume file: None
