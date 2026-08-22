@@ -15,7 +15,8 @@
 //     {transport playing | stopped} × {automation-write armed | not armed}
 //     (arranger-arm vs launcher-arm are distinguished in every state line)
 //   Each QUALIFYING transport/write-mode transition (play/stop, arm toggles)
-//   executes the next queued write step against cursorDevice.getParameter(0):
+//   executes the next queued write step against remote-page knob 0
+//   (device-site createCursorRemoteControlsPage — e.g. Surge XT "M1"):
 //     value-before → touch(true) → {set | setImmediately | setRaw} →
 //     touch(false) → value-after.
 //   The three variants cycle with DISTINCT target values (set=0.75,
@@ -239,7 +240,7 @@ function registerRemotePageObservers(siteLabel, pageFactory, cache) {
     (function (idx) {
       var p = null;
       try { p = page.getParameter(idx); } catch (e) { return; }
-      cache[idx] = { exists: 0, name: "" };
+      cache[idx] = { exists: 0, name: "", param: p };
       try {
         p.exists().addValueObserver(function (has) {
           cache[idx].exists = has ? 1 : 0;
@@ -296,7 +297,10 @@ function cellLabel() {
   return play + "/" + arm;
 }
 
-// ---- One queued matrix step against cursorDevice.getParameter(0) -------------
+// ---- One queued matrix step against remote-page knob 0 (live 2026-08-22:
+// cursorDevice.getParameter(0) HARD-THROWS "deprecated since API version 2"
+// in the JS API — the remote-controls page is the only live write surface;
+// Surge XT page knob 0 = "M1", exists=1, verified live) ----------------------
 function readValue(p) {
   // Probe BOTH accessors: plan/RESEARCH cite value().get(); SettableRangedValue
   // also exposes get() directly. Record which one actually worked — once.
@@ -329,8 +333,12 @@ function runNextStep() {
   var variant = STEP_VARIANTS[stepIndex % STEP_VARIANTS.length];
   var target = STEP_VALUES[stepIndex % STEP_VALUES.length];
   var p = null;
-  try { p = cursorDevice.getParameter(0); } catch (e) {
-    host.println(LOG + " STEP#" + (stepIndex + 1) + " ABORT getParameter(0) threw: " + e);
+  var slot = deviceSiteParams[0];
+  if (slot && slot.param && slot.exists === 1) { p = slot.param; }
+  else if (slot && slot.param) { p = slot.param; } // exists() lagged — still attempt
+  if (!p) {
+    host.println(LOG + " STEP#" + (stepIndex + 1) + " ABORT remote-page knob 0 " +
+      "unavailable — select a device with macros (e.g. Surge XT) first");
     return;
   }
   var before = readValue(p);
