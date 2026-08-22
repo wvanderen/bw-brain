@@ -202,7 +202,7 @@ issues a labelled edit so the user can revert.
 > human-verify).** Every `Observed:` field in this subsection is filled ONLY
 > from the producer's live Bitwig session (Bitwig Studio 6.0.11, THROWAWAY
 > project, third-party VST/AU on the selected track) via the script
-> `spike/automation-write-probe.js` (throwaway — threat T-05-05; nothing
+> `spike/automation-write-probe.control.js` (throwaway — threat T-05-05; nothing
 > imports it). Nothing is inferred; cells the human does not exercise are
 > recorded as **UNVERIFIED**, never guessed.
 
@@ -305,7 +305,7 @@ track follow bank scrolls? 8-remote-parameters-per-page confirmed?
 ### Parameter indexing probe (AUTO-04 / A2) — 2026-08-22 (template prepared; results PENDING)
 
 > **Status: PENDING live probe — Phase 5 Plan 05-02 Task 2.** Filled only from
-> the producer's live session via `spike/automation-write-probe.js`
+> the producer's live session via `spike/automation-write-probe.control.js`
 > (`WALK …` log lines: `getParameter(0..127)` walk with `exists()`-termination
 > on the selected VST/AU).
 

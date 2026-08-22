@@ -1,5 +1,5 @@
 // =============================================================================
-// spike/automation-write-probe.js — THROWAWAY Bitwig controller script (JsApi).
+// spike/automation-write-probe.control.js — THROWAWAY Bitwig controller script (JsApi).
 // =============================================================================
 // Phase 5 Plan 05-02 Task 1 (D-05-05/D-05-06 LOCKED live probe — gates the
 // entire write wave). This file lives under spike/ precisely so its throwaway
@@ -51,7 +51,14 @@
 //   4. After the last step: stop. Report per-cell observations.
 // =============================================================================
 
-loadAPI(1);
+// loadAPI(21): the Phase-1 spike ran loadAPI(1), but this probe calls surfaces
+// the host gates behind newer API versions (live 2026-08-22 error: "This
+// cannot be called when specifying API version 1. This is only available for
+// APIs after version 2" — host.createCursorDevice(), CursorTrack.channel(),
+// createCursorRemoteControlsPage, Transport automation-write observers).
+// 21 matches the extension-api the production Java bridge builds against and
+// has proven live in this exact Bitwig build (bridge/pom.xml).
+loadAPI(21);
 
 // Fresh UUID — deliberately distinct from every prior bw-brain extension
 // (Phase-1 SpikeProbe used adffe628-…; the production bridge has its own).
