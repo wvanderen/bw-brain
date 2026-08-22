@@ -240,7 +240,15 @@ function registerRemotePageObservers(siteLabel, pageFactory, cache) {
     (function (idx) {
       var p = null;
       try { p = page.getParameter(idx); } catch (e) { return; }
-      cache[idx] = { exists: 0, name: "", param: p };
+      cache[idx] = { exists: 0, name: "", param: p, value: null };
+      try {
+        // Live 2026-08-22: value().get() throws "Either call markInterested()
+        // or add at least one observer in init" unless interested. A value
+        // observer both marks interest AND caches the value for readback.
+        p.value().addValueObserver(function (v) {
+          cache[idx].value = v;
+        });
+      } catch (e0) { /* readValue falls back to cached/direct */ }
       try {
         p.exists().addValueObserver(function (has) {
           cache[idx].exists = has ? 1 : 0;
@@ -327,6 +335,11 @@ function readValue(p) {
   }
 }
 
+// Cached readback for the step target slot (observer-backed; never throws).
+function cachedSlotValue(slot) {
+  return (slot && typeof slot.value === "number") ? slot.value : "unknown";
+}
+
 function runNextStep() {
   stepTimerPending = false;
   if (!cursorDevice) { return; }
@@ -342,6 +355,7 @@ function runNextStep() {
     return;
   }
   var before = readValue(p);
+  if (String(before).indexOf("ERR:") === 0) { before = cachedSlotValue(slot) + "(cached)"; }
   var writeErr = "";
   try {
     p.touch(true);
@@ -354,6 +368,7 @@ function runNextStep() {
     try { p.touch(false); } catch (e2) { /* already failing */ }
   }
   var after = readValue(p);
+  if (String(after).indexOf("ERR:") === 0) { after = cachedSlotValue(slot) + "(cached)"; }
   stepIndex++;
   host.println(LOG + " STEP#" + stepIndex + " cell=" + cellLabel() +
     " variant=" + variant + " target=" + target +
