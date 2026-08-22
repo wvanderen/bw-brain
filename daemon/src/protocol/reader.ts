@@ -80,13 +80,16 @@ const validateEnvelope = ajv.getSchema(envelopeSchema.$id)!;
 // is unit-tested in schemas.test.ts ("Pitfall 1: OBSERVATIONAL_EVENT_TYPES ===
 // event.schema.json type enum") so the build fails on drift. Phase 2 froze the
 // 5-event set (selection.changed + track/clip/device.name_changed +
-// transport.changed); Plan 02 emits all 5 from the bridge.
+// transport.changed); Plan 02 emits all 5 from the bridge. Phase 5 (05-01) adds
+// parameter.changed (AUTO-01 observation spine) in the SAME commit as the
+// schema enum extension.
 export const OBSERVATIONAL_EVENT_TYPES: ReadonlySet<string> = new Set([
   "selection.changed",
   "track.name_changed",
   "clip.name_changed",
   "device.name_changed",
   "transport.changed",
+  "parameter.changed",
 ]);
 
 function isObservationalEvent(msg: unknown): boolean {

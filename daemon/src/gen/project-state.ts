@@ -47,6 +47,27 @@ export interface ProjectState {
         start?: number;
         length?: number;
       };
+      /**
+       * Automation-write state folded verbatim from transport.changed payloads (Phase 5, D-05-05) — the refusal-gate vocabulary for the automation apply path (05-05+).
+       */
+      automationWrite?: {
+        /**
+         * Arranger automation write armed.
+         */
+        arrangerWriteEnabled: boolean;
+        /**
+         * Launcher automation write armed.
+         */
+        launcherWriteEnabled: boolean;
+        /**
+         * An automation override is currently active.
+         */
+        overrideActive: boolean;
+        /**
+         * Transport automation write mode.
+         */
+        writeMode: "latch" | "touch" | "write";
+      };
     };
   };
   /**
@@ -94,4 +115,47 @@ export interface ProjectState {
    * @maxItems 0
    */
   automation?: [];
+  /**
+   * Phase 5 (AUTO-01/D-05-01): bounded per-parameter MOVEMENT AGGREGATES keyed by `${deviceKey}:${source}:${paramIndex}`, folded daemon-side from parameter.changed events. NEVER an event log — each entry is 8 bounded scalar fields (T-05-03) and the map is capped at 512 entries (the fold evicts the lowest-lastMovedAt entry; maxProperties mirrors the cap for defense in depth).
+   */
+  parameters?: {
+    [k: string]: {
+      /**
+       * Device identity key in the selected track's chain.
+       */
+      deviceKey: string;
+      /**
+       * Parameter index within the device (cursorDevice.getParameter(int) window).
+       */
+      paramIndex: number;
+      /**
+       * Optional human-readable parameter name.
+       */
+      paramName?: string;
+      /**
+       * Movement origin.
+       */
+      source: "device_parameter" | "remote_page";
+      /**
+       * Movements observed (incoming value differing from lastValue by more than 1e-4).
+       */
+      movementCount: number;
+      /**
+       * Latest observed normalized value.
+       */
+      lastValue: number;
+      /**
+       * Minimum observed value.
+       */
+      minValue: number;
+      /**
+       * Maximum observed value.
+       */
+      maxValue: number;
+      /**
+       * Unix-seconds timestamp of the last movement (drives lowest-lastMovedAt eviction).
+       */
+      lastMovedAt: number;
+    };
+  };
 }

@@ -1,6 +1,6 @@
 // daemon/src/ingest/fold-event.ts
 //
-// STATE-04 live operation — the PURE event -> RawState fold for the 5
+// STATE-04 live operation — the PURE event -> RawState fold for the 6
 // observational event types (RESEARCH.md Pattern 2 lines 463-492;
 // 02-PATTERNS.md Assignment 6 lines 261-297; Observers.java:83-162 the
 // exact payload each observer emits). This is the SECOND-stage ingest
@@ -18,7 +18,7 @@
 // leaves the prior state intact.
 //
 // ROBUSTNESS: an unknown event type returns the state unchanged. The
-// reader's Ajv envelope gate already constrains `type` to the 5 enum
+// reader's Ajv envelope gate already constrains `type` to the 6 enum
 // values (event.schema.json), so the default branch is unreachable in
 // practice — but defensive (a future event type added to the schema
 // without a fold branch should not crash the dispatcher).
@@ -28,8 +28,44 @@
 // payload; this fold writes it into selection.clipSid. Pre-fix bridges
 // (no clipSid in the payload) keep the documented NO-OP — see the
 // backward-compat branch in the case below.
+//
+// parameter.changed (Phase 5, 05-01 — AUTO-01/D-05-01/D-05-02): the fold
+// maintains state.parameters, a BOUNDED map of per-parameter MOVEMENT
+// AGGREGATES keyed by `${deviceKey}:${source}:${paramIndex}` — NEVER an
+// event log (Pitfall 5 / T-05-03: 8 bounded scalar fields, no value
+// arrays). A movement counts only when the incoming value differs from
+// the stored lastValue by more than MOVEMENT_EPSILON (1e-4). The map is
+// capped at PARAM_AGGREGATE_CAP (512) entries with lowest-lastMovedAt
+// eviction, so a parameter.changed flood can never grow state without
+// bound (T-05-01) — on top of the reader's existing drop-oldest
+// observational backpressure.
 
 import type { RawState, StableIdMap } from "../state/reconcile.js";
+
+/**
+ * A value delta must exceed this to count as a movement (D-05-01: observer
+ * fires with value delta > epsilon). 1e-4 absorbs float jitter from the
+ * bridge's normalized [0,1] parameter values without hiding real nudges.
+ */
+export const MOVEMENT_EPSILON = 1e-4;
+
+/**
+ * Hard cap on the parameters aggregate map (Pitfall 5 / T-05-01). Mirrors
+ * project-state.schema.json parameters.maxProperties (defense in depth: the
+ * fold evicts, the schema refuses anything larger).
+ */
+export const PARAM_AGGREGATE_CAP = 512;
+
+/** The per-source vocabulary of parameter.changed (event.schema.json `source`). */
+type ParamSource = "device_parameter" | "remote_page";
+
+/** The D-05-05 automation-write state object (event/project-state schemas). */
+interface AutomationWriteState {
+  arrangerWriteEnabled: boolean;
+  launcherWriteEnabled: boolean;
+  overrideActive: boolean;
+  writeMode: "latch" | "touch" | "write";
+}
 
 /**
  * Context the fold needs to resolve raw Bitwig slot indices to stable IDs.
@@ -51,8 +87,10 @@ export interface FoldContext {
  * a valid pure return: the caller's contract is `state = foldEvent(...)`).
  *
  * @param state  - the current RawState (read-only).
- * @param event  - one of the 5 observational events. `payload` is optional
+ * @param event  - one of the 6 observational events. `payload` is optional
  *   + permissive (event.schema.json's payload union); each branch narrows.
+ *   `timestamp` (optional here, required on the wire) feeds the parameter
+ *   aggregates' lastMovedAt clock.
  * @param ctx    - the {@link FoldContext} for slot -> sid resolution.
  * @returns the new RawState (or the same reference for no-op folds).
  *
@@ -61,7 +99,7 @@ export interface FoldContext {
  */
 export function foldEvent(
   state: RawState,
-  event: { type: string; payload?: Record<string, unknown> | undefined },
+  event: { type: string; payload?: Record<string, unknown> | undefined; timestamp?: unknown },
   ctx: FoldContext,
 ): RawState {
   const p = (event.payload ?? {}) as Record<string, unknown>;
@@ -138,24 +176,124 @@ export function foldEvent(
     }
 
     case "transport.changed": {
+      // Phase 5 (05-01): transport.changed may carry `playing` (Transport
+      // play observer) AND/OR the optional `automationWrite` object (D-05-05
+      // write-state observers — they fire independently of play state). An
+      // event carrying neither is a defensive no-op.
       const playing = typeof p.playing === "boolean" ? p.playing : undefined;
-      if (playing === undefined) return state;
+      const automationWrite = parseAutomationWrite(p.automationWrite);
+      if (playing === undefined && automationWrite === undefined) return state;
       const prevTransport = state.project.transport ?? {};
+      const nextTransport = { ...prevTransport };
+      if (playing !== undefined) nextTransport.playing = playing;
+      if (automationWrite !== undefined) nextTransport.automationWrite = automationWrite;
       return {
         ...state,
         project: {
           ...state.project,
-          transport: { ...prevTransport, playing },
+          transport: nextTransport,
         },
       };
     }
 
+    case "parameter.changed": {
+      // Phase 5 (05-01) — AUTO-01 observation spine. Defensive typeof guards
+      // mirror the device.name_changed branch (the reader's Ajv gate already
+      // constrains the payload; a malformed fold input must never crash the
+      // dispatcher).
+      const deviceKey = typeof p.deviceKey === "string" ? p.deviceKey : undefined;
+      const paramIndex = typeof p.paramIndex === "number" ? p.paramIndex : undefined;
+      const source: ParamSource | undefined =
+        p.source === "device_parameter" || p.source === "remote_page" ? p.source : undefined;
+      const value = typeof p.value === "number" ? p.value : undefined;
+      if (deviceKey === undefined || paramIndex === undefined || source === undefined || value === undefined) {
+        return state;
+      }
+      const paramName = typeof p.paramName === "string" ? p.paramName : undefined;
+      const ts = typeof event.timestamp === "number" ? event.timestamp : 0;
+
+      const key = `${deviceKey}:${source}:${paramIndex}`;
+      const prevMap = (state.parameters ?? {}) as NonNullable<RawState["parameters"]>;
+      const prev = prevMap[key];
+
+      let nextEntry;
+      if (prev === undefined) {
+        // First observation of this param — no prior to differ from, so this
+        // is NOT a movement (movementCount stays 0).
+        nextEntry = {
+          deviceKey,
+          paramIndex,
+          ...(paramName !== undefined ? { paramName } : {}),
+          source,
+          movementCount: 0,
+          lastValue: value,
+          minValue: value,
+          maxValue: value,
+          lastMovedAt: ts,
+        };
+      } else {
+        const moved = Math.abs(value - prev.lastValue) > MOVEMENT_EPSILON;
+        nextEntry = {
+          ...prev,
+          ...(paramName !== undefined ? { paramName } : {}),
+          movementCount: prev.movementCount + (moved ? 1 : 0),
+          lastValue: value,
+          minValue: Math.min(prev.minValue, value),
+          maxValue: Math.max(prev.maxValue, value),
+          lastMovedAt: moved ? ts : prev.lastMovedAt,
+        };
+      }
+
+      // Bounded map: cap PARAM_AGGREGATE_CAP entries, evicting the entry
+      // with the LOWEST lastMovedAt (Pitfall 5 / T-05-01 — stale params go
+      // first; actively-moved params survive).
+      let nextMap = { ...prevMap, [key]: nextEntry };
+      if (Object.keys(nextMap).length > PARAM_AGGREGATE_CAP) {
+        let stalestKey: string | undefined;
+        let stalestTs = Number.POSITIVE_INFINITY;
+        for (const [k, entry] of Object.entries(nextMap)) {
+          if (entry.lastMovedAt < stalestTs) {
+            stalestTs = entry.lastMovedAt;
+            stalestKey = k;
+          }
+        }
+        const { [stalestKey as string]: _evicted, ...rest } = nextMap;
+        nextMap = rest;
+      }
+      return { ...state, parameters: nextMap };
+    }
+
     default:
       // Unknown event type — defensive. The reader's envelope Ajv gate
-      // already constrains `type` to the 5 enum values (event.schema.json),
+      // already constrains `type` to the 6 enum values (event.schema.json),
       // so this is unreachable in practice.
       return state;
   }
+}
+
+/**
+ * Narrow an event-payload `automationWrite` value to the D-05-05 state
+ * object, or `undefined` when absent/malformed (defensive — the reader's
+ * Ajv gate already validated the shape; a malformed fold input no-ops
+ * rather than writing garbage state).
+ */
+function parseAutomationWrite(raw: unknown): AutomationWriteState | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const w = raw as Record<string, unknown>;
+  const arrangerWriteEnabled = typeof w.arrangerWriteEnabled === "boolean" ? w.arrangerWriteEnabled : undefined;
+  const launcherWriteEnabled = typeof w.launcherWriteEnabled === "boolean" ? w.launcherWriteEnabled : undefined;
+  const overrideActive = typeof w.overrideActive === "boolean" ? w.overrideActive : undefined;
+  const writeMode =
+    w.writeMode === "latch" || w.writeMode === "touch" || w.writeMode === "write" ? w.writeMode : undefined;
+  if (
+    arrangerWriteEnabled === undefined ||
+    launcherWriteEnabled === undefined ||
+    overrideActive === undefined ||
+    writeMode === undefined
+  ) {
+    return undefined;
+  }
+  return { arrangerWriteEnabled, launcherWriteEnabled, overrideActive, writeMode };
 }
 
 /**

@@ -9,13 +9,19 @@
  */
 export interface Event {
   version: string;
-  type: "selection.changed" | "track.name_changed" | "clip.name_changed" | "device.name_changed" | "transport.changed";
+  type:
+    | "selection.changed"
+    | "track.name_changed"
+    | "clip.name_changed"
+    | "device.name_changed"
+    | "transport.changed"
+    | "parameter.changed";
   /**
    * Unix-seconds, sender-originated. Required on every event.
    */
   timestamp: number;
   /**
-   * Event payload. Fields are a permissive union across the 5 observational event types (all optional). selection.changed carries trackId/clipId/deviceId (legacy identity) + slot (raw cursor position). *.name_changed carry name (+ slot for windowed-bank tracks). transport.changed carries playing. slot is a RAW Bitwig position index — NOT a stable id; the daemon computes STATE-04 fingerprints from it (Pitfall 2).
+   * Event payload. Fields are a permissive union across the 6 observational event types (all optional). selection.changed carries trackId/clipId/deviceId (legacy identity) + slot (raw cursor position). *.name_changed carry name (+ slot for windowed-bank tracks). transport.changed carries playing + the optional automationWrite object (D-05-05 write-state vocabulary). parameter.changed carries deviceKey/paramIndex/paramName?/source/value. slot is a RAW Bitwig position index — NOT a stable id; the daemon computes STATE-04 fingerprints from it (Pitfall 2).
    */
   payload?: {
     /**
@@ -40,5 +46,46 @@ export interface Event {
      * STATE-04 fingerprint of the clip (D-03 push). Populated by the bridge on every clip.name_changed event; the daemon folds this into selection.clipSid immediately. Pre-fix bridges omit it (backward-compat NO-OP in fold-event.ts).
      */
     clipSid?: string;
+    /**
+     * Device identity key for parameter.changed (Phase 5) — identifies the device in the selected track's chain whose parameter moved (D-05-02).
+     */
+    deviceKey?: string;
+    /**
+     * Parameter index within the device for parameter.changed (Phase 5) — the cursorDevice.getParameter(int) window (A1-NEGATED fallback surface).
+     */
+    paramIndex?: number;
+    /**
+     * Optional human-readable parameter name for parameter.changed (Phase 5).
+     */
+    paramName?: string;
+    /**
+     * Movement origin for parameter.changed (Phase 5): direct device parameter vs remote-controls page knob.
+     */
+    source?: "device_parameter" | "remote_page";
+    /**
+     * Normalized observed value [0,1] for parameter.changed (Phase 5). Scale conversion happens at the bridge boundary (Pitfall 6).
+     */
+    value?: number;
+    /**
+     * Automation-write state for transport.changed (Phase 5, D-05-05) — the refusal-gate vocabulary the daemon's automation apply path consumes (transport_stopped / automation_write_disabled / automation_override_active).
+     */
+    automationWrite?: {
+      /**
+       * Arranger automation write armed.
+       */
+      arrangerWriteEnabled: boolean;
+      /**
+       * Launcher automation write armed.
+       */
+      launcherWriteEnabled: boolean;
+      /**
+       * An automation override is currently active (e.g. a touched parameter fighting the envelope).
+       */
+      overrideActive: boolean;
+      /**
+       * Transport automation write mode.
+       */
+      writeMode: "latch" | "touch" | "write";
+    };
   };
 }

@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/protocol/request.schema.json",
   "title": "Request",
   "description": "A request message from client to bridge/daemon. id is REQUIRED (correlation key — echoed on the response). Frozen from docs/seed.md §Request example (get.selected_clip). $comment: payload is left open for parameterized requests in the spike; tighten in Phase 2 (Pitfall 4).",
-  "$comment": "Phase 1 freezes get.selected_clip only. Additional get.* requests land in Phase 2 (M1 read-only context). The id field is the request/response correlation key — required on every request, echoed on its response.",
+  "$comment": "Phase 1 freezes get.selected_clip only. Additional get.* requests land in Phase 2 (M1 read-only context). Phase 5 (05-01) adds get.project_meta (D-05-16 — tempo/time-signature pull; closes the daemon's tempo=120 default hole and supplies beatsPerBar for curve/bar math). The id field is the request/response correlation key — required on every request, echoed on its response.",
   "type": "object",
   "required": ["version", "type", "id"],
   "additionalProperties": false,
@@ -14,7 +14,7 @@
     },
     "type": {
       "type": "string",
-      "enum": ["get.selected_clip", "get.selected_device_chain", "get.project_summary", "get.launcher_clips"]
+      "enum": ["get.selected_clip", "get.selected_device_chain", "get.project_summary", "get.launcher_clips", "get.project_meta"]
     },
     "id": {
       "type": "string",

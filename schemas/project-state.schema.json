@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/project-state.schema.json",
   "title": "ProjectState",
   "description": "STATE-01 raw project-state contract. The daemon normalizes bridge snapshots into this shape; every RawState the daemon holds is valid against this schema. Source: docs/seed.md §A 'Raw project state' generalized into JSON Schema 2020-12 (RESEARCH.md §Code Examples 'raw-state schema seed').",
-  "$comment": "Phase 2 freezes the raw-state contract Plans 03/04/05 implement against. TRUST-SPINE: selection.trackSid/clipSid/deviceSid carry the ^trk_/^clip_/^dev_ fingerprint pattern (STATE-04) — a bare Bitwig slot index like 'trk_5' is structurally invalid (Pitfall 2 defense, RESEARCH.md lines 800-805). stateFreshness is optional HERE (the raw-state can be persisted without it) but REQUIRED on every cli-query result (result.schema.json) so SC#3 staleness surfaces to every CLI consumer. automation is reserved EMPTY in M1 (maxItems 0 — D-04: automation mirror deferred). additionalProperties:false at EVERY object level (PATTERNS.md Assignment 1).",
+  "$comment": "Phase 2 freezes the raw-state contract Plans 03/04/05 implement against. TRUST-SPINE: selection.trackSid/clipSid/deviceSid carry the ^trk_/^clip_/^dev_ fingerprint pattern (STATE-04) — a bare Bitwig slot index like 'trk_5' is structurally invalid (Pitfall 2 defense, RESEARCH.md lines 800-805). stateFreshness is optional HERE (the raw-state can be persisted without it) but REQUIRED on every cli-query result (result.schema.json) so SC#3 staleness surfaces to every CLI consumer. automation is reserved EMPTY in M1 (maxItems 0 — D-04: automation mirror deferred). additionalProperties:false at EVERY object level (PATTERNS.md Assignment 1). Phase 5 (05-01) adds the daemon-side observation extensions: parameters = BOUNDED per-parameter movement aggregates folded from parameter.changed events (AUTO-01/D-05-01 — maxProperties 512 mirrors the fold's eviction cap; aggregates only, NEVER an event log, T-05-03) and project.transport.automationWrite = the D-05-05 write-state vocabulary folded from transport.changed. Neither field is bridge-emitted — snapshots without them stay valid.",
   "type": "object",
   "required": ["version", "project", "selection"],
   "additionalProperties": false,
@@ -42,6 +42,18 @@
                 "enabled": { "type": "boolean" },
                 "start": { "type": "number" },
                 "length": { "type": "number" }
+              }
+            },
+            "automationWrite": {
+              "type": "object",
+              "description": "Automation-write state folded verbatim from transport.changed payloads (Phase 5, D-05-05) — the refusal-gate vocabulary for the automation apply path (05-05+).",
+              "additionalProperties": false,
+              "required": ["arrangerWriteEnabled", "launcherWriteEnabled", "overrideActive", "writeMode"],
+              "properties": {
+                "arrangerWriteEnabled": { "type": "boolean", "description": "Arranger automation write armed." },
+                "launcherWriteEnabled": { "type": "boolean", "description": "Launcher automation write armed." },
+                "overrideActive": { "type": "boolean", "description": "An automation override is currently active." },
+                "writeMode": { "enum": ["latch", "touch", "write"], "description": "Transport automation write mode." }
               }
             }
           }
@@ -98,6 +110,27 @@
       "items": { "type": "object" },
       "maxItems": 0,
       "description": "D-04: automation mirror is deferred to Phase 5 (AUTO-01). The slot is RESERVED EMPTY in M1 — maxItems 0 enforces this at the schema level so producers cannot leak automation data prematurely."
+    },
+    "parameters": {
+      "type": "object",
+      "maxProperties": 512,
+      "description": "Phase 5 (AUTO-01/D-05-01): bounded per-parameter MOVEMENT AGGREGATES keyed by `${deviceKey}:${source}:${paramIndex}`, folded daemon-side from parameter.changed events. NEVER an event log — each entry is 8 bounded scalar fields (T-05-03) and the map is capped at 512 entries (the fold evicts the lowest-lastMovedAt entry; maxProperties mirrors the cap for defense in depth).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["deviceKey", "paramIndex", "source", "movementCount", "lastValue", "minValue", "maxValue", "lastMovedAt"],
+        "properties": {
+          "deviceKey": { "type": "string", "minLength": 1, "description": "Device identity key in the selected track's chain." },
+          "paramIndex": { "type": "integer", "minimum": 0, "description": "Parameter index within the device (cursorDevice.getParameter(int) window)." },
+          "paramName": { "type": "string", "description": "Optional human-readable parameter name." },
+          "source": { "enum": ["device_parameter", "remote_page"], "description": "Movement origin." },
+          "movementCount": { "type": "integer", "minimum": 0, "description": "Movements observed (incoming value differing from lastValue by more than 1e-4)." },
+          "lastValue": { "type": "number", "minimum": 0, "maximum": 1, "description": "Latest observed normalized value." },
+          "minValue": { "type": "number", "minimum": 0, "maximum": 1, "description": "Minimum observed value." },
+          "maxValue": { "type": "number", "minimum": 0, "maximum": 1, "description": "Maximum observed value." },
+          "lastMovedAt": { "type": "number", "description": "Unix-seconds timestamp of the last movement (drives lowest-lastMovedAt eviction)." }
+        }
+      }
     }
   }
 }

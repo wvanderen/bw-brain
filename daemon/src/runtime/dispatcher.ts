@@ -9,10 +9,13 @@
 //                           branch is exercised by the smoke test's fake bridge
 //                           + a future bridge that does send hello.
 //   - "response"          : route to the correlator's pending get.* request.
-//   - the 5 event types   : PURE fold into the current RawState via foldEvent
+//   - the 6 event types   : PURE fold into the current RawState via foldEvent
 //                           (Task 1) + watchdog.onBridgeMessage + onSnapshot
 //                           hook (boot's DEBOUNCED persistence — Pitfall 3:
-//                           never sync disk I/O on the data path).
+//                           never sync disk I/O on the data path). Phase 5
+//                           (05-01) adds parameter.changed — the fold receives
+//                           the envelope's timestamp (the parameter aggregates'
+//                           lastMovedAt clock).
 //
 // The handler NEVER does sync disk I/O. The reader already drained heavy work
 // off the transport's data event via queueMicrotask (Pitfall 3); the
@@ -88,7 +91,12 @@ export interface DispatcherDeps {
  */
 export function createDispatcher(deps: DispatcherDeps): (msg: unknown) => void {
   return (msg: unknown): void => {
-    const envelope = msg as { type?: string; id?: string; payload?: Record<string, unknown> };
+    const envelope = msg as {
+      type?: string;
+      id?: string;
+      payload?: Record<string, unknown>;
+      timestamp?: unknown;
+    };
     const type = envelope?.type;
 
     try {
@@ -112,6 +120,7 @@ export function createDispatcher(deps: DispatcherDeps): (msg: unknown) => void {
         case "clip.name_changed":
         case "device.name_changed":
         case "transport.changed":
+        case "parameter.changed":
           handleEvent(deps, envelope);
           return;
 
@@ -155,7 +164,10 @@ function handleHello(deps: DispatcherDeps, envelope: { payload?: Record<string, 
 }
 
 /** Event fold branch: fold into current state, setState, watchdog, onSnapshot. */
-function handleEvent(deps: DispatcherDeps, envelope: { type?: string; payload?: Record<string, unknown> }): void {
+function handleEvent(
+  deps: DispatcherDeps,
+  envelope: { type?: string; payload?: Record<string, unknown>; timestamp?: unknown },
+): void {
   const cur = deps.getState();
   if (cur === null) {
     // No baseline to fold into yet — the snapshot pull is pending. Log +
@@ -167,7 +179,9 @@ function handleEvent(deps: DispatcherDeps, envelope: { type?: string; payload?: 
     summaryTracks: deps.summaryTracks(),
     stableIds: deps.stableIds,
   };
-  const next = foldEvent(cur, { type: envelope.type ?? "", payload: envelope.payload }, ctx);
+  // timestamp rides along for the parameter.changed fold (the aggregates'
+  // lastMovedAt clock); other branches ignore it.
+  const next = foldEvent(cur, { type: envelope.type ?? "", payload: envelope.payload, timestamp: envelope.timestamp }, ctx);
   deps.setState(next);
   deps.watchdog.onBridgeMessage();
   // The onSnapshot hook is the boot's DEBOUNCED persistence entry point

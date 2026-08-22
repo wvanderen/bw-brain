@@ -9,7 +9,12 @@
  */
 export interface Request {
   version: string;
-  type: "get.selected_clip" | "get.selected_device_chain" | "get.project_summary" | "get.launcher_clips";
+  type:
+    | "get.selected_clip"
+    | "get.selected_device_chain"
+    | "get.project_summary"
+    | "get.launcher_clips"
+    | "get.project_meta";
   /**
    * Request/response correlation id. REQUIRED on every request.
    */
