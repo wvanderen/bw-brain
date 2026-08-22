@@ -102,6 +102,7 @@ bool copyId(const std::string& value, std::array<char, Size>& destination) {
 
 std::atomic<std::uint64_t> analysisSequence{0};
 std::atomic<std::uint64_t> reviewSequence{0};
+std::atomic<std::uint64_t> deviceReviewSequence{0};
 
 }  // namespace
 
@@ -168,6 +169,17 @@ UiAction UiAction::arrangementReview(std::string projectId, std::string instance
   action.projectId = std::move(projectId); action.instanceId = std::move(instanceId);
   action.clipSid = std::move(clipSid); action.refresh = refresh;
   action.token = "review-" + std::to_string(reviewSequence.fetch_add(1, std::memory_order_relaxed) + 1);
+  return action;
+}
+
+// 05-09: the arrangementReview factory copied point-for-point (the additive-
+// member precedent) — device-review request tokens live in their own
+// sequence so arrangement + device requestIds never collide.
+UiAction UiAction::deviceReview(std::string projectId, std::string instanceId, std::string clipSid, bool refresh) {
+  UiAction action{.kind = Kind::deviceReview};
+  action.projectId = std::move(projectId); action.instanceId = std::move(instanceId);
+  action.clipSid = std::move(clipSid); action.refresh = refresh;
+  action.token = "device-review-" + std::to_string(deviceReviewSequence.fetch_add(1, std::memory_order_relaxed) + 1);
   return action;
 }
 
@@ -269,6 +281,15 @@ bool encodePeerAction(const UiAction& action, std::string& message) {
       if (!validPeerId(action.token) || !validPeerId(action.projectId) || !validPeerId(action.instanceId) ||
           (!action.clipSid.empty() && !validPeerId(action.clipSid))) return false;
       message = "{\"type\":\"arrangement.review\",\"requestId\":\"" + action.token + "\",\"scope\":" +
+                scopeJson(action.projectId, action.instanceId, action.clipSid) +
+                ",\"refresh\":" + (action.refresh ? "true" : "false") + "}";
+      return true;
+    // 05-09: the arrangementReview encode case copied point-for-point — only
+    // the wire type differs (device.review).
+    case UiAction::Kind::deviceReview:
+      if (!validPeerId(action.token) || !validPeerId(action.projectId) || !validPeerId(action.instanceId) ||
+          (!action.clipSid.empty() && !validPeerId(action.clipSid))) return false;
+      message = "{\"type\":\"device.review\",\"requestId\":\"" + action.token + "\",\"scope\":" +
                 scopeJson(action.projectId, action.instanceId, action.clipSid) +
                 ",\"refresh\":" + (action.refresh ? "true" : "false") + "}";
       return true;
