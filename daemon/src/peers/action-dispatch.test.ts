@@ -4,6 +4,7 @@ import { ActionDispatch } from "./action-dispatch.js";
 import type { ArrangementReviewEvidence, ArrangementReviewOutcome } from "../query/query-server.js";
 
 const reviewEvidence: ArrangementReviewEvidence = {
+  sceneCount: 4,
   sections: [
     { startScene: 0, endScene: 1, label: "intro", avgSimilarity: 0.8, energy: 0.3, confidence: 0.9 },
     { startScene: 2, endScene: 3, label: "drop", avgSimilarity: 0.7, energy: 0.9, confidence: 0.85 },

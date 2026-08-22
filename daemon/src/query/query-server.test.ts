@@ -868,6 +868,53 @@ describe("refreshArrangementSnapshot (04.3-07 DEFECT B — validated write gate)
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   });
+
+  it("persists populated track-role analysis without analyzer-only fields", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-refresh-"));
+    try {
+      const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+      const rolesPath = path.join(dir, "roles.json");
+      const snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: vi.fn(async () => ({
+          tracks: [{
+            trackSid: "trk_fm4000000000001",
+            name: "FM-4",
+            scenes: [{
+              sceneIdx: 0,
+              clipSid: "clip_fm400000000001",
+              hasContent: true,
+              loopBeats: 4,
+              notes: [
+                { key: "n1", pitch: 24, start: 0, length: 0.25, velocity: 120 },
+                { key: "n2", pitch: 24, start: 1, length: 0.25, velocity: 120 },
+                { key: "n3", pitch: 24, start: 2, length: 0.25, velocity: 120 },
+                { key: "n4", pitch: 24, start: 3, length: 0.25, velocity: 120 },
+              ],
+            }],
+          }],
+          sceneNames: ["Scene 1"],
+        })),
+        arrangementSnapshotPath: snapshotPath,
+        rolesPath,
+        intent: null,
+      });
+
+      expect(snap).not.toBeNull();
+      expect(snap!.sceneCount).toBe(1);
+      expect(snap!.derived?.sections?.[0]).not.toHaveProperty("energy");
+      expect(snap!.derived?.trackRoles?.trk_fm4000000000001).toMatchObject({
+        role: expect.any(String),
+        confidence: expect.any(Number),
+        alternatives: expect.any(Array),
+      });
+      const persisted = JSON.parse(await fs.readFile(snapshotPath, "utf8"));
+      expect(persisted.derived.trackRoles.trk_fm4000000000001).not.toHaveProperty("trackSid");
+      expect(persisted.derived.trackRoles.trk_fm4000000000001).not.toHaveProperty("assumption");
+      await expect(fs.readFile(rolesPath, "utf8")).resolves.toContain('"trk_fm4000000000001"');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
 });
 
 // ============================================================================

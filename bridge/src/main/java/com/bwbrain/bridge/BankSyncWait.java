@@ -17,15 +17,15 @@
 //
 // DECISION RULE (mirrored case-for-case in BankSyncWaitTest):
 //   1. THRESHOLD — observedCount >= minExpectedObservations → return 0
-//      immediately. Every registered bank observer has fired at least once
-//      (full population): 8 track-name + 16 scene-name + 128 hasContent
-//      observers at the production BANK_SIZE=8 × SCENE_COUNT=16 sizing.
-//   2. QUIET — at least one observation has arrived AND
-//      now - lastObservationAtMs >= settleMs → return. Banks populate in a
-//      burst once the project loads; settleMs of observation quiet = the
-//      burst is over. On a long-settled bank lastObservationAtMs is old, so
-//      this also returns on the FIRST loop check with 0 waited — steady-state
-//      pulls pay no latency through either exit.
+//      immediately. The production caller makes this request-relative:
+//      observations-at-request + one full population (track names + scene
+//      names + their hasContent matrix). A lifetime cumulative count
+//      can therefore never bypass settling a later project-tab switch.
+//   2. QUIET — this request has waited at least settleMs, at least one
+//      observation has arrived in the controller lifetime, AND
+//      now - lastObservationAtMs >= settleMs → return. The request-local
+//      minimum prevents an old timestamp from a previous project making a
+//      new project-switch pull return before its callback burst begins.
 //   3. CAP — neither condition met within maxWaitMs → return anyway. HONEST
 //      proceed-on-expiry: an incomplete grid is answered as-is and refused
 //      downstream by the daemon write gate from Plan 04.3-07 (layered
@@ -94,8 +94,10 @@ final class BankSyncWait {
      * @param lastObservationAtMs    wall-clock ms of the latest observation, 0
      *                               when none has fired (production:
      *                               {@code Observers::getLastBankObservationAt}).
-     * @param minExpectedObservations threshold for the full-population early
-     *                               return (production: 8 + 16 + 8×16 = 152).
+     * @param minExpectedObservations request-relative threshold for the
+     *                               full-population early return (production:
+     *                               count-at-request + the caller's full bank
+     *                               population size).
      * @param settleMs               quiet window (production:
      *                               {@link #BANK_SYNC_SETTLE_MS}).
      * @param maxWaitMs              hard cap (production:
@@ -131,7 +133,7 @@ final class BankSyncWait {
             // has gone quiet for settleMs. lastObservationAtMs == 0 means no
             // observation yet — quiet cannot fire, only threshold or cap can.
             final long last = lastObservationAtMs.getAsLong();
-            if (last > 0L && (now - last) >= settleMs) {
+            if (waited >= settleMs && last > 0L && (now - last) >= settleMs) {
                 return waited;
             }
             try {

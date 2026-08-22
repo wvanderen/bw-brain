@@ -52,6 +52,8 @@ export interface ArrangementReviewTrackRole {
  * query-server.ts assembles) plus optional presentation labels.
  */
 export interface ArrangementReviewRenderInput {
+  /** Authoritative launcher scene count from the snapshot grid. */
+  sceneCount: number;
   sections: SectionSummary[];
   energyCurve: EnergyPoint[];
   repetition: RepetitionCluster[];
@@ -71,11 +73,6 @@ export interface ArrangementReviewRenderInput {
 function energyChar(value: number): string {
   const step = Math.max(0, Math.min(SPARK_STEPS.length - 1, Math.floor(value * SPARK_STEPS.length)));
   return SPARK_STEPS[step]!;
-}
-
-/** Total scene count implied by the section coverage (max endScene + 1). */
-function sceneCountOf(sections: SectionSummary[]): number {
-  return sections.reduce((max, s) => Math.max(max, s.endScene), -1) + 1;
 }
 
 /** The section covering a scene, or undefined for an uncovered gap. */
@@ -110,7 +107,7 @@ const MAX_TRACK_ROLE_ENTRIES = 8;
  */
 function buildGroups(input: ArrangementReviewRenderInput): string[][] {
   const pulled = assumptionsLine(input.pulledAt);
-  const sceneCount = sceneCountOf(input.sections);
+  const sceneCount = input.sceneCount;
 
   // --- Group 1: State (incl. the fifth dimension — track roles) ---
   const state: string[] = [
@@ -133,6 +130,7 @@ function buildGroups(input: ArrangementReviewRenderInput): string[][] {
   const timeline: string[] = [`Timeline (${sceneCount} scenes):`];
   if (input.sections.length === 0) {
     timeline.push("  (no sections detected — labels below the analyzer confidence gate are omitted rather than guessed)");
+    if (sceneCount > 0) timeline.push(`  ${Array.from({ length: sceneCount }, (_, scene) => `${scene}:—`).join("   ")}`);
   } else {
     const labels: string[] = [];
     const bars: string[] = [];
@@ -148,7 +146,11 @@ function buildGroups(input: ArrangementReviewRenderInput): string[][] {
   // --- Group 3: Energy sparkline (one char per scene) + curve stats ---
   const energy: string[] = ["Energy sparkline (per-scene aggregate, 0-1 against project peak):"];
   if (input.sections.length === 0) {
-    energy.push("  (no per-scene energy — no sections detected)");
+    energy.push(
+      input.energyCurve.length === 0
+        ? "  (no energy detected)"
+        : "  (section-level sparkline unavailable — section labels were below confidence; per-bar energy remains below)",
+    );
   } else {
     const chars: string[] = [];
     for (let scene = 0; scene < sceneCount; scene++) chars.push(sceneChar(input.sections, scene));

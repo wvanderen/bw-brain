@@ -26,7 +26,11 @@ export class PeerRegistry {
 
   lease(connectionId: string, instanceId: string): { lease: InstanceLease; rekey?: { oldInstanceId: string; newInstanceId: string } } {
     const existing = this.leases.get(instanceId);
-    if (existing && existing.connectionId !== connectionId) {
+    // `inst-local` is the plug-in construction sentinel, not a durable
+    // identity. Always replace it, even when no simultaneous claimant is
+    // connected; otherwise a newly inserted plug-in can inherit a historical
+    // confirmed project merely because an older inst-local disconnected.
+    if (instanceId === "inst-local" || (existing && existing.connectionId !== connectionId)) {
       const newInstanceId = `inst-${randomUUID()}`;
       const lease = { connectionId, instanceId: newInstanceId, status: "unconfirmed" as const };
       this.leases.set(newInstanceId, lease);

@@ -22,7 +22,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createArrangementReviewDependency, loadArrangementAnalysisEvidence } from "./boot.js";
+import { createArrangementReviewDependency, includeCursorSelectedTrack, loadArrangementAnalysisEvidence } from "./boot.js";
 import { loadArrangementSnapshot, saveArrangementSnapshot, type ArrangementSnapshot } from "../state/arrangement-snapshot.js";
 
 const OLD_PULLED_AT = "2026-08-21T10:00:00.000Z";
@@ -49,6 +49,21 @@ const withTmp = async (run: (dir: string) => Promise<void>): Promise<void> => {
 };
 
 const liveGrid = { tracks: [{ trackSid: "t1", name: "bass", scenes: [] }], sceneNames: [] };
+
+describe("includeCursorSelectedTrack (out-of-window link confirmation)", () => {
+  it("adds the cursor-selected ninth track when the summary bank contains only slots 0-7", () => {
+    const summary = Array.from({ length: 8 }, (_, slot) => ({ slot, name: `Track ${slot + 1}` }));
+    expect(includeCursorSelectedTrack(summary, 8, "Lead")).toEqual([
+      ...summary,
+      { slot: 8, name: "Lead" },
+    ]);
+  });
+
+  it("prefers the in-window summary name and does not duplicate the selected slot", () => {
+    const summary = [{ slot: 1, name: "Bass" }];
+    expect(includeCursorSelectedTrack(summary, 1, "stale cursor hint")).toBe(summary);
+  });
+});
 
 describe("createArrangementReviewDependency (04.3-02 injected review dependency)", () => {
   it("serves durable snapshot evidence with pulledAt assumptions (no refresh)", async () => {

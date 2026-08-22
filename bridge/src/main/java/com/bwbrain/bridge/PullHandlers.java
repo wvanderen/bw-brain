@@ -21,6 +21,7 @@
 package com.bwbrain.bridge;
 
 import com.bitwig.extension.controller.api.NoteStep;
+import com.bitwig.extension.controller.api.ClipLauncherSlotBank;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
 import com.bitwig.extension.controller.api.Track;
 import com.bitwig.extension.controller.api.TrackBank;
@@ -513,8 +514,8 @@ public final class PullHandlers {
         //
         // minExpectedObservations derives from the same constants that size
         // the banks: BANK_SIZE track-name observers + SCENE_COUNT scene-name
-        // observers + BANK_SIZE×SCENE_COUNT hasContent observers (8+16+128 =
-        // 152 at the BridgeExtension sizing).
+        // observers + BANK_SIZE×SCENE_COUNT hasContent observers (derived
+        // from the live BridgeExtension sizing; no hard-coded threshold).
         //
         // Why post-walk re-stamping of trackSids is deliberately NOT done:
         // ClipSid.derive pins each cell's clipSid hash to the trackSid
@@ -531,9 +532,20 @@ public final class PullHandlers {
         // (threshold met, or lastBankObservationAt is old so the quiet check
         // passes on the first poll with 0 waited) — repeated pulls pay no
         // latency.
-        final int minExpectedBankObservations = observers.getBankSize()
+        // The threshold is REQUEST-RELATIVE, not a lifetime absolute. The
+        // observer counter is cumulative; using the bare 152 threshold meant
+        // it stayed permanently satisfied after init and every later pull
+        // skipped the quiet window, including pulls racing a project-tab
+        // switch. Anchor the full-population target at this request's count.
+        // A partial project-switch burst normally exits through QUIET; a full
+        // repopulation may reach this request-relative threshold first.
+        final int observationsAtRequest = observers.getBankObservationCount();
+        final int observationsPerFullPopulation = observers.getBankSize()
                 + observers.getSceneBankSize()
                 + (observers.getBankSize() * observers.getSceneBankSize());
+        final int minExpectedBankObservations = observationsAtRequest > Integer.MAX_VALUE - observationsPerFullPopulation
+                ? Integer.MAX_VALUE
+                : observationsAtRequest + observationsPerFullPopulation;
         BankSyncWait.awaitSettled(
                 System::currentTimeMillis,
                 observers::getBankObservationCount,
@@ -564,7 +576,11 @@ public final class PullHandlers {
                 try {
                     if (!l.await(timeoutMs, TimeUnit.MILLISECONDS)) {
                         observers.clearWalkerReadyLatch();
-                        return -1.0; // timeout (D-22) — mark empty + advance
+                        // A same-length clip does not necessarily fire the
+                        // loopLength observer. The slot was already proven
+                        // populated by subscribed hasContent, so retain it
+                        // when the cursor exposes a positive current length.
+                        return currentLoopBeats();
                     }
                 } catch (final InterruptedException ie) {
                     Thread.currentThread().interrupt();
@@ -572,6 +588,9 @@ public final class PullHandlers {
                     return -1.0;
                 }
                 // Fire — read the loop length the cursor clip now reports.
+                return currentLoopBeats();
+            }
+            private double currentLoopBeats() {
                 try {
                     final double loopBeats = cursorClip.getLoopLength().get();
                     return loopBeats > 0 ? loopBeats : -1.0;
@@ -582,22 +601,20 @@ public final class PullHandlers {
         };
         final LauncherGridWalker.SlotSelector selector = (t, s) ->
                 trackBank.getItemAt(t).clipLauncherSlotBank().select(s);
-        // Phase 4 Plan 04-01 Task 2 fix — read hasContent from the observers
-        // cache (populated by Observers.wireClipLauncherSlots at register()
-        // time), NOT from slot.hasContent().get() on an unsubscribed
-        // BooleanValue. ClipLauncherSlot.hasContent() is a BooleanValue that
-        // returns its default `false` until addValueObserver is registered;
-        // the pre-fix direct .get() call short-circuited every cell to empty
-        // (live probe signature: 0/128 hasContent cells in 5-12ms across 5
-        // requests — the diagnostic of an unsubscribed observer). The cache
-        // is populated by the time the first get.launcher_clips pull arrives
-        // (register() completes before the connector thread starts).
+        // Every slot BooleanValue was subscribed eagerly during init. Read the
+        // subscribed LIVE value at walk time so a project-switch callback that
+        // has not yet published into the cache cannot produce an all-false
+        // snapshot. The observer cache remains a defensive fallback for a
+        // transient Bitwig accessor failure. (The original unsafe direct read
+        // happened before subscription; this read is explicitly post-subscribe.)
         final LauncherGridWalker.HasContentReader hasContent = (t, s) -> {
             try {
-                return observers.getHasContent(t, s);
+                final ClipLauncherSlotBank slotBank = trackBank.getItemAt(t).clipLauncherSlotBank();
+                if (slotBank != null) return slotBank.getItemAt(s).hasContent().get();
             } catch (final Exception e) {
-                return false;
+                // Fall through to the last observer-published value.
             }
+            return observers.getHasContent(t, s);
         };
         final LauncherGridWalker.NotesReader notes = loopBeats -> {
             final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;

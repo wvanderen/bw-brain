@@ -34,7 +34,10 @@ public final class BridgeExtension extends ControllerExtension {
     // Pitfall 5 — loopback ONLY (replicated from the spike lines 43-44).
     static final String LOOPBACK = "127.0.0.1";
     static final int PORT = 7878;
-    static final int BANK_SIZE = 8; // D-01 windowed TrackBank page size
+    // 16 keeps ordinary projects (including the live-UAT ninth-track Lead)
+    // inside the launcher walk. LauncherGridWalker trims the unnamed phantom
+    // tail, so the wider bank does not persist empty synthetic tracks.
+    static final int BANK_SIZE = 16; // D-01 windowed TrackBank page size
     // Phase 4 Plan 04-01 (D-01) — SceneBank page size. 16 covers common producer
     // projects (RESEARCH §Bitwig Probe acceptance: "8×16=128 cells" worst case).
     // The live probe (Task 2 capabilities doc §7) confirms the actual project's

@@ -907,6 +907,8 @@ function pulledAtAssumption(snap: ArrangementSnapshot | null): Assumption {
  * question 4).
  */
 export interface ArrangementReviewEvidence {
+  /** Authoritative launcher scene count, independent of section confidence. */
+  sceneCount: number;
   sections: SectionSummary[];
   energyCurve: EnergyPoint[];
   repetition: RepetitionCluster[];
@@ -990,6 +992,7 @@ export function assembleArrangementReviewEvidence(
   return {
     kind: "evidence",
     evidence: {
+      sceneCount: input.snap.sceneCount,
       sections,
       energyCurve,
       repetition,
@@ -1068,10 +1071,40 @@ export async function refreshArrangementSnapshot(
   const fields = getM3Registry().runAll(rawFromSnapshot(snap), ctx);
   const derived: NonNullable<ArrangementSnapshot["derived"]> = {};
   for (const f of fields) {
-    if (f.field === "sections") derived.sections = f.value as NonNullable<ArrangementSnapshot["derived"]>["sections"];
+    if (f.field === "sections") {
+      const sections = f.value as Array<{
+        startScene: number;
+        endScene: number;
+        label: string;
+        avgSimilarity: number;
+        confidence: number;
+      }>;
+      derived.sections = sections.map((section) => ({
+        startScene: section.startScene,
+        endScene: section.endScene,
+        label: section.label,
+        avgSimilarity: section.avgSimilarity,
+        confidence: section.confidence,
+      }));
+    }
     if (f.field === "repetition") derived.repetition = f.value as NonNullable<ArrangementSnapshot["derived"]>["repetition"];
     if (f.field === "energyCurve") derived.energyCurve = f.value as NonNullable<ArrangementSnapshot["derived"]>["energyCurve"];
-    if (f.field === "trackRoles") derived.trackRoles = f.value as NonNullable<ArrangementSnapshot["derived"]>["trackRoles"];
+    if (f.field === "trackRoles") {
+      // RoleClassification is analyzer-internal and also carries `trackSid`
+      // (plus an optional diagnostic `assumption`). The durable snapshot is
+      // already keyed by trackSid and intentionally has a narrower strict
+      // schema, so project only the persisted fields at this boundary.
+      const classifications = f.value as Record<
+        string,
+        { role: string; confidence: number; alternatives: Array<{ role: string; score: number }> }
+      >;
+      derived.trackRoles = Object.fromEntries(
+        Object.entries(classifications).map(([trackSid, role]) => [
+          trackSid,
+          { role: role.role, confidence: role.confidence, alternatives: role.alternatives },
+        ]),
+      );
+    }
   }
   snap.derived = derived;
   // Persist the snapshot + roles.json (atomic temp+rename). 04.3-07 (DEFECT B):

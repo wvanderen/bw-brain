@@ -36,3 +36,14 @@ describe("PeerRegistry project fork rekey", () => {
     expect(() => registry.planProjectFork(peer.connectionId, "source", ["i1", "i2"])).toThrow("fork_instances_not_connected");
   });
 });
+
+describe("PeerRegistry construction-sentinel identity", () => {
+  it("always rekeys inst-local even without a simultaneous live claimant", () => {
+    const registry = new PeerRegistry();
+    const result = registry.lease("connection-new", "inst-local");
+    expect(result.rekey).toMatchObject({ oldInstanceId: "inst-local" });
+    expect(result.rekey!.newInstanceId).toMatch(/^inst-[0-9a-f-]{36}$/);
+    expect(result.lease.instanceId).toBe(result.rekey!.newInstanceId);
+    expect(registry.getLease("inst-local")).toBeUndefined();
+  });
+});

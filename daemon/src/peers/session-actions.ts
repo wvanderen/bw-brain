@@ -49,7 +49,10 @@ export class SessionActions {
         this.pendingLinks.set(connectionId, pending);
         this.deps.markLinkPending(scope);
         return this.deps.sendTo(connectionId, { type: "link.confirm.pending", ...pending });
-      } catch { return this.deps.sendTo(connectionId, { type: "action.error", error: "link_confirmation_failed" }); }
+      } catch (error) {
+        console.error("[session-actions] link.confirm.request failed:", error instanceof Error ? error.message : String(error));
+        return this.deps.sendTo(connectionId, { type: "action.error", error: "link_confirmation_failed" });
+      }
     }
     if (message.type === "link.confirm.accept") {
       const pending = this.pendingLinks.get(connectionId);
@@ -71,7 +74,10 @@ export class SessionActions {
         });
         this.deps.markLinkConfirmed(pending.scope);
         return this.deps.sendTo(connectionId, { type: "link.status", status: "confirmed", scope: pending.scope });
-      } catch { return this.deps.sendTo(connectionId, { type: "action.error", error: "link_confirmation_failed" }); }
+      } catch (error) {
+        console.error("[session-actions] link.confirm.accept failed:", error instanceof Error ? error.message : String(error));
+        return this.deps.sendTo(connectionId, { type: "action.error", error: "link_confirmation_failed" });
+      }
     }
     if (message.type === "session.fork.request") {
       const sourceProjectId = String(message.sourceProjectId ?? ""), newProjectId = String(message.newProjectId ?? "");

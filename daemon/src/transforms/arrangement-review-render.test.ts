@@ -55,6 +55,7 @@ const gapObservation: TransitionObservation = {
 };
 
 const fullInput = (): ArrangementReviewRenderInput => ({
+  sceneCount: 4,
   sections: [section(0, 1, "intro", 0.3), section(2, 3, "drop", 0.9)],
   energyCurve: [{ bar: 0, value: 0.2 }, { bar: 1, value: 0.4 }, { bar: 2, value: 0.9 }, { bar: 3, value: 1 }] as EnergyPoint[],
   repetition: [{ group: [0, 2], similarity: 0.82, matchedOn: ["density", "velocity"] }] as RepetitionCluster[],
@@ -135,6 +136,7 @@ describe("renderArrangementReview (04.3-02 bounded text render)", () => {
 
   it("maps per-scene energy 0-1 onto the eight unicode block steps, one char per scene", () => {
     const stepped = fullInput();
+    stepped.sceneCount = 3;
     stepped.sections = [section(0, 0, "a", 0), section(1, 1, "b", 0.4), section(2, 2, "c", 1)];
     const steppedLines = renderArrangementReview(stepped).join("\n").split("\n");
     expect(steppedLines).toContain("  ▁ ▄ █");
@@ -153,10 +155,22 @@ describe("renderArrangementReview (04.3-02 bounded text render)", () => {
     input.energyCurve = [];
     const joined = renderArrangementReview(input).join("\n");
     expect(joined).toContain("no sections detected");
-    expect(joined).toContain("no per-scene energy");
+    expect(joined).toContain("no energy detected");
     expect(joined).toContain("no repetition clusters detected");
     expect(joined).toContain("no transition observations");
     expect(joined).toContain("no track roles classified");
+  });
+
+  it("keeps authoritative scenes and per-bar energy visible when section labels are below confidence", () => {
+    const input = fullInput();
+    input.sections = [];
+    input.energyCurve = [{ bar: 0, value: 0.4 }, { bar: 1, value: 1 }];
+    const joined = renderArrangementReview(input).join("\n");
+    expect(joined).toContain("Timeline (4 scenes):");
+    expect(joined).toContain("0:—   1:—   2:—   3:—");
+    expect(joined).toContain("section-level sparkline unavailable");
+    expect(joined).toContain("energy curve: 2 bars, peak 1.00");
+    expect(joined).not.toContain("Timeline (0 scenes):");
   });
 
   it("is deterministic for identical input", () => {

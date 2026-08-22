@@ -66,6 +66,30 @@ class BankSyncWaitTest {
     }
 
     @Test
+    void lifetimeThresholdDoesNotBypassRequestRelativeQuietSettle() {
+        // Live UAT DEFECT G: after init the cumulative counter was already
+        // above 152, so a later project-tab-switch pull returned immediately
+        // while hasContent callbacks were still changing. Production now
+        // anchors the threshold to observationsAtRequest + 152. With a
+        // lifetime count of 300 and a request-relative target of 452, this
+        // request must honor the 250ms quiet window.
+        final FakeClock clock = new FakeClock(1_000L);
+        final int observationsAtRequest = 300;
+        final long waited = BankSyncWait.awaitSettled(
+                clock::nowMs,
+                () -> observationsAtRequest,
+                () -> 1_000L,
+                observationsAtRequest + 152,
+                BankSyncWait.BANK_SYNC_SETTLE_MS,
+                BankSyncWait.BANK_SYNC_MAX_WAIT_MS,
+                clock.sleeper);
+        assertEquals(BankSyncWait.BANK_SYNC_SETTLE_MS, waited,
+                "a prior lifetime count above 152 must not bypass this request's quiet window");
+        assertEquals(5, clock.sleepCalls,
+                "request-relative settle waits five 50ms polls before walking the switched project");
+    }
+
+    @Test
     void quietSettleReturnsAfterBurstGoesQuiet() {
         // (b) One observation at t0=1000 (the clock start), then the bank
         // goes quiet. The loop polls in 50ms increments until 250ms of quiet
@@ -85,6 +109,25 @@ class BankSyncWaitTest {
                 "250ms of quiet at 50ms polls = 5 sleeps — returns at the settle check, never hits the cap");
         assertTrue(waited < BankSyncWait.BANK_SYNC_MAX_WAIT_MS,
                 "quiet-settle exit must beat the cap");
+    }
+
+    @Test
+    void oldObservationTimestampStillPaysRequestLocalSettleWindow() {
+        // A prior project's last callback is already long-quiet when this
+        // request starts. It must not make the new request return at t=0;
+        // Bitwig may not have begun publishing the project-switch burst yet.
+        final FakeClock clock = new FakeClock(10_000L);
+        final long waited = BankSyncWait.awaitSettled(
+                clock::nowMs,
+                () -> 300,
+                () -> 1_000L,
+                452,
+                BankSyncWait.BANK_SYNC_SETTLE_MS,
+                BankSyncWait.BANK_SYNC_MAX_WAIT_MS,
+                clock.sleeper);
+        assertEquals(BankSyncWait.BANK_SYNC_SETTLE_MS, waited,
+                "an old prior-project timestamp cannot bypass this request's minimum settle window");
+        assertEquals(5, clock.sleepCalls);
     }
 
     @Test

@@ -2,6 +2,7 @@
 #include "PluginProcessor.h"
 #include "identity/InstanceState.h"
 #include "model/UiState.h"
+#include "ui/TextEditorViewport.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -159,6 +160,22 @@ int main() {
   check(generatedMix, "Generated Mix parameter missing");
   std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
   check(processor.hasEditor() && editor != nullptr, "hosted editor unavailable");
+
+  juce::TextEditor scrollingEditor;
+  scrollingEditor.setMultiLine(true, true);
+  scrollingEditor.setScrollbarsShown(true);
+  scrollingEditor.setBounds(0, 0, 240, 80);
+  juce::String longText;
+  for (int line = 0; line < 80; ++line)
+    longText << "evidence line " << line << "\n";
+  scrollingEditor.setText(longText, false);
+  auto* scrollingViewport = textEditorViewport(scrollingEditor);
+  check(scrollingViewport != nullptr, "text editor viewport unavailable");
+  scrollingViewport->setViewPosition(0, 240);
+  const auto retainedPosition = scrollingViewport->getViewPosition();
+  replaceTextPreservingViewport(scrollingEditor, longText + "fresh review\n");
+  check(scrollingViewport->getViewPosition() == retainedPosition,
+        "conversation refresh must retain the user's scroll position");
 
   juce::MemoryBlock saved;
   processor.getStateInformation(saved);

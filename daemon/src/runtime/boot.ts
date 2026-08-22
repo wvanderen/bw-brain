@@ -692,7 +692,11 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       if (controllerEvidence.available !== true || !Number.isInteger(trackSlot) || trackSlot! < 0) throw new Error("link_scope_unavailable");
 
       const summaryResp = (await correlator.send("get.project_summary")) as { tracks?: { slot: number; name: string }[] };
-      const freshSummaryTracks = summaryResp.tracks ?? [];
+      const freshSummaryTracks = includeCursorSelectedTrack(
+        summaryResp.tracks ?? [],
+        trackSlot!,
+        controllerEvidence.trackSidHint,
+      );
       const observed = normalize({
         ...BASELINE_RAW_STATE,
         tracks: enrichSummaryTracks(freshSummaryTracks),
@@ -895,6 +899,22 @@ function enrichSummaryTracks(
       slot: t.slot,
     };
   });
+}
+
+/**
+ * Ensure the controller-selected track participates in reconciliation even
+ * when it lies outside the fixed TrackBank summary window. The correlation
+ * response is cursor-derived and therefore authoritative for the selected
+ * slot; the summary name remains preferred whenever that slot is in-window.
+ */
+export function includeCursorSelectedTrack(
+  tracks: { slot: number; name: string }[],
+  selectedSlot: number,
+  cursorTrackHint?: string | null,
+): { slot: number; name: string }[] {
+  if (tracks.some((track) => track.slot === selectedSlot)) return tracks;
+  const name = typeof cursorTrackHint === "string" ? cursorTrackHint.trim() : "";
+  return name ? [...tracks, { slot: selectedSlot, name }] : tracks;
 }
 
 /** Convert an in-memory StableIdMap to the JSON-serializable payload shape. */
