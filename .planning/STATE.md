@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-08-22T20:24:56.641Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-08-22T20:51:08.213Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 63
-  completed_plans: 52
+  completed_plans: 53
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -100,6 +100,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 04.3 P06 | 5min | 2 tasks | 5 files |
 | Phase 04.3 P07 | 6min | 3 tasks | 8 files |
 | Phase 05 P01 | 10min | 2 tasks | 16 files |
+| Phase 05 P03 | 15min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -203,6 +204,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.3 P07] LAUNCHER_GRID_PULL_TIMEOUT_MS = 90_000 (5000ms BankSyncWait cap + 128×500ms D-22 ceiling + margin) at all three get.launcher_clips sites; every other get.* pull keeps the 3000ms default; RB-03/UX-03 stay unchecked until 04.3-08's live re-run
 - [Phase ?]: [Phase 05 P01] parameter.changed protocol event + bounded fold: aggregates keyed deviceKey:source:paramIndex, movement = delta>1e-4, 512-cap lowest-lastMovedAt eviction; transport.changed folds automationWrite verbatim (D-05-05 vocabulary) independent of playing
 - [Phase ?]: [Phase 05 P01] generic.json ships a NEUTRAL automationShapes block (energyWeights presence precedent: present in both profiles); schema optionality keeps absence valid and 05-08 consumers default via ctx.profile?.automationShapes ?? DEFAULT (ARCH-02)
+- [Phase 05]: [Phase 05 P03] Device.getParameter(int) is @Deprecated in extension-api:21 (javadoc replacement getRemoteControls() absent from the jar) — the locked D-05-03 surface stays behind per-index try/catch graceful degradation + a deprecated-allow marker; the PENDING live A2 probe (05-02) arbitrates window-survival vs page-based flip
+- [Phase 05]: [Phase 05 P03] isClipLauncherAutomationWriteEnabled flagged by the HTML deprecated-list but NOT annotated in the jar (javap -v verified) — allowlisted as a javadoc artifact; the schema-required launcherWriteEnabled field has no other surface
+- [Phase 05]: [Phase 05 P03] AUTO-01/AUTO-04 stay unchecked: 05-03 is code-complete but live-unverified (A2 probe + end-of-phase UAT pending) — parameter.changed deviceKey IS the AutomationScope deviceSid (deriveDeviceSid pin, load-bearing for 05-05/05-08)
 
 ### Pending Todos
 
@@ -236,6 +240,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T20:24:47.188Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-automation-device-workflows-m4/05-CONTEXT.md
+Last session: 2026-08-22T20:51:01.679Z
+Stopped at: Completed 05-03-PLAN.md
+Resume file: None
