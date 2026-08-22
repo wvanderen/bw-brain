@@ -73,6 +73,9 @@ import {
 // Phase 5 (Plan 05-04 — AUTO-01): the salience analyzer + the ranked-param
 // type it emits (observed movement in, ranked honest scores out — D-05-01/03).
 import { AutomationSalience, type SaliencePriors, type RankedSalienceParam } from "../transforms/automation-salience.js";
+// Phase 5 (Plan 05-07 — AUTO-02): the advisory macro/XY suggestion generator
+// (D-05-09 zero-mutation surface; consumes the 05-04 ranked salience entries).
+import { macroSuggest, type MacroSuggestion } from "../transforms/macro-suggest.js";
 import { suggestTransitions, type TransitionObservation } from "../transforms/transition-suggest.js";
 import type { SectionSummary } from "../transforms/section-detector.js";
 import type { EnergyPoint } from "../transforms/energy-curve.js";
@@ -112,6 +115,10 @@ const LIVE_OPS = new Set([
   // Phase 5 Plan 05-04 — automation salience (AUTO-01/D-05-01..04). Reads
   // the 05-01 folded movement aggregates + the durable salience snapshot.
   "automation.inspect",
+  // Phase 5 Plan 05-07 — advisory macro/XY suggestions (AUTO-02/D-05-09..
+  // 12). Reads the SAME durable salience snapshot through the SAME 05-04
+  // freshness path; emits text evidence only — zero mutation surface.
+  "device.macros_suggest",
 ]);
 
 /** Dependencies injected by the daemon boot sequence. */
@@ -408,6 +415,14 @@ export function startQueryServer(deps: QueryServerDeps): void {
     // resolves later + transport.send fires from the async continuation.
     if (op === "automation.inspect") {
       void handleAutomationInspect(deps, state, intent, freshness, msg as { payload?: { refresh?: boolean } });
+      return;
+    }
+
+    // Phase 5 Plan 05-07 — device.macros_suggest dispatch (AUTO-02). Same
+    // fire-and-forget shape; the handler reads the salience snapshot through
+    // the SHARED 05-04 read path (loadSalienceForRead — no forked semantics).
+    if (op === "device.macros_suggest") {
+      void handleDeviceMacrosSuggest(deps, state, intent, freshness, msg as { payload?: { refresh?: boolean } });
       return;
     }
 
@@ -1365,6 +1380,12 @@ export interface DeviceReviewEvidence {
   chain: unknown[];
   /** The ranked per-parameter salience list — highest first (SC#2 duty). */
   salience: SalienceParamEntry[];
+  /**
+   * Advisory macro/XY suggestions (05-07 — the 05-09 drawer field). Defaults
+   * to [] when the caller supplies none; populated IDENTICALLY to the
+   * device.macros_suggest op when present (same macroSuggest single source).
+   */
+  macros: MacroSuggestion[];
   /** ISO timestamp of the snapshot the evidence came from; null = no snapshot. */
   pulledAt: string | null;
   assumptions: Assumption[];
@@ -1390,6 +1411,12 @@ export interface AssembleDeviceReviewEvidenceInput {
   snapshotInvalid?: boolean;
   /** Confirmed-chain devices (boot supplies from the device-chain read). */
   chain: unknown[];
+  /**
+   * Advisory macro/XY suggestions computed from the SAME snapshot (the
+   * caller invokes buildMacroSuggestions — the macroSuggest single source);
+   * absent → evidence.macros defaults to [] (05-09 renders an honest empty).
+   */
+  macros?: MacroSuggestion[];
   intent: ProjectIntent | null;
   freshness: "live" | "stale" | "disconnected";
   /** Whether the caller requested a fresh refresh (already performed when true). */
@@ -1421,6 +1448,7 @@ export function assembleDeviceReviewEvidence(
     evidence: {
       chain: input.chain,
       salience: flatRankedSalience(input.snap),
+      macros: input.macros ?? [],
       pulledAt: input.snap.pulledAt,
       assumptions,
     },
@@ -1428,31 +1456,38 @@ export function assembleDeviceReviewEvidence(
 }
 
 /**
- * automation.inspect handler (AUTO-01) — freshness semantics per D-05-04:
- *   - connected: refresh optional; a missing snapshot bootstraps from the
- *     live folds (analyze + persist, mirroring boot's on-demand arrange pull);
- *     empty folds serve the honest empty ranking (nothing moved yet).
- *   - disconnected + snapshot: STALE-BUT-READABLE with visible pulledAt.
- *   - disconnected + no snapshot: named refusal `no_snapshot`.
- *   - corrupt snapshot (no refresh): bounded `snapshot_invalid` refusal
- *     (04.3-07 DEFECT C discipline — never a crash).
- *   - refresh while disconnected: `state_disconnected` hard refusal.
+ * The shared salience-snapshot read path (05-07 — the SINGLE SOURCE for the
+ * 05-04 freshness semantics; automation.inspect and device.macros_suggest
+ * both consume it — semantics reused, never forked):
+ *   - unconfigured path → `not_implemented` refusal (sent).
+ *   - refresh while disconnected → `state_disconnected` hard refusal (sent).
+ *   - corrupt snapshot (no refresh) → bounded `snapshot_invalid` refusal
+ *     (sent; 04.3-07 DEFECT C discipline — never a crash, never a fallback).
+ *   - refresh → re-analyze + persist (a refresh proceeds past a corrupted
+ *     file — the fresh analysis replaces it).
+ *   - connected + no snapshot → bootstrap from the live folds (analyze +
+ *     persist, mirroring boot's on-demand arrange pull).
+ *
+ * @returns `{ refused: true }` when a refusal was already sent (the caller
+ *   returns immediately), else `{ refused: false, snap }` where `snap` may
+ *   still be null (disconnected-no-snapshot / refused refresh) — the caller
+ *   shapes its own null-snap response (inspect: empty ranking or
+ *   `no_snapshot`; macros_suggest: the same refusal + honest empty payload).
  */
-async function handleAutomationInspect(
+async function loadSalienceForRead(
   deps: QueryServerDeps,
   state: RawState,
   intent: ProjectIntent | null,
   freshness: "live" | "stale" | "disconnected",
-  msg: { payload?: { refresh?: boolean } },
-): Promise<void> {
+  wantRefresh: boolean,
+): Promise<{ refused: true } | { refused: false; snap: SalienceSnapshot | null }> {
   if (!deps.salienceSnapshotPath) {
     safeSendErr(deps.transport, freshness, "not_implemented");
-    return;
+    return { refused: true };
   }
-  const wantRefresh = msg.payload?.refresh === true;
   if (freshness === "disconnected" && wantRefresh) {
     safeSendErr(deps.transport, freshness, "state_disconnected");
-    return;
+    return { refused: true };
   }
 
   let loadFailed = false;
@@ -1471,12 +1506,59 @@ async function handleAutomationInspect(
     // Without refresh an invalid file refuses with the bounded code — it must
     // not masquerade as "no snapshot" (the producer repairs via refresh).
     safeSendErr(deps.transport, freshness, "snapshot_invalid");
-    return;
+    return { refused: true };
   } else if (snap === null && freshness !== "disconnected") {
     // Connected bootstrap: no durable snapshot yet — analyze the live folds
     // + persist so subsequent disconnected reads have something to read.
     snap = await refreshSalienceFromDeps(deps, state, intent);
   }
+  return { refused: false, snap };
+}
+
+/**
+ * Build the advisory macro/XY suggestions from a salience snapshot (the
+ * macroSuggest single source — the device.macros_suggest op AND the 05-09
+ * device-review evidence assembly both call THIS, so the drawer is populated
+ * identically to the CLI surface).
+ *
+ * The profile comes from the SNAPSHOT's own `profile` field (provenance
+ * honesty — the snapshot records which profile fed the ranking). An unknown
+ * profile name degrades to the unbiased ordering with a logged warning
+ * (ARCH-02 enhance-never-gate — never a refusal).
+ */
+function buildMacroSuggestions(snap: SalienceSnapshot): ReturnType<typeof macroSuggest> {
+  let profile: Profile | undefined;
+  try {
+    profile = loadProfile(snap.profile);
+  } catch (e) {
+    console.error("[query-server] macros_suggest profile load failed — proceeding unbiased:", (e as Error).message);
+    profile = undefined;
+  }
+  return macroSuggest(flatRankedSalience(snap), { profile, pulledAt: snap.pulledAt });
+}
+
+/**
+ * automation.inspect handler (AUTO-01) — freshness semantics per D-05-04
+ * (see {@link loadSalienceForRead}, the shared single source):
+ *   - connected: refresh optional; a missing snapshot bootstraps from the
+ *     live folds (analyze + persist, mirroring boot's on-demand arrange pull);
+ *     empty folds serve the honest empty ranking (nothing moved yet).
+ *   - disconnected + snapshot: STALE-BUT-READABLE with visible pulledAt.
+ *   - disconnected + no snapshot: named refusal `no_snapshot`.
+ *   - corrupt snapshot (no refresh): bounded `snapshot_invalid` refusal
+ *     (04.3-07 DEFECT C discipline — never a crash).
+ *   - refresh while disconnected: `state_disconnected` hard refusal.
+ */
+async function handleAutomationInspect(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: { refresh?: boolean } },
+): Promise<void> {
+  const read = await loadSalienceForRead(deps, state, intent, freshness, msg.payload?.refresh === true);
+  if (read.refused) return;
+  const snap = read.snap;
 
   if (snap === null) {
     if (freshness === "disconnected") {
@@ -1501,6 +1583,53 @@ async function handleAutomationInspect(
     deps.transport,
     freshness,
     { params: flatRankedSalience(snap), tracks: snap.tracks, pulledAt: snap.pulledAt },
+    [...liveAssumptions(state, intent), saliencePulledAtAssumption(snap)],
+  );
+}
+
+/**
+ * device.macros_suggest handler (AUTO-02, 05-07) — the advisory macro/XY
+ * surface over the SAME durable salience snapshot + the SAME 05-04 freshness
+ * semantics as automation.inspect (loadSalienceForRead — no forked logic).
+ * Pure advisory output (D-05-09): suggestions + manualHint + pulledAt; the
+ * producer wires macros by hand — zero mutation surface on this path.
+ */
+async function handleDeviceMacrosSuggest(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: { refresh?: boolean } },
+): Promise<void> {
+  const read = await loadSalienceForRead(deps, state, intent, freshness, msg.payload?.refresh === true);
+  if (read.refused) return;
+  const snap = read.snap;
+
+  if (snap === null) {
+    if (freshness === "disconnected") {
+      safeSendErr(deps.transport, freshness, "no_snapshot");
+      return;
+    }
+    // Connected but nothing observable — the honest empty suggestion list
+    // with the refuse-path manualHint (macroSuggest's own thin-evidence
+    // wording), never a fabricated ranking.
+    safeSendOk(
+      deps.transport,
+      freshness,
+      { suggestions: [], manualHint: macroSuggest([]).manualHint, pulledAt: null },
+      [
+        ...liveAssumptions(state, intent),
+        saliencePulledAtAssumption(null),
+      ],
+    );
+    return;
+  }
+
+  const result = buildMacroSuggestions(snap);
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { suggestions: result.suggestions, manualHint: result.manualHint, pulledAt: snap.pulledAt },
     [...liveAssumptions(state, intent), saliencePulledAtAssumption(snap)],
   );
 }

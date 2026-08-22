@@ -65,6 +65,11 @@ const ALLOWED_QUERY_OPS: ReadonlySet<string> = new Set([
   // persists salience-snapshot.json. Same arrange.refresh class: atomic
   // daemon-mediated durable write, no CLI-side ephemeral write. MEM-02 holds.
   "automation.inspect",
+  // Phase 5 (05-07 — AUTO-02) — advisory macro/XY suggestions. Reads the SAME
+  // durable salience snapshot through the same 05-04 path; refresh shares the
+  // automation.inspect refresh class. Purely advisory output (D-05-09) —
+  // zero mutation surface anywhere on this op. MEM-02 holds.
+  "device.macros_suggest",
 ]);
 
 /**
