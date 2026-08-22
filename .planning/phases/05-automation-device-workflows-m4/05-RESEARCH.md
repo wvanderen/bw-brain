@@ -481,7 +481,7 @@ export function buildCurve(spec: CurveSpec, beatsPerBar: number, maxPoints = 64)
 | AUTO-01 | Snapshot persist/load/`snapshot_invalid` refusal | unit | `npm test -- --run src/state/salience-snapshot.test.ts` | ❌ Wave 0 |
 | AUTO-02 | Macro/XY suggestions ranked + evidence + ≥1 alternative | unit | `npm test -- --run src/transforms/macro-suggest.test.ts` | ❌ Wave 0 |
 | AUTO-03 | Curve shapes respect D-05-14 bounds; values ∈ [0,1] | unit (property, fast-check) | `npm test -- --run src/transforms/curve-shapes.test.ts` | ❌ Wave 0 |
-| AUTO-03 | Patch schema accepts automation ops; rejects out-of-bounds (65 points, >16 bars, 2 params) | unit | `npm test -- --run src/patch/patch-schema.test.ts` (extend) | ❌ Wave 0 (new file; inverse-ops.test.ts exists) |
+| AUTO-03 | Patch schema accepts automation ops; rejects out-of-bounds (65 points, >16 bars, 2 params) | unit | `npm test -- --run src/patch/patch-schema.test.ts` (extend) | ✅ extend (exists on disk; 05-05 extends it) |
 | AUTO-03 | Author-aware inverse freezes prior value (D-05-07) | unit | `npm test -- --run src/patch/inverse-ops.test.ts` (extend) | ✅ extend |
 | AUTO-03 | EditService automation pre-flight (transport refusals, wrong-device) | unit | `npm test -- --run src/runtime/edit-service.test.ts` (extend/new) | ❌ Wave 0 |
 | AUTO-04 | Bridge dispatch: parameter enumeration + automation ops via recording ParameterWriter | unit (JUnit) | `mvn test -Dtest=PullHandlersAutomationTest` (bridge) | ❌ Wave 0 |
@@ -498,7 +498,7 @@ export function buildCurve(spec: CurveSpec, beatsPerBar: number, maxPoints = 64)
 - [ ] `daemon/src/state/salience-snapshot.test.ts` — covers AUTO-01 (D-05-04)
 - [ ] `daemon/src/transforms/macro-suggest.test.ts` — covers AUTO-02 (D-05-11/12)
 - [ ] `daemon/src/transforms/curve-shapes.test.ts` — covers AUTO-03 (D-05-13/14)
-- [ ] `daemon/src/patch/patch-schema.test.ts` — automation-op schema bounds (extend `inverse-ops.test.ts` for D-05-07)
+- [ ] `daemon/src/patch/patch-schema.test.ts` — automation-op schema bounds (exists ✅ — extension only; extend `inverse-ops.test.ts` for D-05-07)
 - [ ] `bridge/src/test/java/com/bwbrain/bridge/PullHandlersAutomationTest.java` — recording ParameterWriter dispatch
 - [ ] `daemon/src/sessions/pi-tools.test.ts` — extend for parameter-target PREVIEW_EDIT_PARAMETERS (exists ✅ — extension)
 
