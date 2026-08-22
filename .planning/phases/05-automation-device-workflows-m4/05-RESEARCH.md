@@ -429,7 +429,7 @@ export function buildCurve(spec: CurveSpec, beatsPerBar: number, maxPoints = 64)
 | A8 | Proposed salience formula weights (log-scaled count, range, variance; macro prior; role/energy boosts) are a first-draft discretion design needing live-UAT tuning | Code Examples | Rankings feel wrong → tunable constants, no architecture change |
 | A9 | Surge XT (or equivalent third-party VST/AU) is available in the live Bitwig environment for the AUTO-04 checkpoint (used in the 2026-06-29 probe; no user VST dirs populated — availability via Bitwig library unconfirmed for this session) | Environment | AUTO-04 live verification blocked → human checkpoint precondition |
 
-## Open Questions
+## Open Questions (RESOLVED — Q1-3 via in-phase probe 05-02 per locked D-05-05/06; Q4 not adopted, D-05-03 locked enumeration stands; Q5 v1 rule adopted in 05-07)
 
 1. **Automation write semantics (probe, locked D-05-05/06)**
    - What we know: verified API surface (`touch`/`set`/Transport states); Javadoc explicitly frames `touch` as automation recording.
