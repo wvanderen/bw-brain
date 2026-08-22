@@ -341,6 +341,76 @@ class LauncherGridWalkerTest {
         assertTrue(a1.matches("^clip_[0-9a-f]{16}$"));
     }
 
+    // ======================================================================
+    // fix-04.3 (DEFECT D): the windowed TrackBank is 8-wide regardless of the
+    // project's real track count, and the production trackSidFor wiring
+    // (PullHandlers observers.getBankTrackNames().getOrDefault(t, "")) returns
+    // "" for unpopulated tail slots. Pre-fix, those phantom tail rows were
+    // emitted as track rows, so every arrangement snapshot built from a
+    // project with <8 tracks was schema-invalid (/grid/tracks/N/trackSid
+    // minLength) and could never persist. The walker must trim the TRAILING
+    // CONTIGUOUS run of empty-sid rows — and ONLY the suffix: a mid-bank
+    // empty-sid row (real-but-unsynced track) must SURVIVE so the daemon can
+    // refuse honestly downstream.
+    // ======================================================================
+
+    @Test
+    void trailingEmptySidTailRowsAreTrimmed() {
+        // 6 real rows + 2 trailing empty-sid rows (the <8-track live-UAT
+        // scenario) → the response must carry EXACTLY 6 tracks.
+        final LauncherGridWalker walker = new LauncherGridWalker(8, 1);
+        final LauncherGridWalker.LauncherGridResponse grid = walker.walkGrid(
+                new RecordingSelector(),
+                new ScriptedHasContent(false),
+                new ScriptedNotes(),
+                new ScriptedReadySignal(),
+                t -> t < 6 ? "trk_" + t : "",
+                t -> t < 6 ? "Track " + t : "");
+        assertEquals(6, grid.tracks.size(),
+                "6 real + 2 phantom tail rows → exactly 6 tracks (tail trimmed)");
+        assertEquals("trk_5", grid.tracks.get(5).trackSid,
+                "the LAST surviving row is the last real (non-empty-sid) row");
+    }
+
+    @Test
+    void allEmptySidRowsYieldZeroTracks() {
+        // Every row empty-sid (the cold-start / DEFECT A shape) → 0 tracks.
+        // Pins BOTH empty forms: "" (getOrDefault default) and null (an
+        // unsynced lookup that never fired).
+        final LauncherGridWalker walker = new LauncherGridWalker(3, 1);
+        final LauncherGridWalker.LauncherGridResponse grid = walker.walkGrid(
+                new RecordingSelector(),
+                new ScriptedHasContent(false),
+                new ScriptedNotes(),
+                new ScriptedReadySignal(),
+                t -> t == 1 ? null : "",
+                t -> "");
+        assertTrue(grid.tracks.isEmpty(),
+                "all rows empty-sid → 0 tracks (the daemon refuses an empty pull)");
+    }
+
+    @Test
+    void midBankEmptySidRowSurvivesWhileOnlyTailTrims() {
+        // Rows [real, empty, real, empty, empty] → 3 rows survive: the
+        // mid-bank empty-sid row (a REAL-but-unsynced track) SURVIVES so the
+        // daemon's incomplete-grid refusal can fire honestly; silently
+        // dropping it would produce an incomplete snapshot that looks valid.
+        final LauncherGridWalker walker = new LauncherGridWalker(5, 1);
+        final LauncherGridWalker.LauncherGridResponse grid = walker.walkGrid(
+                new RecordingSelector(),
+                new ScriptedHasContent(false),
+                new ScriptedNotes(),
+                new ScriptedReadySignal(),
+                t -> (t == 0 || t == 2) ? "trk_" + t : "",
+                t -> (t == 0 || t == 2) ? "Track " + t : "");
+        assertEquals(3, grid.tracks.size(),
+                "only the TRAILING empty run trims; the mid-bank empty row survives");
+        assertEquals("trk_0", grid.tracks.get(0).trackSid);
+        assertEquals("", grid.tracks.get(1).trackSid,
+                "mid-bank empty-sid row survives AS-IS (daemon refuses honestly)");
+        assertEquals("trk_2", grid.tracks.get(2).trackSid);
+    }
+
     /**
      * REGRESSION (Plan 04-01 Task 2 fix): ClipLauncherSlot.hasContent() is a
      * BooleanValue that returns its default {@code false} until
