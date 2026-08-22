@@ -871,6 +871,76 @@ describe("refreshArrangementSnapshot (04.3-07 DEFECT B — validated write gate)
 });
 
 // ============================================================================
+// fix-04.3 — DEFECT D (daemon half): a pulled launcher grid that is EMPTY or
+// carries ANY row with an empty/missing trackSid is INCOMPLETE (unsynced bank
+// or stale bridge mid-settle — e.g. a mid-bank real-but-unsynced track that
+// the bridge's tail-trim deliberately preserved). refreshArrangementSnapshot
+// must refuse it up front (null: no snapshot, no roles.json) instead of
+// building a snapshot the write gate rejects — keeping the DEFECT A all-empty
+// poison impossible even against a stale bridge, and rendering the honest
+// no-snapshot hint via boot's dependency.
+// ============================================================================
+
+describe("refreshArrangementSnapshot (fix-04.3 DEFECT D — incomplete launcher grid refusal)", () => {
+  it("returns null AND writes no files when the pulled grid has ZERO tracks (all-empty poison)", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-refresh-"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+      const rolesPath = path.join(dir, "roles.json");
+      const snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: vi.fn(async () => ({ tracks: [], sceneNames: [] })),
+        arrangementSnapshotPath: snapshotPath,
+        rolesPath,
+        intent: null,
+      });
+      expect(snap).toBeNull();
+      // The refusal is the UP-FRONT incomplete-grid diagnosis (bounded log),
+      // not a downstream save-gate rejection.
+      expect(errSpy.mock.calls.some((c) => String(c[0]).includes("arrange.refresh launcher grid incomplete"))).toBe(true);
+      await expect(fs.readFile(snapshotPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(fs.readFile(rolesPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      errSpy.mockRestore();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+
+  it("returns null AND writes no files when ANY pulled track has an empty trackSid (mid-bank, tail-trim survivor)", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "bw-brain-refresh-"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const snapshotPath = path.join(dir, "arrangement-snapshot.json");
+      const rolesPath = path.join(dir, "roles.json");
+      const snap = await refreshArrangementSnapshot({
+        pullLauncherGrid: vi.fn(async () => ({
+          tracks: [
+            { trackSid: "t1", name: "kick", scenes: [] },
+            { trackSid: "", name: "unsynced mid-bank track", scenes: [] },
+            { trackSid: "t3", name: "hat", scenes: [] },
+          ],
+          sceneNames: [],
+        })),
+        arrangementSnapshotPath: snapshotPath,
+        rolesPath,
+        intent: null,
+      });
+      expect(snap).toBeNull();
+      // Refused UP FRONT as an incomplete grid (bounded incomplete-grid log),
+      // never reaching the write gate's generic save-failure path.
+      expect(errSpy.mock.calls.some((c) => String(c[0]).includes("arrange.refresh launcher grid incomplete"))).toBe(true);
+      // An incomplete grid persists NOTHING — no partial snapshot, no roles
+      // derived from a grid the daemon knows is incomplete.
+      await expect(fs.readFile(snapshotPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(fs.readFile(rolesPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      errSpy.mockRestore();
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  });
+});
+
+// ============================================================================
 // 04.3 Plan 04.3-07 Task 2 — DEFECT C: an INVALID arrangement-snapshot.json on
 // disk yields a bounded, visible snapshot_invalid refusal on the arrange query
 // surfaces — the exact scenario that process-exited the daemon during the
