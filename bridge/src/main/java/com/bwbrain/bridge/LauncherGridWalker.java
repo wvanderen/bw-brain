@@ -359,7 +359,37 @@ final class LauncherGridWalker {
         // sceneNames is enriched separately (Observers.wireSceneBank) — the
         // walker returns an empty list here; PullHandlers.handleLauncherGrid
         // fills it from the observers cache before building the response line.
-        return new LauncherGridResponse(tracks, new ArrayList<>(sceneCount));
+        //
+        // fix-04.3 (DEFECT D): trim the trailing contiguous run of phantom
+        // bank tail rows before building the response. The windowed TrackBank
+        // is BANK_SIZE-wide regardless of the project's real track count, and
+        // the production trackSidFor wiring
+        // (observers.getBankTrackNames().getOrDefault(t, "")) returns "" for
+        // unpopulated tail slots — emitting those as track rows made every
+        // arrangement snapshot from a <8-track project schema-invalid
+        // (/grid/tracks/N/trackSid minLength), so no snapshot could persist.
+        // ONLY the suffix trims: a MID-BANK empty-sid row (a real-but-unsynced
+        // track) must SURVIVE so the daemon can refuse honestly downstream —
+        // silently dropping mid-bank rows would produce incomplete snapshots.
+        return new LauncherGridResponse(trimTrailingEmptySidTracks(tracks), new ArrayList<>(sceneCount));
+    }
+
+    /** DEFECT D (fix-04.3): a phantom tail row carries an empty trackSid (null or ""). */
+    private static boolean isEmptyTrackSid(final String sid) {
+        return sid == null || sid.isEmpty();
+    }
+
+    /**
+     * DEFECT D (fix-04.3): trim ONLY the trailing contiguous run of empty-sid
+     * rows from the walked track list. A mid-bank empty-sid row is preserved
+     * (the daemon's incomplete-grid refusal fires on it honestly).
+     */
+    private static List<TrackRowView> trimTrailingEmptySidTracks(final List<TrackRowView> tracks) {
+        int last = tracks.size();
+        while (last > 0 && isEmptyTrackSid(tracks.get(last - 1).trackSid)) {
+            last--;
+        }
+        return new ArrayList<>(tracks.subList(0, last));
     }
 
     // Cell-scoped loop-length holder between AWAITING_LOOPLEN and DRAINING.
