@@ -34,6 +34,9 @@ import { SectionDetector } from "../transforms/section-detector.js";
 import { RepetitionReport } from "../transforms/repetition-report.js";
 import { EnergyCurve } from "../transforms/energy-curve.js";
 import { TrackRoleClassifier } from "../transforms/track-role-classifier.js";
+// M4 (Plan 05-04): AutomationSalience joins for Phase 5 (AUTO-01). Same
+// type-only back-import discipline — no runtime cycle.
+import { AutomationSalience } from "../transforms/automation-salience.js";
 
 /** The Plan-01-generated raw-state contract (re-aliased from 02-03a's reconcile.ts). */
 export type RawState = ProjectState;
@@ -213,4 +216,17 @@ export const M3_ANALYZERS: readonly Analyzer[] = [
   RepetitionReport,
   EnergyCurve,
   TrackRoleClassifier,
+];
+
+/**
+ * M4's complete analyzer set (Phase 5 / Plan 05-04 — AUTO-01): M3 plus
+ * AutomationSalience, the daemon analytics half of the salience pipeline
+ * (observed 05-01/05-03 movement aggregates in, ranked honest scores out —
+ * D-05-01/D-05-03). The arrange.* surfaces keep serving from M3_ANALYZERS so
+ * their wire payloads stay byte-identical; the salience refresh path
+ * (query-server refreshSalienceSnapshot) consumes this analyzer directly.
+ */
+export const M4_ANALYZERS: readonly Analyzer[] = [
+  ...M3_ANALYZERS,
+  AutomationSalience,
 ];
