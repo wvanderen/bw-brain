@@ -6,14 +6,14 @@ current_phase: 04.3
 current_phase_name: clap-first-product-rebaseline-and-roadmap-reconciliation
 status: executing
 stopped_at: "Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)"
-last_updated: "2026-08-21T22:51:46.344Z"
+last_updated: "2026-08-22T00:12:46.677Z"
 last_activity: 2026-08-21
-last_activity_desc: Phase 04.3 execution started
+last_activity_desc: "Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 53
-  completed_plans: 48
+  completed_plans: 50
   percent: 67
 ---
 
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-08-20)
 ## Current Position
 
 Phase: 04.3 (clap-first-product-rebaseline-and-roadmap-reconciliation) — EXECUTING
-Plan: 7 of 8 (next: 04.3-07 daemon halves of DEFECT A/B/C; 01–06 complete)
-Status: Executing Phase 04.3
+Plan: 8 of 8 (next: 04.3-07 daemon halves of DEFECT A/B/C; 01–06 complete)
+Status: Ready to execute
 Last activity: 2026-08-21 — Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
 
 Progress: [█████████░] 48/53 defined plans complete; Phase 5 unplanned
@@ -97,6 +97,7 @@ Progress: [█████████░] 48/53 defined plans complete; Phase 5
 | Phase 04.3 P03 | 12 min | 2 tasks | 5 files |
 | Phase 04.3 P04 | 2h 45m | 2 tasks | 3 files |
 | Phase 04.3 P06 | 5min | 2 tasks | 5 files |
+| Phase 04.3 P07 | 6min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.3 P04] Legacy 04-UAT.md classified additive-only (rows 1-4, 6-14 retained-CLI; row 5 superseded-UI; zero product-gap) and committed — acceptance history classified, never falsified; 04.3-UAT.md replaces the obsolete external-Pi /review acceptance surface.
 - [Phase ?]: [Phase 04.3 P06] BankSyncWait.Sleeper declares InterruptedException (not java.util.function.LongConsumer) so production binds Thread::sleep verbatim — LongConsumer accept() is throws-incompatible with Thread.sleep (would not compile); interruption restores the flag and returns waited (honest proceed, never busy-spin).
 - [Phase ?]: [Phase 04.3 P06] RB-03/UX-03 deliberately left unchecked after 04.3-06 — this plan closes only DEFECT A bridge half; acceptance requires daemon halves (04.3-07) + live re-run (04.3-08).
+- [Phase ?]: [Phase 04.3 P07] refreshArrangementSnapshot returns null on a rejected save AND skips saveRoles — a rejected grid must not leak derived roles; handleArrangeRefresh error string broadened to name both null causes (failure-path only, ok:true payloads byte-identical)
+- [Phase ?]: [Phase 04.3 P07] Single error vocabulary snapshot_invalid on BOTH surfaces (peer action.error pattern-legal, CLI free-string) — zero schemas/ churn; peer path distinguishes invalid (refusal) from absent (no-snapshot); loadArrangementAnalysisEvidence untouched
+- [Phase ?]: [Phase 04.3 P07] LAUNCHER_GRID_PULL_TIMEOUT_MS = 90_000 (5000ms BankSyncWait cap + 128×500ms D-22 ceiling + margin) at all three get.launcher_clips sites; every other get.* pull keeps the 3000ms default; RB-03/UX-03 stay unchecked until 04.3-08's live re-run
 
 ### Pending Todos
 
@@ -228,6 +232,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-21T22:51:23.780Z
+Last session: 2026-08-22T00:12:42.733Z
 Stopped at: Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
 Resume file: None

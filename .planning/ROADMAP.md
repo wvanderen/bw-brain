@@ -267,7 +267,7 @@ Plans:
   4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
   5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
 
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 **UI hint:** yes
 **Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
 
@@ -291,7 +291,7 @@ Plans:
 **Wave 4** *(parallel — zero file overlap: bridge-only vs daemon-only)*
 
 - [x] 04.3-06-PLAN.md — [GAP CLOSURE] DEFECT A bridge half: bounded bank-sync settle wait (pure BankSyncWait seam + Observers bank-observation tracking) before the get.launcher_clips walk + repackaged .bwextension passing the freshness gate (autonomous, Wave 4)
-- [ ] 04.3-07-PLAN.md — [GAP CLOSURE] DEFECT B + C + A daemon half: validate-before-persist in saveArrangementSnapshot + failed-save→null refresh + bounded snapshot_invalid refusals on the query/peer load paths + per-request 90s launcher-grid correlator deadline (autonomous, Wave 4)
+- [x] 04.3-07-PLAN.md — [GAP CLOSURE] DEFECT B + C + A daemon half: validate-before-persist in saveArrangementSnapshot + failed-save→null refresh + bounded snapshot_invalid refusals on the query/peer load paths + per-request 90s launcher-grid correlator deadline (autonomous, Wave 4)
 
 **Wave 5** *(blocked on Wave 4 — the live re-run needs all three defects closed)*
 
@@ -329,5 +329,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
-| 04.3. CLAP-First Product Rebaseline | 6/8 | In Progress|  |
+| 04.3. CLAP-First Product Rebaseline | 7/8 | In Progress|  |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
