@@ -87,6 +87,13 @@ const snapshotSchema = {
       properties: {
         tracks: {
           type: "array",
+          // fix-04.3 (DEFECT D): a persistable snapshot carries at least one
+          // track. A zero-track pull is an INCOMPLETE grid (unsynced bank /
+          // stale bridge) that refreshArrangementSnapshot refuses up front —
+          // minItems is the write-gate backstop so tracks: [] can never
+          // reach disk through ANY path (and the shared validator refuses a
+          // hand-written empty file at load).
+          minItems: 1,
           items: {
             type: "object",
             required: ["trackSid", "name", "scenes"],

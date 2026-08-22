@@ -27,13 +27,16 @@ import { loadArrangementSnapshot, saveArrangementSnapshot, type ArrangementSnaps
 
 const OLD_PULLED_AT = "2026-08-21T10:00:00.000Z";
 
+// fix-04.3 (DEFECT D): the fixture carries one real track — the snapshot
+// schema requires minItems:1 on grid.tracks (a zero-track "snapshot" is an
+// incomplete grid the refresh path refuses, never a persistable file).
 const snapshot = (pulledAt = OLD_PULLED_AT): ArrangementSnapshot => ({
   version: "1.0",
   pulledAt,
   profile: "generic",
   sceneCount: 0,
-  trackCount: 0,
-  grid: { tracks: [], sceneNames: [] },
+  trackCount: 1,
+  grid: { tracks: [{ trackSid: "trk_bootarr000000001", name: "Kick", scenes: [] }], sceneNames: [] },
 });
 
 const withTmp = async (run: (dir: string) => Promise<void>): Promise<void> => {
