@@ -311,14 +311,14 @@ Plans:
   4. Device inspection and automation workflows cover third-party VST/AU plugins loaded in the chain, not just native Bitwig devices.
   5. The CLAP device workspace renders chain summary, parameter targets, macro opportunities, and mutation outcome; Pi remains behind the daemon and the CLI remains a secondary contract.
 
-**Plans**: 10
+**Plans**: 1/10 plans executed
 **UI hint**: yes
 **Research needed**: automation salience statistics; bounded automation generation with genre-profile constraints.
 
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Protocol/profile schema extension (parameter.changed, get.project_meta, automationWrite payload, automationShapes bias) — schema-first per Pitfall 8 (Wave 1)
+- [x] 05-01-PLAN.md — Protocol/profile schema extension (parameter.changed, get.project_meta, automationWrite payload, automationShapes bias) — schema-first per Pitfall 8 (Wave 1)
 - [ ] 05-02-PLAN.md — Live automation-write probe → dated Observed fields + named-refusal vocabulary in docs/bitwig-capabilities.md; gates the write wave (Wave 1, autonomous: false)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -359,4 +359,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
 | 04.3. CLAP-First Product Rebaseline | 8/8 | Complete    | 2026-08-22 |
-| 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |
+| 5. Automation & Device Workflows (M4) | 1/10 | In Progress|  |

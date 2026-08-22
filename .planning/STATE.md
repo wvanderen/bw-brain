@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 5
-current_phase_name: M4
+current_phase_name: Automation & Device Workflows (M4
 status: executing
 stopped_at: Phase 5 context gathered
-last_updated: "2026-08-22T20:13:39.734Z"
+last_updated: "2026-08-22T20:24:56.641Z"
 last_activity: 2026-08-22
-last_activity_desc: Phase 04.3 complete, transitioned to Phase 5
+last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 53
-  completed_plans: 51
+  total_plans: 63
+  completed_plans: 52
   percent: 67
 ---
 
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 
 ## Current Position
 
-Phase: 5 — Automation & Device Workflows (M4)
-Plan: Not started
+Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
+Plan: 2 of 10
 Status: Ready to execute
-Last activity: 2026-08-22 — Phase 04.3 complete, transitioned to Phase 5
+Last activity: 2026-08-22 — Phase 5 execution started
 
 Progress: [████████████████████] 51/51 defined plans complete; Phase 5 unplanned
 
@@ -99,6 +99,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 04.3 P04 | 2h 45m | 2 tasks | 3 files |
 | Phase 04.3 P06 | 5min | 2 tasks | 5 files |
 | Phase 04.3 P07 | 6min | 3 tasks | 8 files |
+| Phase 05 P01 | 10min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -200,6 +201,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.3 P07] refreshArrangementSnapshot returns null on a rejected save AND skips saveRoles — a rejected grid must not leak derived roles; handleArrangeRefresh error string broadened to name both null causes (failure-path only, ok:true payloads byte-identical)
 - [Phase ?]: [Phase 04.3 P07] Single error vocabulary snapshot_invalid on BOTH surfaces (peer action.error pattern-legal, CLI free-string) — zero schemas/ churn; peer path distinguishes invalid (refusal) from absent (no-snapshot); loadArrangementAnalysisEvidence untouched
 - [Phase ?]: [Phase 04.3 P07] LAUNCHER_GRID_PULL_TIMEOUT_MS = 90_000 (5000ms BankSyncWait cap + 128×500ms D-22 ceiling + margin) at all three get.launcher_clips sites; every other get.* pull keeps the 3000ms default; RB-03/UX-03 stay unchecked until 04.3-08's live re-run
+- [Phase ?]: [Phase 05 P01] parameter.changed protocol event + bounded fold: aggregates keyed deviceKey:source:paramIndex, movement = delta>1e-4, 512-cap lowest-lastMovedAt eviction; transport.changed folds automationWrite verbatim (D-05-05 vocabulary) independent of playing
+- [Phase ?]: [Phase 05 P01] generic.json ships a NEUTRAL automationShapes block (energyWeights presence precedent: present in both profiles); schema optionality keeps absence valid and 05-08 consumers default via ctx.profile?.automationShapes ?? DEFAULT (ARCH-02)
 
 ### Pending Todos
 
@@ -233,6 +236,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T15:53:37.296Z
+Last session: 2026-08-22T20:24:47.188Z
 Stopped at: Phase 5 context gathered
 Resume file: .planning/phases/05-automation-device-workflows-m4/05-CONTEXT.md
