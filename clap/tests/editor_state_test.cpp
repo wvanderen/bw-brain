@@ -70,6 +70,26 @@ int main() {
         "Review refresh-false must omit empty clipSid and emit a false literal");
   auto invalidReview = UiAction::arrangementReview("project a", "inst-a", "clip-a", true);
   check(!encodePeerAction(invalidReview, peerMessage), "Review action with invalid peer id must fail closed");
+
+  // --- 05-09: deviceReview (the additive-member arrangementReview precedent;
+  // factory + golden wire + fail-closed mirror the review_ block above). ---
+  auto deviceReviewAction = UiAction::deviceReview("project-a", "inst-a", "clip-a", true);
+  check(deviceReviewAction.kind == UiAction::Kind::deviceReview && deviceReviewAction.refresh &&
+            deviceReviewAction.projectId == "project-a" && deviceReviewAction.instanceId == "inst-a" &&
+            deviceReviewAction.clipSid == "clip-a",
+        "Devices factory must populate scope + refresh");
+  check(deviceReviewAction.token.rfind("device-review-", 0) == 0, "Devices factory must mint device-review-N request tokens");
+  deviceReviewAction.token = "device-review-1";
+  check(encodePeerAction(deviceReviewAction, peerMessage), "Devices action must encode for the confirmed visible scope");
+  check(peerMessage == "{\"type\":\"device.review\",\"requestId\":\"device-review-1\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"clipSid\":\"clip-a\"},\"refresh\":true}",
+        "device.review golden wire mismatch");
+  auto snapshotDeviceReview = UiAction::deviceReview("project-a", "inst-a", "", false);
+  snapshotDeviceReview.token = "device-review-2";
+  check(encodePeerAction(snapshotDeviceReview, peerMessage) &&
+            peerMessage == "{\"type\":\"device.review\",\"requestId\":\"device-review-2\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\"},\"refresh\":false}",
+        "Devices refresh-false must omit empty clipSid and emit a false literal");
+  auto invalidDeviceReview = UiAction::deviceReview("project a", "inst-a", "clip-a", true);
+  check(!encodePeerAction(invalidDeviceReview, peerMessage), "Devices action with invalid peer id must fail closed");
   check(reducePeerMessage(peerStore, "{\"type\":\"analysis.status\",\"requestId\":\"analysis-1\",\"status\":\"running\",\"scope\":{\"projectId\":\"project-a\",\"instanceId\":\"inst-a\",\"clipSid\":\"clip-a\"}}"), "analysis running response reducer");
   check(peerStore.snapshot()->analysis == "running" && peerStore.snapshot()->session == "open", "Analyze must visibly leave idle");
   check(reducePeerMessage(peerStore, "{\"type\":\"analysis.complete\",\"requestId\":\"analysis-1\",\"status\":\"error\",\"error\":\"analysis_failed\"}"), "analysis failure response reducer");
@@ -100,6 +120,22 @@ int main() {
   check(!reducePeerMessage(chunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"review-12\",\"sequence\":0,\"text\":\"" + std::string(513, 'x') + "\"}"), "513-char chunk text must fail closed");
   check(chunkStore.snapshot()->analysis == "error: analysis_auth_required" && chunkStore.snapshot()->lastChunkRequestId == "review-10",
         "rejected chunks must not mutate visible analysis or bookkeeping");
+
+  // --- 05-09: the device-review render rides the SAME ConversationChunkReceived
+  // machinery — contiguous sequence appends, ok completion preserves, bounds
+  // fail closed exactly as the arrangement-review stream does. ---
+  UiStateStore deviceChunkStore;
+  check(reducePeerMessage(deviceChunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"device-review-9\",\"sequence\":0,\"text\":\"device chain\"}"), "device chunk sequence 0 reducer");
+  check(deviceChunkStore.snapshot()->analysis == "device chain", "first device chunk must reset analysis to its text");
+  check(reducePeerMessage(deviceChunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"device-review-9\",\"sequence\":1,\"text\":\"parameter targets\"}"), "contiguous device chunk reducer");
+  check(deviceChunkStore.snapshot()->analysis == "device chain\nparameter targets", "contiguous device chunk must append with newline separator");
+  check(reducePeerMessage(deviceChunkStore, "{\"type\":\"analysis.complete\",\"requestId\":\"device-review-9\",\"status\":\"ok\"}"), "device review ok completion reducer");
+  check(deviceChunkStore.snapshot()->analysis == "device chain\nparameter targets", "device ok completion must preserve accumulated chunk text");
+  check(!reducePeerMessage(deviceChunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"device-review-10\",\"sequence\":65536,\"text\":\"bounded\"}"), "device sequence above 65535 must fail closed");
+  check(!reducePeerMessage(deviceChunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"\",\"sequence\":0,\"text\":\"bounded\"}"), "device empty requestId chunk must fail closed");
+  check(!reducePeerMessage(deviceChunkStore, "{\"type\":\"conversation.chunk\",\"requestId\":\"device-review-10\",\"sequence\":0,\"text\":\"" + std::string(513, 'x') + "\"}"), "device 513-char chunk text must fail closed");
+  check(deviceChunkStore.snapshot()->lastChunkRequestId == "device-review-9",
+        "rejected device chunks must not mutate bookkeeping");
   const std::string digest(64, 'a');
   const std::string published =
       "{\"type\":\"proposal.publish\",\"proposalId\":\"proposal-a\",\"revision\":2,\"digest\":\"" + digest +
@@ -137,6 +173,7 @@ int main() {
   check(actions.enqueue(UiAction::analyze()), "Analyze must be hosted action");
   check(actions.enqueue(UiAction::stop()), "Stop must be hosted action");
   check(actions.enqueue(UiAction::arrangementReview("project-a", "inst-a", "clip-a", true)), "Review must be hosted action");
+  check(actions.enqueue(UiAction::deviceReview("project-a", "inst-a", "clip-a", true)), "Devices must be hosted action");
   check(actions.enqueue(UiAction::linkConfirmRequest()), "link confirmation request action");
   check(actions.enqueue(UiAction::linkConfirmAccept("nonce-a")), "link confirmation accept action");
   check(actions.enqueue(UiAction::focusSet("project-a", "inst-a", "clip-a")), "focus action");
@@ -146,7 +183,7 @@ int main() {
   bool generatedMix = false;
   for (auto* parameter : processor.getParameters()) {
     const auto name = parameter->getName(128).toStdString();
-    check(name != "Analyze" && name != "Stop" && name != "Review", "Analyze/Stop/Review must not be parameters");
+    check(name != "Analyze" && name != "Stop" && name != "Review" && name != "Devices", "Analyze/Stop/Review/Devices must not be parameters");
     if (name == "Generated Mix") {
       generatedMix = true;
       check(parameter->isAutomatable(), "musical control must be automatable");
