@@ -60,6 +60,11 @@ const ALLOWED_QUERY_OPS: ReadonlySet<string> = new Set([
   "arrange.review",
   "arrange.current_section",
   "arrange.refresh",
+  // Phase 5 (05-04 — AUTO-01) — automation salience. Reads the folded
+  // movement aggregates + the durable salience snapshot; a refresh analyzes +
+  // persists salience-snapshot.json. Same arrange.refresh class: atomic
+  // daemon-mediated durable write, no CLI-side ephemeral write. MEM-02 holds.
+  "automation.inspect",
 ]);
 
 /**

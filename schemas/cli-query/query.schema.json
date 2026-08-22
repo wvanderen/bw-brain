@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/cli-query/query.schema.json",
   "title": "CliQuery",
   "description": "D-07 daemon-local CLI query contract. The query half of the CLI↔daemon channel (separate from the bridge TCP protocol — Pitfall 3 defense). Source: CONTEXT.md D-07 + RESEARCH.md Pattern 3 'Query/response shape'.",
-  "$comment": "Phase 2 freezes the CLI-query op enum as the 5 live + diff ops (D-05): focus.export, project.summary, project.region, midi.inspect, device.inspect, diff. This is its OWN schema set at schemas/cli-query/ — NOT a constrained subset of the bridge protocol (Pitfall 3). The two contracts evolve independently: bridge-protocol changes (Phase 3+ tightening of get.* payload) cannot break CLI consumers. payload is additionalProperties:true (op-specific args like project.region {start,end}); tightened per-op in Phase 3 if patterns stabilize. type is fixed to 'query' (the discriminator vs result.schema.json's 'result'). Phase 3 (EDIT-02/04/05, MIDI-02..05) extends the op enum additively with edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize — backward-compatible.",
+  "$comment": "Phase 2 freezes the CLI-query op enum as the 5 live + diff ops (D-05): focus.export, project.summary, project.region, midi.inspect, device.inspect, diff. This is its OWN schema set at schemas/cli-query/ — NOT a constrained subset of the bridge protocol (Pitfall 3). The two contracts evolve independently: bridge-protocol changes (Phase 3+ tightening of get.* payload) cannot break CLI consumers. payload is additionalProperties:true (op-specific args like project.region {start,end}); tightened per-op in Phase 3 if patterns stabilize. type is fixed to 'query' (the discriminator vs result.schema.json's 'result'). Phase 3 (EDIT-02/04/05, MIDI-02..05) extends the op enum additively with edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize — backward-compatible. Phase 4 (ARRANGE-01..05) adds arrange.*; Phase 5 (Plan 05-04, AUTO-01) adds automation.inspect (bw-automation went live — the stub carve-out no longer applies to it).",
   "type": "object",
   "required": ["version", "type", "op"],
   "additionalProperties": false,
@@ -39,9 +39,10 @@
         "arrange.energy_curve",
         "arrange.review",
         "arrange.current_section",
-        "arrange.refresh"
+        "arrange.refresh",
+        "automation.inspect"
       ],
-      "description": "The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize + Phase 4 arrange.* (ARRANGE-01..05, UX-03): arrange.sections/repetition_report/energy_curve/review/current_section/refresh. Stubs (bw-automation) do NOT get ops here — they emit not_implemented results without ever querying the daemon."
+      "description": "The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize + Phase 4 arrange.* (ARRANGE-01..05, UX-03): arrange.sections/repetition_report/energy_curve/review/current_section/refresh + Phase 5 (AUTO-01, Plan 05-04): automation.inspect — the ranked per-parameter salience read (observed movement → analyzer → durable snapshot, D-05-01..04). Result payload: {params: ranked list (salience desc), tracks, pulledAt} on ok:true; named refusals no_snapshot/snapshot_invalid/state_disconnected on ok:false."
     },
     "payload": {
       "type": "object",

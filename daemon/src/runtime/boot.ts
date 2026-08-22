@@ -103,6 +103,13 @@ export const DEFAULT_ARRANGEMENT_SNAPSHOT_PATH: string = join(process.cwd(), ".b
 export const DEFAULT_ROLES_PATH: string = join(process.cwd(), ".bw-brain", "roles.json");
 
 /**
+ * Phase 5 Plan 05-04 — path to .bw-brain/salience-snapshot.json (AUTO-01
+ * durable store, D-05-04). automation.inspect refreshes/persists the ranked
+ * per-parameter salience snapshot here.
+ */
+export const DEFAULT_SALIENCE_SNAPSHOT_PATH: string = join(process.cwd(), ".bw-brain", "salience-snapshot.json");
+
+/**
  * 04.3 / 04.3-07 (DEFECT A daemon half) — per-request correlator deadline for
  * the get.launcher_clips pull (all three send sites). Derivation:
  *   5000ms  BankSyncWait settle-wait cap (Plan 04.3-06, BANK_SYNC_MAX_WAIT_MS)
@@ -366,6 +373,8 @@ export interface BootOptions {
   arrangementSnapshotPath?: string;
   /** Phase 4: roles.json path (default {@link DEFAULT_ROLES_PATH}). */
   rolesPath?: string;
+  /** Phase 5 (05-04): salience-snapshot path (default {@link DEFAULT_SALIENCE_SNAPSHOT_PATH}). */
+  salienceSnapshotPath?: string;
 }
 
 /** Handle returned by boot() so callers (smoke test, harness) can shut down. */
@@ -394,6 +403,7 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   const intentPath = opts.intentPath ?? DEFAULT_INTENT_PATH;
   const arrangementSnapshotPath = opts.arrangementSnapshotPath ?? DEFAULT_ARRANGEMENT_SNAPSHOT_PATH;
   const rolesPath = opts.rolesPath ?? DEFAULT_ROLES_PATH;
+  const salienceSnapshotPath = opts.salienceSnapshotPath ?? DEFAULT_SALIENCE_SNAPSHOT_PATH;
 
   // --- a. Stale-socket probe (RESEARCH.md Pattern 3 "cleaned on daemon exit"
   //     precedent; dbus/ssh-agent convention). Distinguishes live (connect ->
@@ -800,6 +810,10 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
     pullLauncherGrid: () => correlator.send("get.launcher_clips", {}, { timeoutMs: LAUNCHER_GRID_PULL_TIMEOUT_MS }),
     arrangementSnapshotPath,
     rolesPath,
+    // Phase 5 (05-04 — AUTO-01): the durable salience snapshot path. Wired
+    // here so automation.inspect serves live in production; 05-09's peer
+    // device-review path consumes the same store.
+    salienceSnapshotPath,
   });
 
   // --- j. Signal handlers + shutdown. ----------------------------------

@@ -64,6 +64,15 @@ import {
   type ArrangementSnapshot,
 } from "../state/arrangement-snapshot.js";
 import { loadRoles, saveRoles, type RolesFile } from "../state/roles-store.js";
+import {
+  loadSalienceSnapshot,
+  saveSalienceSnapshot,
+  type SalienceSnapshot,
+  type SalienceParamEntry,
+} from "../state/salience-snapshot.js";
+// Phase 5 (Plan 05-04 — AUTO-01): the salience analyzer + the ranked-param
+// type it emits (observed movement in, ranked honest scores out — D-05-01/03).
+import { AutomationSalience, type SaliencePriors, type RankedSalienceParam } from "../transforms/automation-salience.js";
 import { suggestTransitions, type TransitionObservation } from "../transforms/transition-suggest.js";
 import type { SectionSummary } from "../transforms/section-detector.js";
 import type { EnergyPoint } from "../transforms/energy-curve.js";
@@ -100,6 +109,9 @@ const LIVE_OPS = new Set([
   "arrange.review",
   "arrange.current_section",
   "arrange.refresh",
+  // Phase 5 Plan 05-04 — automation salience (AUTO-01/D-05-01..04). Reads
+  // the 05-01 folded movement aggregates + the durable salience snapshot.
+  "automation.inspect",
 ]);
 
 /** Dependencies injected by the daemon boot sequence. */
@@ -165,6 +177,13 @@ export interface QueryServerDeps {
    * store). arrange.refresh persists track-role classifications here.
    */
   rolesPath?: string;
+  /**
+   * Phase 5 Plan 05-04 — path to .bw-brain/salience-snapshot.json (AUTO-01
+   * durable store, D-05-04). automation.inspect refreshes/persists the ranked
+   * salience snapshot here. Absent when the daemon is not configured for
+   * automation analysis (automation.inspect returns not_implemented).
+   */
+  salienceSnapshotPath?: string;
   /** Canonical shared mutation authority; when present all edit routes delegate to it. */
   editService?: EditService;
 }
@@ -381,6 +400,14 @@ export function startQueryServer(deps: QueryServerDeps): void {
     }
     if (op === "arrange.refresh") {
       void handleArrangeRefresh(deps, state, intent, freshness);
+      return;
+    }
+
+    // Phase 5 Plan 05-04 — automation.inspect dispatch (AUTO-01). Same
+    // fire-and-forget shape as the arrange.* arms above: the async handler
+    // resolves later + transport.send fires from the async continuation.
+    if (op === "automation.inspect") {
+      void handleAutomationInspect(deps, state, intent, freshness, msg as { payload?: { refresh?: boolean } });
       return;
     }
 
@@ -1149,6 +1176,333 @@ async function refreshSnapshot(
     rolesPath: deps.rolesPath,
     intent,
   });
+}
+
+// ============================================================================
+// Phase 5 Plan 05-04 — automation salience: refresh + evidence assembly +
+// the automation.inspect op (AUTO-01, D-05-01..04).
+// ============================================================================
+//
+// refreshSalienceSnapshot mirrors refreshArrangementSnapshot (:1021-1120):
+// refuse-incomplete-up-front (empty folded parameters → null, NOTHING
+// persisted — no empty snapshot ever reaches disk), run the
+// AutomationSalience analyzer over the fold (+ roles.json/energyCurve priors
+// through the documented automationPriors sidecar), then the schema-gated
+// save. assembleDeviceReviewEvidence mirrors assembleArrangementReviewEvidence
+// (:962-1005) with the 04.3-07 snapshot_invalid widening — 05-09's
+// action-dispatch consumes it via boot injection; 05-07 extends it with macros.
+
+/** Options for {@link refreshSalienceSnapshot} (CLI + peer paths share this). */
+export interface RefreshSalienceSnapshotOptions {
+  /** The 05-01 folded movement aggregates (state.parameters). */
+  parameters: RawState["parameters"];
+  /** Selection trackSid at refresh time — the snapshot's attribution key. */
+  trackKey: string;
+  salienceSnapshotPath: string;
+  /** Optional roles.json path — the roleSalience prior (absent → default). */
+  rolesPath?: string;
+  /** Optional arrangement-snapshot path — the energyAtMovement prior. */
+  arrangementSnapshotPath?: string;
+  intent: ProjectIntent | null;
+}
+
+/**
+ * Resolve the D-05-01 prior context: roleSalience from roles.json (the
+ * classified track's role confidence) + energyAtMovement from the arrangement
+ * snapshot's derived energyCurve (its mean — the fold carries no per-section
+ * movement spread, so the honest available signal is the overall energy
+ * level). Every failure/absence degrades to `undefined` (the analyzer's
+ * default-0.5 fallback + its "default"-source assumption disclose it).
+ */
+async function resolveSaliencePriors(options: {
+  rolesPath?: string;
+  arrangementSnapshotPath?: string;
+  trackKey: string;
+}): Promise<SaliencePriors | undefined> {
+  let roleSalience: number | undefined;
+  let energyAtMovement: number | undefined;
+
+  if (options.rolesPath) {
+    try {
+      const roles = await loadRoles(options.rolesPath);
+      const confidence = roles?.tracks[options.trackKey]?.confidence;
+      if (typeof confidence === "number") roleSalience = confidence;
+    } catch (e) {
+      console.error("[query-server] salience roles prior load failed:", (e as Error).message);
+    }
+  }
+  if (options.arrangementSnapshotPath) {
+    try {
+      const snap = await loadArrangementSnapshot(options.arrangementSnapshotPath);
+      const curve = snap?.derived?.energyCurve;
+      if (curve && curve.length > 0) {
+        energyAtMovement = curve.reduce((s, p) => s + p.value, 0) / curve.length;
+      }
+    } catch (e) {
+      console.error("[query-server] salience energy prior load failed:", (e as Error).message);
+    }
+  }
+
+  if (roleSalience === undefined && energyAtMovement === undefined) return undefined;
+  return {
+    ...(roleSalience !== undefined ? { roleSalience } : {}),
+    ...(energyAtMovement !== undefined ? { energyAtMovement } : {}),
+  };
+}
+
+/**
+ * Build the pseudo-RawState the AutomationSalience analyzer consumes: the
+ * folded parameters + the documented `automationPriors` sidecar (the
+ * open-typed defensive-read discipline energy-curve.ts uses for raw.tracks —
+ * the runtime contract, not the generated type, describes the sidecar).
+ */
+function rawForSalience(parameters: NonNullable<RawState["parameters"]>, priors: SaliencePriors | undefined): RawState {
+  return {
+    version: "1.0",
+    project: { name: "", tempo: 120, timeSignature: "4/4" },
+    selection: {},
+    parameters,
+    automationPriors: priors,
+  } as unknown as RawState;
+}
+
+/**
+ * Salience refresh core (05-04 — the refreshArrangementSnapshot mirror):
+ * fold aggregates → priors → AutomationSalience analyzer → schema-gated
+ * saveSalienceSnapshot. Returns the persisted snapshot, or null on refusal.
+ *
+ * Refuse-incomplete-up-front: empty folded parameters → null WITHOUT any
+ * disk write (no empty snapshot is ever persisted — the minItems:1 write-gate
+ * backstop never even engages). A schema-rejected save is a FAILED refresh
+ * (null, nothing derived persisted) — the 04.3-07 DEFECT B discipline.
+ */
+export async function refreshSalienceSnapshot(
+  options: RefreshSalienceSnapshotOptions,
+): Promise<SalienceSnapshot | null> {
+  const { parameters, trackKey, salienceSnapshotPath, rolesPath, arrangementSnapshotPath, intent } = options;
+  const entryCount = parameters ? Object.keys(parameters).length : 0;
+  if (entryCount === 0) {
+    console.error("[query-server] automation salience refresh refused: folded parameters empty");
+    return null;
+  }
+
+  const priors = await resolveSaliencePriors({ rolesPath, arrangementSnapshotPath, trackKey });
+  const fields = AutomationSalience.analyze(
+    rawForSalience(parameters as NonNullable<RawState["parameters"]>, priors),
+    buildAnalyzeCtx(intent, Date.now()),
+  );
+  const ranked = (fields[0]?.value as RankedSalienceParam[] | undefined) ?? [];
+  if (fields.length === 0 || ranked.length === 0) {
+    // Every entry malformed defensively — same refusal as empty (no guess).
+    console.error("[query-server] automation salience refresh refused: analyzer produced no ranking");
+    return null;
+  }
+
+  const snap: SalienceSnapshot = {
+    version: "1.0",
+    pulledAt: new Date().toISOString(),
+    profile: intent?.projectIntent.profile ?? "generic",
+    tracks: [{ trackKey: trackKey.length > 0 ? trackKey : "unknown", params: ranked as SalienceParamEntry[] }],
+  };
+  try {
+    await saveSalienceSnapshot(salienceSnapshotPath, snap);
+  } catch (e) {
+    console.error("[query-server] automation salience saveSalienceSnapshot failed:", (e as Error).message);
+    return null;
+  }
+  return snap;
+}
+
+/** Internal wrapper: {@link refreshSalienceSnapshot} from QueryServerDeps. */
+async function refreshSalienceFromDeps(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+): Promise<SalienceSnapshot | null> {
+  if (!deps.salienceSnapshotPath) return null;
+  return refreshSalienceSnapshot({
+    parameters: state.parameters,
+    trackKey: state.selection.trackSid ?? "",
+    salienceSnapshotPath: deps.salienceSnapshotPath,
+    rolesPath: deps.rolesPath,
+    arrangementSnapshotPath: deps.arrangementSnapshotPath,
+    intent,
+  });
+}
+
+/** The pulledAt assumption every salience read surface carries (Pitfall 8). */
+function saliencePulledAtAssumption(snap: SalienceSnapshot | null): Assumption {
+  if (snap === null) {
+    return {
+      claim: "no salience snapshot loaded — move a knob and run `bw-automation inspect --refresh` while connected",
+      confidence: 1.0,
+      source: "default",
+    };
+  }
+  return {
+    claim: `derived from salience snapshot pulled at ${snap.pulledAt} (profile ${snap.profile}); run \`bw-automation inspect --refresh\` if the project has changed`,
+    confidence: 1.0,
+    source: "default",
+  };
+}
+
+/** Flatten a snapshot's tracks into one salience-desc ranked param list (SC#2). */
+function flatRankedSalience(snap: SalienceSnapshot): SalienceParamEntry[] {
+  const params: SalienceParamEntry[] = [];
+  for (const track of snap.tracks) params.push(...track.params);
+  params.sort((a, b) => b.salience - a.salience);
+  return params;
+}
+
+/**
+ * 05-04 Task 3 — the transport-free device-review evidence assembly (the
+ * assembleArrangementReviewEvidence mirror for the salience half). SINGLE
+ * SOURCE for the 05-09 action-dispatch peer path (boot-injected dependency);
+ * 05-07 extends the evidence with macros (structurally optional today).
+ */
+export interface DeviceReviewEvidence {
+  /** Confirmed-chain device list (the 05-03 device-chain read surface). */
+  chain: unknown[];
+  /** The ranked per-parameter salience list — highest first (SC#2 duty). */
+  salience: SalienceParamEntry[];
+  /** ISO timestamp of the snapshot the evidence came from; null = no snapshot. */
+  pulledAt: string | null;
+  assumptions: Assumption[];
+}
+
+/**
+ * The device-review outcome the dispatch layer consumes: a bounded refusal
+ * reason (action.error surface), the honest no-snapshot case (hint path), or
+ * the chain + ranked-salience evidence. The refusal union carries
+ * snapshot_invalid exactly as 04.3-07 widened the arrangement union (:934-937)
+ * — an invalid snapshot file refuses visibly, never masquerades as absent.
+ */
+export type DeviceReviewOutcome =
+  | { kind: "refusal"; reason: "state_disconnected" | "not_implemented" | "snapshot_invalid" }
+  | { kind: "no-snapshot" }
+  | { kind: "evidence"; evidence: DeviceReviewEvidence };
+
+/** Input to {@link assembleDeviceReviewEvidence}. */
+export interface AssembleDeviceReviewEvidenceInput {
+  /** The loaded salience snapshot; null when none exists. */
+  snap: SalienceSnapshot | null;
+  /** Set by the caller when loadSalienceSnapshot THREW (corrupt file). */
+  snapshotInvalid?: boolean;
+  /** Confirmed-chain devices (boot supplies from the device-chain read). */
+  chain: unknown[];
+  intent: ProjectIntent | null;
+  freshness: "live" | "stale" | "disconnected";
+  /** Whether the caller requested a fresh refresh (already performed when true). */
+  refresh: boolean;
+  /** Whether a salience snapshot path is configured at all. */
+  snapshotConfigured: boolean;
+}
+
+/**
+ * Assemble the device-review evidence (chain + ranked salience + pulledAt)
+ * from a loaded snapshot. Pure over its inputs.
+ *
+ * Refusals: `state_disconnected` when a refresh is needed while disconnected
+ * (hard refusal — arrange parity); `not_implemented` when unconfigured;
+ * `snapshot_invalid` when the load boundary threw. A null snapshot otherwise
+ * is NOT a refusal — the honest `no-snapshot` outcome (hint path, no
+ * fabricated evidence, Pitfall 5).
+ */
+export function assembleDeviceReviewEvidence(
+  input: AssembleDeviceReviewEvidenceInput,
+): DeviceReviewOutcome {
+  if (!input.snapshotConfigured) return { kind: "refusal", reason: "not_implemented" };
+  if (input.freshness === "disconnected" && input.refresh) return { kind: "refusal", reason: "state_disconnected" };
+  if (input.snapshotInvalid) return { kind: "refusal", reason: "snapshot_invalid" };
+  const assumptions: Assumption[] = [...liveAssumptionClaims(input.intent), saliencePulledAtAssumption(input.snap)];
+  if (input.snap === null) return { kind: "no-snapshot" };
+  return {
+    kind: "evidence",
+    evidence: {
+      chain: input.chain,
+      salience: flatRankedSalience(input.snap),
+      pulledAt: input.snap.pulledAt,
+      assumptions,
+    },
+  };
+}
+
+/**
+ * automation.inspect handler (AUTO-01) — freshness semantics per D-05-04:
+ *   - connected: refresh optional; a missing snapshot bootstraps from the
+ *     live folds (analyze + persist, mirroring boot's on-demand arrange pull);
+ *     empty folds serve the honest empty ranking (nothing moved yet).
+ *   - disconnected + snapshot: STALE-BUT-READABLE with visible pulledAt.
+ *   - disconnected + no snapshot: named refusal `no_snapshot`.
+ *   - corrupt snapshot (no refresh): bounded `snapshot_invalid` refusal
+ *     (04.3-07 DEFECT C discipline — never a crash).
+ *   - refresh while disconnected: `state_disconnected` hard refusal.
+ */
+async function handleAutomationInspect(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: { refresh?: boolean } },
+): Promise<void> {
+  if (!deps.salienceSnapshotPath) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return;
+  }
+  const wantRefresh = msg.payload?.refresh === true;
+  if (freshness === "disconnected" && wantRefresh) {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
+    return;
+  }
+
+  let loadFailed = false;
+  let snap: SalienceSnapshot | null = null;
+  try {
+    snap = await loadSalienceSnapshot(deps.salienceSnapshotPath);
+  } catch (e) {
+    console.error("[query-server] salience snapshot load failed:", (e as Error).message);
+    loadFailed = true;
+  }
+
+  if (wantRefresh) {
+    // A refresh proceeds past a corrupted file — the fresh analysis replaces it.
+    snap = await refreshSalienceFromDeps(deps, state, intent);
+  } else if (loadFailed) {
+    // Without refresh an invalid file refuses with the bounded code — it must
+    // not masquerade as "no snapshot" (the producer repairs via refresh).
+    safeSendErr(deps.transport, freshness, "snapshot_invalid");
+    return;
+  } else if (snap === null && freshness !== "disconnected") {
+    // Connected bootstrap: no durable snapshot yet — analyze the live folds
+    // + persist so subsequent disconnected reads have something to read.
+    snap = await refreshSalienceFromDeps(deps, state, intent);
+  }
+
+  if (snap === null) {
+    if (freshness === "disconnected") {
+      safeSendErr(deps.transport, freshness, "no_snapshot");
+      return;
+    }
+    // Connected but nothing observable (empty fold / refused refresh) — the
+    // honest empty ranking, never a fabricated one.
+    safeSendOk(
+      deps.transport,
+      freshness,
+      { params: [], tracks: [], pulledAt: null },
+      [
+        ...liveAssumptions(state, intent),
+        saliencePulledAtAssumption(null),
+      ],
+    );
+    return;
+  }
+
+  safeSendOk(
+    deps.transport,
+    freshness,
+    { params: flatRankedSalience(snap), tracks: snap.tracks, pulledAt: snap.pulledAt },
+    [...liveAssumptions(state, intent), saliencePulledAtAssumption(snap)],
+  );
 }
 
 /**

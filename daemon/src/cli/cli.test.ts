@@ -7,7 +7,8 @@
 //
 // Covers: multicall dispatch (shim + git-style reach the same handler), the 5
 // live commands (mock daemon → compact JSON + exit 0 + assumptions[] [UX-06]),
-// the 3 stubs (not_implemented JSON + exit 0 + correct availableFrom), --explain
+// the former stubs' live multicall behavior (bw-edit/bw-arrange/bw-automation
+// — no-subcommand help), --explain
 // pretty-printing, the daemon-error / socket-absent fail-closed path
 // ({ok:false, stateFreshness:"disconnected"} [SC#3]), and bw-diff (pure, SC#1).
 //
@@ -249,7 +250,7 @@ describe("CLI contract --explain pretty-prints (CLI-01)", () => {
   });
 });
 
-describe("CLI contract — 1 stub + 2 live multicalls (CLI-01, D-05; bw-edit/bw-arrange went live)", () => {
+describe("CLI contract — live multicalls (CLI-01, D-05; bw-edit/bw-arrange/bw-automation all live)", () => {
   it("bw-edit with no subcommand prints help (live multicall — was a stub pre-M2)", async () => {
     // bw-edit replaced its M1 stub with live preview/apply/revert subcommands
     // (Plan 03-02 Task 2). With no subcommand, commander prints help to stderr
@@ -275,12 +276,16 @@ describe("CLI contract — 1 stub + 2 live multicalls (CLI-01, D-05; bw-edit/bw-
     expect(helpText).toContain("refresh");
   });
 
-  it("bw-automation → not_implemented JSON, availableFrom M4, exit 0", async () => {
+  it("bw-automation with no subcommand prints help (live multicall — was a stub pre-M4/05-04)", async () => {
+    // bw-automation replaced its M1 stub with the live inspect subcommand
+    // (Plan 05-04 Task 3 — AUTO-01). With no subcommand, commander prints
+    // help to stderr + exits 1. The dedicated automation.test.ts covers the
+    // live inspect contract (query shell + --explain + fail-closed envelope).
     const r = await runCli(join(COMMANDS, "automation.ts"), [], {});
-    expect(r.code).toBe(0);
-    const out = JSON.parse(r.stdout);
-    expect(out.ok).toBe(false);
-    expect(out.availableFrom).toBe("M4");
+    expect(r.code).toBe(1); // commander's missing-subcommand exit code
+    const helpText = r.stdout + r.stderr;
+    expect(helpText).toContain("inspect");
+    expect(helpText).toContain("salience");
   });
 });
 

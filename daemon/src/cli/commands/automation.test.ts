@@ -18,7 +18,7 @@ import * as fs from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFile, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { startQueryServer, assembleDeviceReviewEvidence, type QueryServerDeps } from "../../query/query-server.js";
 import { saveSalienceSnapshot, loadSalienceSnapshot, type SalienceSnapshot } from "../../state/salience-snapshot.js";
 import type { StaleWatchdog } from "../../state/stale-watchdog.js";
@@ -504,7 +504,7 @@ describe("bw-automation inspect CLI (thin shell contract)", () => {
   });
 
   it("structural: automation.ts is a live thin shell (queries the op; emitStub gone)", async () => {
-    const source = await readFile(AUTOMATION_TS, "utf8");
+    const source = await fs.readFile(AUTOMATION_TS, "utf8");
     expect(source).toContain('query("automation.inspect"');
     expect(source).not.toContain("emitStub");
     expect(source).toContain("printConnectionError");
