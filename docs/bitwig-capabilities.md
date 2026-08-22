@@ -336,6 +336,14 @@ planned. Cheap to behaviorally confirm on a reorder, high downstream value
 P4 analyzer depends on. The behavioral characteristics (latency, observer
 coalescing, GUI focus) are now no longer trust-spine unknowns.
 
+> **Observed 2026-08-22 — Bitwig Studio 6.0.11:** after the request-relative
+> bank-settle, live-value, same-length-clip, and 16-track-window corrections,
+> a cold project review visibly walked the launcher and persisted 11 named
+> tracks with 19 `hasContent:true` cells (`pulledAt`
+> `2026-08-22T15:26:50.942Z`). Subsequent review and post-edit refreshes
+> remained populated. The settle stage is bounded by its 5-second cap; the
+> complete populated cursor walk remains proportional to the clips read.
+
 **Probe tool:** `scripts/probe-launcher-clips.mjs` — a standalone loopback
 daemon that binds `127.0.0.1:7878`, accepts the Bitwig bridge's reconnect, fires
 `get.launcher_clips` requests, and reports per-request wall-clock latency +
