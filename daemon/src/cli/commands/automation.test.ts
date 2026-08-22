@@ -397,8 +397,9 @@ describe("assembleDeviceReviewEvidence (outcome union refusal|no-snapshot|eviden
     expect(out.evidence.salience[0]!.salience).toBe(0.9);
     expect(out.evidence.pulledAt).toBe("2026-08-22T10:00:00.000Z");
     expect(out.evidence.assumptions.length).toBeGreaterThan(0);
-    // 05-07 macro extension is structurally OPTIONAL — absent today, tolerated.
-    expect((out.evidence as { macros?: unknown }).macros).toBeUndefined();
+    // 05-07 macro extension landed: the field is structurally present now,
+    // defaulting to an honestly-empty list when the caller supplies none.
+    expect(out.evidence.macros).toEqual([]);
   });
 });
 
