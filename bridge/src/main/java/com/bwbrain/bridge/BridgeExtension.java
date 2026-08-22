@@ -111,10 +111,12 @@ public final class BridgeExtension extends ControllerExtension {
         // === Connector thread: retry-connect to the daemon, then start the
         // writer thread (Outbox) + pull-handler thread (PullHandlers) on the same
         // socket. Matches the spike's retry-until-connected pattern.
-        startConnector(cursorClip);
+        // Phase 5 Plan 05-03 (Pitfall 3): cursorDevice threads through to
+        // PullHandlers.start so the 05-06 write wave can reach parameters.
+        startConnector(cursorClip, cursorDevice);
     }
 
-    private void startConnector(final PinnableCursorClip cursorClip) {
+    private void startConnector(final PinnableCursorClip cursorClip, final CursorDevice cursorDevice) {
         connectorThread = new Thread(() -> {
             // D-08 lifecycle loop (replaces the old connect-once-then-exit shape):
             // each iteration is one connect → run → socket-loss cycle. The cycle
@@ -122,7 +124,7 @@ public final class BridgeExtension extends ControllerExtension {
             // clean exit() shutdown); a socket loss returns true so the loop
             // re-enters CONNECT and self-heals without a controller toggle.
             while (running) {
-                if (!runConnectorCycle(LOOPBACK, PORT, outbox, cursorClip, observers, walker,
+                if (!runConnectorCycle(LOOPBACK, PORT, outbox, cursorClip, cursorDevice, observers, walker,
                         () -> running, s -> socket = s, host::println)) {
                     return;
                 }
@@ -164,23 +166,27 @@ public final class BridgeExtension extends ControllerExtension {
      *       daemon's {@code refreshSnapshot} is source of truth after reconnect).</li>
      * </ol>
      *
-     * @param loopback   the bind host (always {@link #LOOPBACK} in production).
-     * @param port       the daemon port (always {@link #PORT} in production).
-     * @param outbox     the shared Outbox (writer re-arms each cycle via reset).
-     * @param cursorClip the cursor clip (nullable in tests — see above).
-     * @param observers  the observers (nullable in tests — see above).
-     * @param walker     the launcher-grid walker (nullable in tests — the
-     *                   {@code get.launcher_clips} handler returns
-     *                   {@code "internal"} when the walker is null).
-     * @param isRunning  supplies the live {@code running} flag (loop condition).
-     * @param setSocket  publishes/nulls the live socket for {@link #exit}'s cleanup.
-     * @param logger     receives status/loss lines (production: {@code host::println}).
+     * @param loopback      the bind host (always {@link #LOOPBACK} in production).
+     * @param port          the daemon port (always {@link #PORT} in production).
+     * @param outbox        the shared Outbox (writer re-arms each cycle via reset).
+     * @param cursorClip    the cursor clip (nullable in tests — see above).
+     * @param cursorDevice  the cursor device created at init (:84) — threaded
+     *                      through to PullHandlers.start (Phase 5 Plan 05-03,
+     *                      Pitfall 3; nullable in tests like cursorClip).
+     * @param observers     the observers (nullable in tests — see above).
+     * @param walker        the launcher-grid walker (nullable in tests — the
+     *                      {@code get.launcher_clips} handler returns
+     *                      {@code "internal"} when the walker is null).
+     * @param isRunning     supplies the live {@code running} flag (loop condition).
+     * @param setSocket     publishes/nulls the live socket for {@link #exit}'s cleanup.
+     * @param logger        receives status/loss lines (production: {@code host::println}).
      * @return {@code true} to retry (socket loss), {@code false} to exit (shutdown).
      */
     static boolean runConnectorCycle(final String loopback,
                                       final int port,
                                       final Outbox outbox,
                                       final PinnableCursorClip cursorClip,
+                                      final CursorDevice cursorDevice,
                                       final Observers observers,
                                       final LauncherGridWalker walker,
                                       final BooleanSupplier isRunning,
@@ -210,7 +216,7 @@ public final class BridgeExtension extends ControllerExtension {
         //     close is the reliable loss signal.
         outbox.reset();
         outbox.startWriterThread(s);
-        final Thread pull = PullHandlers.start(s, outbox, cursorClip, observers, walker);
+        final Thread pull = PullHandlers.start(s, outbox, cursorClip, cursorDevice, observers, walker);
         try {
             pull.join();
         } catch (final InterruptedException ie) {

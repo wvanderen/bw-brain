@@ -66,7 +66,7 @@ class BridgeExtensionReconnectTest {
         final Thread loop = new Thread(() -> {
             while (testRunning.get()) {
                 if (!BridgeExtension.runConnectorCycle(LOOPBACK, port, outbox,
-                        null, null, null, () -> testRunning.get(),
+                        null, null, null, null, () -> testRunning.get(),
                         liveSocket::set, m -> {})) {
                     return;
                 }
@@ -152,7 +152,7 @@ class BridgeExtensionReconnectTest {
             final Thread loop = new Thread(() -> {
                 while (testRunning.get()) {
                     if (!BridgeExtension.runConnectorCycle(LOOPBACK, port, outbox,
-                            null, null, null, () -> testRunning.get(),
+                            null, null, null, null, () -> testRunning.get(),
                             liveSocket::set, m -> {})) {
                         return;
                     }
@@ -211,7 +211,7 @@ class BridgeExtensionReconnectTest {
             final Thread loop = new Thread(() -> {
                 while (testRunning.get()) {
                     if (!BridgeExtension.runConnectorCycle(LOOPBACK, port, outbox,
-                            null, null, null, () -> testRunning.get(),
+                            null, null, null, null, () -> testRunning.get(),
                             liveSocket::set, m -> {})) {
                         return;
                     }

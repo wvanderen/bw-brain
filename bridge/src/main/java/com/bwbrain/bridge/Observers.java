@@ -814,6 +814,55 @@ public final class Observers {
     /** Phase 4 Plan 04-01 — the wired TrackBank reference for walker bindings. */
     TrackBank getTrackBank() { return trackBankRef; }
 
+    // --- Phase 5 Plan 05-03 Task 3 getters: device-chain response assembly ---
+
+    /** Chain window size (the createDeviceBank(16) sizing). */
+    public int getDeviceBankSize() { return DEVICE_BANK_SIZE; }
+    /** Chain slot name cache read ("" when never fired — phantom tail). */
+    public String getChainDeviceName(final int slot) {
+        return chainDeviceNames.getOrDefault(slot, "");
+    }
+    /** Chain slot VST/AU flag (false when never fired — honest native default). */
+    public boolean isChainDevicePlugin(final int slot) {
+        final Boolean v = chainDeviceIsPlugin.get(slot);
+        return v == null ? false : v.booleanValue();
+    }
+    /** Chain slot position (defaults to the bank index until position() fires). */
+    public int getChainDevicePosition(final int slot) {
+        final Integer v = chainDevicePositions.get(slot);
+        return v == null ? slot : v.intValue();
+    }
+    /** Cursor device chain position (-1 until the position observer fires). */
+    public int getCursorDevicePosition() { return cursorDevicePosition; }
+    /** Parameter-window binding (exists() cache; false = absent/walk end). */
+    public boolean isParamBound(final int index) {
+        final Boolean v = paramBound.get(index);
+        return v == null ? false : v.booleanValue();
+    }
+    /** Parameter-window identity ("" when never fired). */
+    public String getParamName(final int index) {
+        return paramNames.getOrDefault(index, "");
+    }
+    /** Parameter-window last value (null when never fired — honest omission). */
+    public Double getParamValue(final int index) {
+        return paramValues.get(index);
+    }
+    /** Remote-page knob binding (exists() cache). */
+    public boolean isRemoteBound(final int slot) {
+        final Boolean v = remoteBound.get(slot);
+        return v == null ? false : v.booleanValue();
+    }
+    /** Remote-page knob identity ("" when never fired). */
+    public String getRemoteName(final int slot) {
+        return remoteNames.getOrDefault(slot, "");
+    }
+    /** Remote-page knob last value (null when never fired). */
+    public Double getRemoteValue(final int slot) {
+        return remoteValues.get(slot);
+    }
+    /** Remote-controls page name ("" when never fired). */
+    public String getRemotePageName() { return remotePageName; }
+
     private static long ts() { return System.currentTimeMillis() / 1000L; }
 
     /** Small LinkedHashMap builder so event payloads serialize with stable key order. */

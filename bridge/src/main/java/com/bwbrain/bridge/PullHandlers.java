@@ -22,6 +22,7 @@
 // buildProjectSummaryResponse) are unit-tested WITHOUT live Bitwig.
 package com.bwbrain.bridge;
 
+import com.bitwig.extension.controller.api.CursorDevice;
 import com.bitwig.extension.controller.api.NoteStep;
 import com.bitwig.extension.controller.api.ClipLauncherSlotBank;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
@@ -72,6 +73,23 @@ public final class PullHandlers {
     public record TrackView(int slot, String name) {}
 
     /**
+     * Phase 5 Plan 05-03 Task 3 — one chain device (AUTO-04). {@code deviceSid}
+     * is the Observers.deriveDeviceSid fingerprint (dev_ + 16-hex) — the SAME
+     * value the parameter.changed {@code deviceKey} carries, which is the
+     * AutomationScope deviceSid the 05-05 apply path will compare
+     * like-for-like (T-05-07).
+     */
+    public record DeviceView(String deviceSid, String name, boolean isPlugin, int position) {}
+
+    /**
+     * Phase 5 Plan 05-03 Task 3 — one bound parameter (device window index or
+     * remote-page slot). {@code source} is the parameter.changed vocabulary:
+     * "device_parameter" (the bounded getParameter window — the A1-NEGATED
+     * fallback surface) or "remote_page" (native macro knobs).
+     */
+    public record ParamView(String deviceKey, int paramIndex, String paramName, double value, String source) {}
+
+    /**
      * Snapshot inputs for the Phase 04.1 controller capability request.
      * Only values already observed by the existing read-only controller
      * surface belong here; absent project/document identity is represented in
@@ -104,6 +122,50 @@ public final class PullHandlers {
     }
 
     public static String buildDeviceChainResponse(final String id, final List<PageView> pages) {
+        // Phase 5 Plan 05-03 Task 3: legacy pages-only overload — delegates to
+        // the full assembly with empty devices/parameters (backward compat for
+        // PullHandlersTest's pages-shape pins).
+        return buildDeviceChainResponse(id, List.of(), List.of(), pages);
+    }
+
+    /**
+     * Phase 5 Plan 05-03 Task 3 — real device-chain response assembly
+     * (AUTO-04 / D-05-03). Pure builder over view records (no Bitwig types —
+     * the PullHandlersTest/ApplyPatchTest discipline): devices from the
+     * DeviceBank chain cache, parameters from the bound parameter-window +
+     * remote-page caches, pages retained for the CLI device-inspect consumer.
+     *
+     * <p>Replaces the A1-NEGATED empty-pages stub. Finding history: on
+     * 2026-06-29 the Phase-2 UAT live-verified (Surge XT + javap) that VST/AU
+     * parameters do NOT surface via CursorRemoteControlsPage and that
+     * CursorDevice exposes no getRemoteControls() in extension-api:21 — the
+     * response returned an empty pages list by design. Phase 5 (D-05-03)
+     * closes the gap with the bounded getParameter(int) window + page-knob
+     * observation; this builder shapes that evidence for the wire.</p>
+     */
+    public static String buildDeviceChainResponse(final String id,
+                                                   final List<DeviceView> devices,
+                                                   final List<ParamView> parameters,
+                                                   final List<PageView> pages) {
+        final List<Map<String, Object>> devicesPayload = new ArrayList<>();
+        for (final DeviceView d : devices) {
+            final Map<String, Object> dm = new LinkedHashMap<>();
+            dm.put("deviceSid", d.deviceSid());
+            dm.put("name", d.name());
+            dm.put("isPlugin", d.isPlugin());
+            dm.put("position", d.position());
+            devicesPayload.add(dm);
+        }
+        final List<Map<String, Object>> paramsPayload = new ArrayList<>();
+        for (final ParamView p : parameters) {
+            final Map<String, Object> pm = new LinkedHashMap<>();
+            pm.put("deviceKey", p.deviceKey());
+            pm.put("paramIndex", p.paramIndex());
+            pm.put("paramName", p.paramName());
+            pm.put("value", p.value());
+            pm.put("source", p.source());
+            paramsPayload.add(pm);
+        }
         final List<Map<String, Object>> pagesPayload = new ArrayList<>();
         for (final PageView p : pages) {
             final List<Map<String, Object>> remotesPayload = new ArrayList<>();
@@ -118,7 +180,11 @@ public final class PullHandlers {
             pm.put("remotes", remotesPayload);
             pagesPayload.add(pm);
         }
-        return LineJson.response(id, true, Map.of("pages", pagesPayload));
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("devices", devicesPayload);
+        payload.put("parameters", paramsPayload);
+        payload.put("pages", pagesPayload);
+        return LineJson.response(id, true, payload);
     }
 
     public static String buildProjectSummaryResponse(final String id, final List<TrackView> tracks) {
@@ -202,11 +268,19 @@ public final class PullHandlers {
      * Start the daemon pull-handler thread bound to the given already-connected
      * loopback socket. Reads request lines, dispatches, offers responses via the
      * shared Outbox (the writer thread sends them on the same socket).
+     *
+     * <p>Phase 5 Plan 05-03 Task 3: {@code cursorDevice} joins the signature
+     * (created at BridgeExtension.java:84, threaded through runConnectorCycle —
+     * Pitfall 3). Pure plumbing in this plan: the apply path stays note-only
+     * until 05-06. Null-safe: the reconnect-test path passes null proxies and
+     * no line exercises the device path.</p>
      */
     public static Thread start(final Socket socket, final Outbox outbox,
-                                final PinnableCursorClip cursorClip, final Observers observers,
+                                final PinnableCursorClip cursorClip,
+                                final CursorDevice cursorDevice,
+                                final Observers observers,
                                 final LauncherGridWalker walker) {
-        final Thread t = new Thread(() -> runLoop(socket, outbox, cursorClip, observers, walker),
+        final Thread t = new Thread(() -> runLoop(socket, outbox, cursorClip, cursorDevice, observers, walker),
                 "bw-brain-pull");
         t.setDaemon(true);
         t.start();
@@ -214,14 +288,16 @@ public final class PullHandlers {
     }
 
     private static void runLoop(final Socket socket, final Outbox outbox,
-                                final PinnableCursorClip cursorClip, final Observers observers,
+                                final PinnableCursorClip cursorClip,
+                                final CursorDevice cursorDevice,
+                                final Observers observers,
                                 final LauncherGridWalker walker) {
         try (final Socket s = socket) {
             final BufferedReader in = new BufferedReader(
                     new InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8));
             String line;
             while ((line = in.readLine()) != null) {
-                handle(line, outbox, cursorClip, observers, walker);
+                handle(line, outbox, cursorClip, cursorDevice, observers, walker);
             }
         } catch (final Exception e) {
             // socket closed / daemon shutdown — daemon-thread, just exit.
@@ -229,7 +305,9 @@ public final class PullHandlers {
     }
 
     private static void handle(final String rawLine, final Outbox outbox,
-                               final PinnableCursorClip cursorClip, final Observers observers,
+                               final PinnableCursorClip cursorClip,
+                               final CursorDevice cursorDevice,
+                               final Observers observers,
                                final LauncherGridWalker walker) {
         final JsonNode req;
         try {
@@ -245,7 +323,7 @@ public final class PullHandlers {
         try {
             switch (type) {
                 case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip, observers));
-                case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id));
+                case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id, observers));
                 case "get.project_summary" -> outbox.offer(handleProjectSummary(id, observers));
                 // Phase 5 Plan 05-03 (D-05-16) — real project meta from the
                 // Observers pull-only transport caches. Closes the M1
@@ -265,6 +343,9 @@ public final class PullHandlers {
                 // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
                 // (D-01 / Pitfall 7). The handler NEVER branches on the
                 // semantic-intent metadata field — it stays three-case forever.
+                // Phase 5 Plan 05-03: cursorDevice is now IN scope (Pitfall 3
+                // plumbing) but deliberately NOT consumed here yet — the
+                // automation write path lands in 05-06 behind the probe.
                 case "apply.patch" -> outbox.offer(handleApplyPatch(id, req, cursorClip));
                 // Phase 4 Plan 04-01 (D-01) — launcher grid cursor-walk. Additive
                 // to the dispatch switch (sibling to get.selected_clip). The
@@ -334,16 +415,97 @@ public final class PullHandlers {
         return notes;
     }
 
-    private static String handleSelectedDeviceChain(final String id) {
-        // DEFERRED (Open Question A1 / Pitfall 10): CursorDevice exposes no
-        // getRemoteControls()/parameter-page accessor in extension-api:21's public
-        // surface (verified via javap this session). The CursorRemoteControlsPage
-        // parameter-walk path — including whether VST/AU params populate it — is
-        // resolved by the Task-3 live human-verify checkpoint. Until then, return
-        // an empty pages list (valid response; the CLI shows "no parameters").
-        // Task 3 records the finding (or fallback to direct parameter enumeration)
-        // in docs/bitwig-capabilities.md §4.
-        return buildDeviceChainResponse(id, List.of());
+    /**
+     * Phase 5 Plan 05-03 Task 3 — REAL device-chain assembly (AUTO-04 /
+     * D-05-03), replacing the A1-NEGATED empty-pages stub that lived here
+     * since Phase 2. Finding history: 2026-06-29 live-verified (Surge XT +
+     * javap) that VST/AU parameters do NOT surface via
+     * CursorRemoteControlsPage and CursorDevice exposes no getRemoteControls()
+     * in extension-api:21 — the handler returned an empty pages list "by
+     * design" (the honest M1 floor). Phase 5 closes the gap: the Observers
+     * caches now hold the chain membership (DeviceBank), the bounded
+     * parameter window, and the remote-page knobs, and this handler shapes
+     * them into the wire response.
+     *
+     * <p>Assembly rules:</p>
+     * <ul>
+     *   <li>devices — chain slots with a NON-BLANK name (the phantom-tail
+     *       trim precedent) carrying the deviceSid fingerprint;</li>
+     *   <li>parameters — ONLY bound entries (exists cache true with a cached
+     *       value): the fixed device window as {@code device_parameter} plus
+     *       page knobs as {@code remote_page}, all keyed by the CURSOR
+     *       device's deviceKey (the same fingerprint parameter.changed
+     *       carries — the 05-05 AutomationScope pin);</li>
+     *   <li>pages — retained from the remote-page cache (the CLI
+     *       device-inspect consumer contract, Test 4 backward compat).</li>
+     * </ul>
+     *
+     * <p>Null-guarded (Pitfall 8): a null observers (reconnect-test path)
+     * returns {@code "internal"} so the dispatch stays total.</p>
+     */
+    private static String handleSelectedDeviceChain(final String id, final Observers observers) {
+        if (observers == null) {
+            return LineJson.responseError(id, "internal");
+        }
+        // devices: chain membership from the DeviceBank cache.
+        final List<DeviceView> devices = new ArrayList<>();
+        final String trackName = observers.getCursorTrackName();
+        for (int slot = 0; slot < observers.getDeviceBankSize(); slot++) {
+            final String name = observers.getChainDeviceName(slot);
+            if (name == null || name.isBlank()) {
+                continue; // phantom/unpopulated bank tail — not chain membership
+            }
+            final int position = observers.getChainDevicePosition(slot);
+            devices.add(new DeviceView(
+                    Observers.deriveDeviceSid(trackName, name, position),
+                    name,
+                    observers.isChainDevicePlugin(slot),
+                    position));
+        }
+        // parameters: the cursor device's deviceKey for BOTH sources (the
+        // window and the page both observe the selected device — the
+        // parameter.changed deviceKey IS this value).
+        final String deviceKey = Observers.deriveDeviceSid(trackName,
+                observers.getCursorDeviceName(), observers.getCursorDevicePosition());
+        final List<ParamView> parameters = new ArrayList<>();
+        for (int i = 0; i < Observers.PARAM_WINDOW; i++) {
+            if (!observers.isParamBound(i)) {
+                continue; // exists() absent — walk termination honored (Test 2)
+            }
+            final Double value = observers.getParamValue(i);
+            if (value == null) {
+                continue; // bound but never fired — honest omission over a fabricated 0.0
+            }
+            parameters.add(new ParamView(deviceKey, i, observers.getParamName(i),
+                    value.doubleValue(), "device_parameter"));
+        }
+        for (int i = 0; i < Observers.REMOTE_PAGE_SIZE; i++) {
+            if (!observers.isRemoteBound(i)) {
+                continue;
+            }
+            final Double value = observers.getRemoteValue(i);
+            if (value == null) {
+                continue;
+            }
+            parameters.add(new ParamView(deviceKey, i, observers.getRemoteName(i),
+                    value.doubleValue(), "remote_page"));
+        }
+        // pages: retained for the legacy CLI consumer (bound knobs only).
+        final List<RemoteView> remotes = new ArrayList<>();
+        for (int i = 0; i < Observers.REMOTE_PAGE_SIZE; i++) {
+            if (!observers.isRemoteBound(i)) {
+                continue;
+            }
+            final Double value = observers.getRemoteValue(i);
+            if (value == null) {
+                continue;
+            }
+            remotes.add(new RemoteView(observers.getRemoteName(i), value.doubleValue()));
+        }
+        final List<PageView> pages = remotes.isEmpty()
+                ? List.of()
+                : List.of(new PageView(observers.getRemotePageName(), remotes));
+        return buildDeviceChainResponse(id, devices, parameters, pages);
     }
 
     private static String handleProjectSummary(final String id, final Observers observers) {
