@@ -15,12 +15,14 @@ import {
   M1_ANALYZERS,
   M2_ANALYZERS,
   M3_ANALYZERS,
+  M4_ANALYZERS,
   IntentAnalyzer,
   CONFIDENCE_THRESHOLD,
   type Analyzer,
   type DerivedField,
   type AnalyzeContext,
 } from "./analyzer-registry.js";
+import { AutomationSalience } from "../transforms/automation-salience.js";
 import { MotifSignatureAnalyzer } from "../transforms/motif-signature.js";
 import type { RawState } from "./reconcile.js";
 import type { ProjectIntent } from "../gen/intent.js";
@@ -245,5 +247,25 @@ describe("AnalyzerRegistry.runAll", () => {
     reg.register(flaky);
     const out = reg.runAll(fixtureRaw(), { intent: null, now: 1_000 });
     expect(out).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 5 / Plan 05-04 — M4_ANALYZERS registration (AUTO-01: the reserved
+  // "automationSalience" slot fills in, D-08 defense lifts).
+  // -------------------------------------------------------------------------
+
+  it("M4_ANALYZERS includes M3_ANALYZERS plus EXACTLY AutomationSalience (AUTO-01)", () => {
+    const m3Ids = M3_ANALYZERS.map((a) => a.id);
+    for (const id of m3Ids) {
+      expect(M4_ANALYZERS.map((a) => a.id)).toContain(id);
+    }
+    expect(M4_ANALYZERS.map((a) => a.id)).toContain("automationSalience");
+    // M4 is strictly larger than M3 by exactly the one addition.
+    expect(M4_ANALYZERS.length).toBe(M3_ANALYZERS.length + 1);
+    expect(M4_ANALYZERS[M4_ANALYZERS.length - 1]).toBe(AutomationSalience);
+  });
+
+  it("M3_ANALYZERS itself still has NO automationSalience (M4-only addition — registration tiers stay honest)", () => {
+    expect(M3_ANALYZERS.map((a) => a.id)).not.toContain("automationSalience");
   });
 });
