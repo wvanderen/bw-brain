@@ -311,9 +311,21 @@ Plans:
   4. Device inspection and automation workflows cover third-party VST/AU plugins loaded in the chain, not just native Bitwig devices.
   5. The CLAP device workspace renders chain summary, parameter targets, macro opportunities, and mutation outcome; Pi remains behind the daemon and the CLI remains a secondary contract.
 
-**Plans**: TBD
+**Plans**: 10
 **UI hint**: yes
 **Research needed**: automation salience statistics; bounded automation generation with genre-profile constraints.
+
+Plans:
+- [ ] 05-01-PLAN.md — Protocol/profile schema extension (parameter.changed, get.project_meta, automationWrite payload, automationShapes bias) — schema-first per Pitfall 8 (Wave 1)
+- [ ] 05-02-PLAN.md — Live automation-write probe → dated Observed fields + named-refusal vocabulary in docs/bitwig-capabilities.md; gates the write wave (Wave 1, autonomous: false)
+- [ ] 05-03-PLAN.md — Bridge device-chain read + bounded VST/AU parameter enumeration + eager observers w/ coalescing + get.project_meta (AUTO-04, D-05-16) (Wave 2)
+- [ ] 05-04-PLAN.md — Automation-salience analyzer + durable snapshot (D-05-04) + automation.inspect op + bw-automation inspect (AUTO-01 complete) (Wave 3)
+- [ ] 05-05-PLAN.md — Automation write contract + daemon spine: patch-schema ops/AutomationScope w/ D-05-14 bounds, author-aware inverse (D-05-07), medium risk (D-05-10), named pre-flight gates (D-05-05/06), journal binding (Wave 3)
+- [ ] 05-06-PLAN.md — Bridge automation execution: ParameterWriter + applyOps dispatch + prior capture (probe-gated) (Wave 4)
+- [ ] 05-07-PLAN.md — Macro/XY advisory suggestions + device.macros_suggest + bw-device macros-suggest (AUTO-02 complete, D-05-09..12) (Wave 4)
+- [ ] 05-08-PLAN.md — Curve shapes (D-05-13/14) + automation.propose from salience targets (D-05-15) + bw-automation propose (AUTO-03 complete) (Wave 5)
+- [ ] 05-09-PLAN.md — CLAP device workspace: deviceReview action + Devices button + deterministic zero-Pi render (UX-04) (Wave 5)
+- [ ] 05-10-PLAN.md — End-of-phase live UAT ledger U1-U9 in Bitwig (all reqs; honest verdicts) (Wave 6, autonomous: false)
 
 ## Progress
 
