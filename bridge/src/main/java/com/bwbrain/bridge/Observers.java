@@ -31,12 +31,16 @@ package com.bwbrain.bridge;
 
 import com.bitwig.extension.callback.BooleanValueChangedCallback;
 import com.bitwig.extension.callback.DoubleValueChangedCallback;
+import com.bitwig.extension.callback.EnumValueChangedCallback;
 import com.bitwig.extension.callback.IntegerValueChangedCallback;
 import com.bitwig.extension.callback.StringValueChangedCallback;
 import com.bitwig.extension.controller.api.ClipLauncherSlotBank;
 import com.bitwig.extension.controller.api.ControllerHost;
 import com.bitwig.extension.controller.api.CursorDevice;
+import com.bitwig.extension.controller.api.CursorRemoteControlsPage;
 import com.bitwig.extension.controller.api.CursorTrack;
+import com.bitwig.extension.controller.api.Device;
+import com.bitwig.extension.controller.api.DeviceBank;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
 import com.bitwig.extension.controller.api.Scene;
 import com.bitwig.extension.controller.api.SceneBank;
@@ -44,12 +48,46 @@ import com.bitwig.extension.controller.api.Track;
 import com.bitwig.extension.controller.api.TrackBank;
 import com.bitwig.extension.controller.api.Transport;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public final class Observers {
+
+    // Phase 5 Plan 05-03 Task 2 — observation-window sizing (D-05-02/D-05-03).
+    /** Chain window: the selected track's device chain via DeviceBank(16). */
+    static final int DEVICE_BANK_SIZE = 16;
+    /** Fixed cursorDevice parameter window (A1-NEGATED fallback, D-05-03). */
+    static final int PARAM_WINDOW = 128;
+    /** Remote-controls page knob count (8-knob page, D-05-03). */
+    static final int REMOTE_PAGE_SIZE = 8;
+    /** Coalescing flush interval (Pitfall 5: bounded 50-100ms drain). */
+    static final long COALESCE_FLUSH_MS = 100L;
+    /**
+     * Movement epsilon (matches daemon fold-event.ts MOVEMENT_EPSILON): a
+     * value delta <= 1e-4 is float jitter, not a movement.
+     */
+    static final double MOVEMENT_EPSILON = 1e-4;
+    /** parameter.changed source vocabulary (event.schema.json `source` enum). */
+    static final int SOURCE_DEVICE_PARAMETER = 0;
+    static final int SOURCE_REMOTE_PAGE = 1;
+    static final String SOURCE_DEVICE_PARAMETER_NAME = "device_parameter";
+    static final String SOURCE_REMOTE_PAGE_NAME = "remote_page";
+
+    /**
+     * Composite coalescing key: {@code (sourceOrdinal << 32) | paramIndex} —
+     * the hasContentKey (trackIdx&lt;&lt;16 | sceneIdx) composite-key
+     * precedent, widened so the same paramIndex under different sources never
+     * collides.
+     */
+    static long paramKey(final int sourceOrdinal, final int paramIndex) {
+        return (((long) sourceOrdinal) << 32) | (paramIndex & 0xFFFFFFFFL);
+    }
 
     private final Outbox outbox;
     private final int bankSize;
@@ -153,11 +191,52 @@ public final class Observers {
     // cache never fabricates a live value.
     private volatile double tempo = 120.0;
     private volatile String timeSignature = "4/4";
+    // ------------------------------------------------------------------------
+    // Phase 5 Plan 05-03 Task 2 (D-05-01/02/03) — device/parameter observation
+    // caches. ALL writes happen on the Bitwig controller thread; ALL reads
+    // happen from the pull-handler thread (Task 3 assembly) or the coalescing
+    // flush thread. ConcurrentHashMap/volatile mirror the established cache
+    // pattern (hasContentCache precedent: thread-safe by construction).
+    // ------------------------------------------------------------------------
+    /** Chain membership (D-05-02): cursorTrack.createDeviceBank(16) window. */
+    private final Map<Integer, String> chainDeviceNames = new ConcurrentHashMap<>();
+    /** VST/AU detection per chain slot (AUTO-04): Device.isPlugin() cache. */
+    private final Map<Integer, Boolean> chainDeviceIsPlugin = new ConcurrentHashMap<>();
+    /** Chain position per bank slot (deviceSid fingerprint input). */
+    private final Map<Integer, Integer> chainDevicePositions = new ConcurrentHashMap<>();
+    /** Cursor device's chain position (deviceKey fingerprint input; -1 = unfired). */
+    private volatile int cursorDevicePosition = -1;
+    /** Fixed 0..127 device-parameter window — exists()/binding cache. */
+    private final Map<Integer, Boolean> paramBound = new ConcurrentHashMap<>();
+    /** Parameter identity cache (name per window index). */
+    private final Map<Integer, String> paramNames = new ConcurrentHashMap<>();
+    /** Parameter last-value cache (normalized [0,1]; written on every fire). */
+    private final Map<Integer, Double> paramValues = new ConcurrentHashMap<>();
+    /** Remote-controls page name (native macro surface, D-05-03). */
+    private volatile String remotePageName = "";
+    /** Page-knob binding cache (8-slot page). */
+    private final Map<Integer, Boolean> remoteBound = new ConcurrentHashMap<>();
+    /** Page-knob identity cache. */
+    private final Map<Integer, String> remoteNames = new ConcurrentHashMap<>();
+    /** Page-knob last-value cache. */
+    private final Map<Integer, Double> remoteValues = new ConcurrentHashMap<>();
+    /**
+     * Per-param last-value-wins coalescer (Pitfall 5 / T-05-06). Movement
+     * callbacks fold here on the controller thread; the bounded flush thread
+     * (below) drains it via outbox.offer — never a direct socket write.
+     */
+    private final ParameterCoalescer coalescer;
+    /** D-05-05 automation-write state push (transport.changed automationWrite). */
+    private final AutomationWriteEmitter automationWriteEmitter;
+    /** Flush-thread start guard (idempotent; register() may be called once). */
+    private final AtomicBoolean flushThreadStarted = new AtomicBoolean(false);
 
     public Observers(final Outbox outbox, final int bankSize) {
         this.outbox = outbox;
         this.bankSize = bankSize;
         this.wiredHasContent = new boolean[bankSize];
+        this.coalescer = new ParameterCoalescer(outbox::offer);
+        this.automationWriteEmitter = new AutomationWriteEmitter(outbox::offer);
     }
 
     /** Wire all 5 observer groups. Idempotent (call once from BridgeExtension.init). */
@@ -211,6 +290,16 @@ public final class Observers {
         // every other observer group (Pitfall 7 — post-init registration
         // throws at runtime).
         wireTransportMeta(transport);
+        // Phase 5 Plan 05-03 Task 2 (D-05-01/02/03) — the device observation
+        // spine: chain cache + fixed parameter window + remote page knobs +
+        // automation-write state. ALL registered HERE (init()-only — Pitfall 7;
+        // the observation set is fixed over proxies that rebind as selection
+        // moves). The coalescing flush thread starts once alongside.
+        wireDeviceChain(cursorTrack);
+        wireParameterWindow(cursorDevice);
+        wireRemotePage(cursorDevice);
+        wireAutomationWrite(transport);
+        startCoalescingFlushThread();
     }
 
     /**
@@ -303,6 +392,14 @@ public final class Observers {
             outbox.offer(LineJson.event("device.name_changed",
                     mapOf("name", cursorDeviceName), ts()));
         });
+        // Phase 5 Plan 05-03 Task 2 — chain position of the cursor device
+        // (PULL-ONLY): the third deviceSid fingerprint input. Device.position()
+        // is non-deprecated (javap-verified; the addPositionObserver form IS
+        // deprecated). Cached on every fire (boot value included) so the
+        // deviceKey fingerprint always sees the current slot.
+        cursorDevice.position().addValueObserver((IntegerValueChangedCallback) (int pos) -> {
+            cursorDevicePosition = pos;
+        });
     }
 
     private void wireTransport(final Transport transport) {
@@ -340,6 +437,180 @@ public final class Observers {
         transport.timeSignature().addValueObserver((StringValueChangedCallback) (String sig) -> {
             timeSignature = sig == null || sig.isEmpty() ? "4/4" : sig;
         });
+    }
+
+    // ------------------------------------------------------------------------
+    // Phase 5 Plan 05-03 Task 2 — device observation wiring (D-05-01/02/03).
+    // Every method below registers its observers EXACTLY ONCE, from the
+    // register() overload above, during init() (Pitfall 7 — Bitwig forbids
+    // registration outside driver initialization; live-observed). The
+    // structural pin is ObserversCoalescingTest.everyNewObserverGroupIs…
+    // (each wire method: exactly one declaration + one call site).
+    // ------------------------------------------------------------------------
+
+    /**
+     * Chain-membership cache (D-05-02): the SELECTED track's device chain via
+     * {@code cursorTrack.createDeviceBank(16)} (Track IS-A Channel IS-A
+     * DeviceChain — the DeviceChain.createDeviceBank(int) surface, javap-
+     * verified non-deprecated). PULL-ONLY: name/isPlugin/position observers
+     * write the caches on every fire and NEVER offer events. Chain membership
+     * for the Task 3 response = non-blank name (the LauncherGridWalker
+     * phantom-tail-trim precedent).
+     */
+    private void wireDeviceChain(final CursorTrack cursorTrack) {
+        final DeviceBank deviceBank = cursorTrack.createDeviceBank(DEVICE_BANK_SIZE);
+        for (int i = 0; i < DEVICE_BANK_SIZE; i++) {
+            final Device d = deviceBank.getItemAt(i); // Bank.getItemAt — non-deprecated terminal accessor
+            final int slot = i;
+            chainDeviceNames.put(slot, ""); // init so a pull before the boot fire sees "" not null
+            d.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+                chainDeviceNames.put(slot, name == null ? "" : name);
+            });
+            d.isPlugin().addValueObserver((BooleanValueChangedCallback) (boolean isPlugin) -> {
+                chainDeviceIsPlugin.put(slot, isPlugin);
+            });
+            d.position().addValueObserver((IntegerValueChangedCallback) (int pos) -> {
+                chainDevicePositions.put(slot, pos);
+            });
+        }
+    }
+
+    /**
+     * The fixed 0..127 parameter window over the cursor device — the
+     * A1-NEGATED fallback surface for VST/AU parameter enumeration (D-05-03,
+     * AUTO-04; 2026-06-29 A1 finding: VST params do NOT surface via
+     * CursorRemoteControlsPage).
+     *
+     * <p><b>Deprecation finding (2026-08-22, javap -v + the official
+     * deprecated-list.html):</b> the Device int-indexed parameter accessor
+     * carries {@code @Deprecated}, and Bitwig 6.x enforces
+     * deprecation-as-error at runtime for deprecated call sites (capabilities
+     * doc §4 — the Phase-2 getTrack incident). The javadoc-recommended
+     * replacement {@code getRemoteControls().getRemoteControlInSlot(i)}
+     * CANNOT be used: {@code getRemoteControls()} does not exist in
+     * extension-api:21 (A1-NEGATED, javap-verified). No non-deprecated
+     * direct-enumeration surface exists. D-05-03 (locked) pins THIS surface,
+     * so the call stays — allowlisted at the call site — behind a per-index
+     * try/catch (the wireClipLauncherSlotsEager defensive-registration
+     * precedent): if the host rejects the deprecated call at registration,
+     * that index (or the whole window) degrades to unbound — no events, no
+     * crash, init() survives — and the PENDING live A2 probe (05-02,
+     * capabilities §"Parameter indexing probe") arbitrates. If the probe
+     * proves the call dies live, the window stays empty and the observation
+     * surface flips to page-based in a follow-up (documented in
+     * 05-03-SUMMARY).</p>
+     *
+     * <p>Value observers feed the coalescer (last-value-wins per key; Pitfall
+     * 5). Names/binding are PULL-ONLY caches consumed by Task 3's response
+     * assembly.</p>
+     */
+    private void wireParameterWindow(final CursorDevice cursorDevice) {
+        for (int i = 0; i < PARAM_WINDOW; i++) {
+            final int idx = i;
+            try {
+                final var p = cursorDevice.getParameter(idx); // deprecated-allow: D-05-03 locked A1-NEGATED fallback — no non-deprecated direct enumeration exists in extension-api:21 (javadoc's getRemoteControls() replacement absent, javap 2026-08-22); per-index try/catch degrades the window gracefully; PENDING A2 live probe (05-02) arbitrates
+                p.exists().addValueObserver((BooleanValueChangedCallback) (boolean has) -> {
+                    paramBound.put(idx, has);
+                });
+                p.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+                    paramNames.put(idx, name == null ? "" : name);
+                });
+                p.addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                    paramValues.put(idx, v);
+                    coalescer.onValue(paramKey(SOURCE_DEVICE_PARAMETER, idx), idx,
+                            paramNames.getOrDefault(idx, ""), SOURCE_DEVICE_PARAMETER_NAME, v);
+                });
+            } catch (final Throwable e) {
+                // Defensive registration (wireClipLauncherSlotsEager
+                // precedent): a host that rejects the deprecated window
+                // surface keeps this index unbound instead of killing init().
+            }
+        }
+    }
+
+    /**
+     * One remote-controls page on the cursor device (native macro knobs —
+     * first-class observation targets, D-05-03: explicit producer exposure
+     * beats inference). {@code createCursorRemoteControlsPage(int)} and
+     * {@code RemoteControlsPage.getParameter(int)} are NON-deprecated (javap
+     * -v verified). 8-knob page; page knob values ride the SAME coalescing
+     * path keyed by page-slot index with source="remote_page".
+     */
+    private void wireRemotePage(final CursorDevice cursorDevice) {
+        final CursorRemoteControlsPage page = cursorDevice.createCursorRemoteControlsPage(0);
+        page.getName().addValueObserver((StringValueChangedCallback) (String name) -> {
+            remotePageName = name == null ? "" : name;
+        });
+        for (int i = 0; i < REMOTE_PAGE_SIZE; i++) {
+            final var knob = page.getParameter(i); // RemoteControl IS-A Parameter; non-deprecated
+            final int slot = i;
+            try {
+                knob.exists().addValueObserver((BooleanValueChangedCallback) (boolean has) -> {
+                    remoteBound.put(slot, has);
+                });
+                knob.name().addValueObserver((StringValueChangedCallback) (String name) -> {
+                    remoteNames.put(slot, name == null ? "" : name);
+                });
+                knob.addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                    remoteValues.put(slot, v);
+                    coalescer.onValue(paramKey(SOURCE_REMOTE_PAGE, slot), slot,
+                            remoteNames.getOrDefault(slot, ""), SOURCE_REMOTE_PAGE_NAME, v);
+                });
+            } catch (final Throwable e) {
+                // Defensive registration — a page slot that rejects observers
+                // stays unbound; init() survives.
+            }
+        }
+    }
+
+    /**
+     * Transport automation-write state observers (D-05-05 vocabulary — the
+     * daemon's future refusal-gate inputs). Each observer delegates to the
+     * {@link AutomationWriteEmitter} (skipFirstFire per field; the emitter
+     * pushes transport.changed carrying the full 4-field automationWrite
+     * snapshot, so every consumer sees a consistent object). Non-deprecated
+     * surfaces: the SettableBooleanValue/BooleanValue value observers +
+     * automationWriteMode() (EnumValue); the Transport-level add*Observer
+     * convenience forms are ALL deprecated (javap -v verified).
+     */
+    private void wireAutomationWrite(final Transport transport) {
+        transport.isArrangerAutomationWriteEnabled().addValueObserver(
+                (BooleanValueChangedCallback) automationWriteEmitter::onArrangerWriteEnabled);
+        transport.isClipLauncherAutomationWriteEnabled().addValueObserver( // deprecated-allow: jar-verified NON-deprecated value accessor (javap -v extension-api-21 2026-08-22: no @Deprecated — only the addIsWritingClipLauncherAutomationObserver convenience form is); the HTML deprecated-list entry carries no replacement note — a javadoc artifact the gate's HTML scan flags; the schema-required launcherWriteEnabled field (D-05-05) has no other surface
+                (BooleanValueChangedCallback) automationWriteEmitter::onLauncherWriteEnabled);
+        transport.isAutomationOverrideActive().addValueObserver(
+                (BooleanValueChangedCallback) automationWriteEmitter::onOverrideActive);
+        transport.automationWriteMode().addValueObserver(
+                (EnumValueChangedCallback) automationWriteEmitter::onWriteMode);
+    }
+
+    /**
+     * Start the bounded coalescing flush thread (once). Drains the coalescer
+     * every {@link #COALESCE_FLUSH_MS} ms and offers the folded
+     * parameter.changed lines through the Outbox (never a direct socket
+     * write — the enqueue-then-drain invariant). The deviceKey fingerprint is
+     * computed HERE (not in the movement callbacks) so the controller thread
+     * does zero hashing per fire (T-05-08: cache writes only in callbacks).
+     */
+    private void startCoalescingFlushThread() {
+        if (!flushThreadStarted.compareAndSet(false, true)) {
+            return;
+        }
+        final Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(COALESCE_FLUSH_MS);
+                } catch (final InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (coalescer.hasPending()) {
+                    coalescer.flush(deriveDeviceSid(cursorTrackName, cursorDeviceName, cursorDevicePosition));
+                }
+            }
+        }, "bw-brain-param-flush");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void wireTrackBank(final TrackBank trackBank) {
@@ -552,5 +823,198 @@ public final class Observers {
             m.put((String) kv[i], kv[i + 1]);
         }
         return m;
+    }
+
+    // ------------------------------------------------------------------------
+    // Phase 5 Plan 05-03 Task 2 — testable observation cores (package-private
+    // static nested classes; the PullHandlers.NoteStepWriter injectable-seam
+    // precedent: pure logic over an injected line sink, no Bitwig types, so
+    // ObserversCoalescingTest exercises them without a live host).
+    // ------------------------------------------------------------------------
+
+    /** One coalesced parameter movement (last-value-wins per coalescing key). */
+    static final class ParamMovement {
+        final int paramIndex;
+        final String paramName;
+        final String source;
+        final double value;
+
+        ParamMovement(final int paramIndex, final String paramName, final String source, final double value) {
+            this.paramIndex = paramIndex;
+            this.paramName = paramName;
+            this.source = source;
+            this.value = value;
+        }
+    }
+
+    /**
+     * Per-param last-value-wins coalescer (Pitfall 5 / T-05-06). Movement
+     * callbacks ({@link #onValue}) run on the Bitwig controller thread and do
+     * ONLY cache writes (T-05-08 — zero computation beyond map puts): the
+     * first observation of a key is cached (registration boot fire), an
+     * epsilon-equal value is a no-op, and a real movement overwrites the
+     * pending slot. {@link #flush(String)} runs on the flush thread, drains
+     * the pending map, and offers ONE parameter.changed line per key through
+     * the injected sink (production: {@code outbox::offer}; tests: a
+     * recording list) — never a direct socket write.
+     *
+     * <p>V1 note: when the cursor device rebinds to another device, per-key
+     * last-values carry over, so each param may emit at most one spurious
+     * movement on the first fire under the new device. Bounded (≤ window size
+     * per switch, coalesced); reconciling device-switch resets is a
+     * reconnect-reconcile responsibility documented with the deviceSid
+     * fingerprint.</p>
+     */
+    static final class ParameterCoalescer {
+        private final Consumer<String> sink;
+        private final Map<Long, Double> lastValues = new ConcurrentHashMap<>();
+        private final Map<Long, Long> movementCounts = new ConcurrentHashMap<>();
+        private final Map<Long, ParamMovement> pending = new ConcurrentHashMap<>();
+
+        ParameterCoalescer(final Consumer<String> sink) {
+            this.sink = sink;
+        }
+
+        /**
+         * A parameter value fire. {@code key} is {@link #paramKey}; the
+         * source string rides the movement so the emitted event carries it.
+         */
+        void onValue(final long key, final int paramIndex, final String paramName,
+                     final String source, final double value) {
+            final Double prev = lastValues.put(key, value);
+            if (prev == null) {
+                return; // first observation (registration boot fire) — cached only
+            }
+            if (Math.abs(value - prev.doubleValue()) <= MOVEMENT_EPSILON) {
+                return; // float jitter, not a movement
+            }
+            movementCounts.merge(key, 1L, Long::sum);
+            pending.put(key, new ParamMovement(paramIndex, paramName, source, value));
+        }
+
+        /**
+         * Drain the pending movements, offering one parameter.changed line
+         * per key with the given deviceKey fingerprint (computed by the
+         * caller on the flush thread — callbacks never hash). Returns the
+         * number of events offered.
+         */
+        int flush(final String deviceKey) {
+            int offered = 0;
+            final var it = pending.entrySet().iterator();
+            while (it.hasNext()) {
+                final var entry = it.next();
+                it.remove();
+                final ParamMovement m = entry.getValue();
+                final Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("deviceKey", deviceKey);
+                payload.put("paramIndex", m.paramIndex);
+                payload.put("paramName", m.paramName);
+                payload.put("source", m.source);
+                payload.put("value", m.value);
+                sink.accept(LineJson.event("parameter.changed", payload, ts()));
+                offered++;
+            }
+            return offered;
+        }
+
+        /** Total movement count for a key (diagnostics + behavior tests). */
+        long movementCount(final long key) {
+            final Long v = movementCounts.get(key);
+            return v == null ? 0L : v.longValue();
+        }
+
+        /** Whether any movement awaits the next flush. */
+        boolean hasPending() {
+            return !pending.isEmpty();
+        }
+    }
+
+    /**
+     * D-05-05 automation-write state emitter. The four transport observers
+     * delegate here; each field's FIRST fire (registration boot state) is
+     * cached without emitting (the skipFirstFire precedent — the daemon's
+     * first transport.changed must be a REAL change); every later fire caches
+     * + pushes transport.changed carrying the FULL 4-field automationWrite
+     * snapshot (schema-required fields; consumers never see a partial
+     * object). writeMode values outside the schema enum (latch/touch/write)
+     * keep the last known valid mode (defensive — the wire line stays
+     * schema-valid).
+     */
+    static final class AutomationWriteEmitter {
+        static final String DEFAULT_WRITE_MODE = "write";
+        private final Consumer<String> sink;
+        private boolean arrangerWriteEnabled;
+        private boolean launcherWriteEnabled;
+        private boolean overrideActive;
+        private String writeMode = DEFAULT_WRITE_MODE;
+        private final boolean[] skipFirstFire = {true, true, true, true};
+
+        AutomationWriteEmitter(final Consumer<String> sink) {
+            this.sink = sink;
+        }
+
+        void onArrangerWriteEnabled(final boolean v) {
+            arrangerWriteEnabled = v;
+            if (skipFirstFire[0]) { skipFirstFire[0] = false; return; }
+            emit();
+        }
+
+        void onLauncherWriteEnabled(final boolean v) {
+            launcherWriteEnabled = v;
+            if (skipFirstFire[1]) { skipFirstFire[1] = false; return; }
+            emit();
+        }
+
+        void onOverrideActive(final boolean v) {
+            overrideActive = v;
+            if (skipFirstFire[2]) { skipFirstFire[2] = false; return; }
+            emit();
+        }
+
+        void onWriteMode(final String v) {
+            if ("latch".equals(v) || "touch".equals(v) || "write".equals(v)) {
+                writeMode = v;
+            }
+            if (skipFirstFire[3]) { skipFirstFire[3] = false; return; }
+            emit();
+        }
+
+        private void emit() {
+            final Map<String, Object> automationWrite = new LinkedHashMap<>();
+            automationWrite.put("arrangerWriteEnabled", arrangerWriteEnabled);
+            automationWrite.put("launcherWriteEnabled", launcherWriteEnabled);
+            automationWrite.put("overrideActive", overrideActive);
+            automationWrite.put("writeMode", writeMode);
+            sink.accept(LineJson.event("transport.changed",
+                    mapOf("automationWrite", automationWrite), ts()));
+        }
+    }
+
+    /**
+     * Phase 5 Plan 05-03 — V1 deviceSid fingerprint (the ClipSid.derive
+     * discipline applied to devices): {@code "dev_" + sha256(cursorTrackName
+     * + ":" + deviceName + ":" + position).slice(0,16)}. The
+     * parameter.changed {@code deviceKey} IS the AutomationScope
+     * {@code deviceSid} value (same fingerprint — the 05-05 apply path
+     * compares like-for-like; T-05-07: track+device+position sensitivity
+     * guards against reconnect/reorder mis-targeting). Null components fold
+     * to "" so an early/unfired cache never throws; reconnect reconciliation
+     * remains the daemon's responsibility (documented V1 gap, same stance as
+     * ClipSid).
+     */
+    static String deriveDeviceSid(final String cursorTrackName, final String deviceName, final int position) {
+        final String input = (cursorTrackName == null ? "" : cursorTrackName)
+                + ":" + (deviceName == null ? "" : deviceName)
+                + ":" + position;
+        try {
+            final byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            final String hex = HexFormat.of().formatHex(hash).substring(0, 16);
+            return "dev_" + hex;
+        } catch (final Exception e) {
+            // SHA-256 is JDK-guaranteed; the pattern-valid fallback keeps the
+            // wire line schema-valid (the ClipSid.derive stance).
+            return "dev_0000000000000000";
+        }
     }
 }

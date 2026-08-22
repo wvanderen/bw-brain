@@ -42,11 +42,12 @@ class ObserversCoalescingTest {
         @Override public void accept(final String line) { lines.add(line); }
     }
 
-    private static JsonNode parseEvent(final String line) throws Exception {
+    private static JsonNode parseEvent(final String line, final String expectedType) throws Exception {
         assertTrue(line.endsWith("\n"), "event line must end with newline");
         final JsonNode node = READER.readTree(line.substring(0, line.length() - 1));
-        assertEquals("event", node.get("type").asText());
+        assertEquals(expectedType, node.get("type").asText(), "LineJson.event stamps the event type");
         assertEquals("1.0", node.get("version").asText());
+        assertTrue(node.has("timestamp"), "sender-originated events carry a timestamp");
         return node;
     }
 
@@ -64,8 +65,7 @@ class ObserversCoalescingTest {
         final int offered = c.flush("dev_a1b2c3d4e5f60718");
         assertEquals(1, offered, "one coalesced event per key per flush window");
         assertEquals(1, sink.lines.size());
-        final JsonNode payload = parseEvent(sink.lines.get(0)).get("payload");
-        assertEquals("parameter.changed", "parameter.changed");
+        final JsonNode payload = parseEvent(sink.lines.get(0), "parameter.changed").get("payload");
         assertEquals("dev_a1b2c3d4e5f60718", payload.get("deviceKey").asText());
         assertEquals(7, payload.get("paramIndex").asInt());
         assertEquals("Cutoff", payload.get("paramName").asText());
@@ -108,10 +108,10 @@ class ObserversCoalescingTest {
         c.onValue(Observers.paramKey(Observers.SOURCE_REMOTE_PAGE, 0), 0, "Macro 1", "remote_page", 0.9);
         assertEquals(2, c.flush("dev_k"));
         assertEquals(2, sink.lines.size());
-        final JsonNode deviceParam = parseEvent(sink.lines.get(0)).get("payload");
+        final JsonNode deviceParam = parseEvent(sink.lines.get(0), "parameter.changed").get("payload");
         assertEquals("device_parameter", deviceParam.get("source").asText());
         assertEquals(0.5, deviceParam.get("value").asDouble(), 0.0001);
-        final JsonNode remote = parseEvent(sink.lines.get(1)).get("payload");
+        final JsonNode remote = parseEvent(sink.lines.get(1), "parameter.changed").get("payload");
         assertEquals("remote_page", remote.get("source").asText());
         assertEquals(0.9, remote.get("value").asDouble(), 0.0001);
     }
@@ -134,7 +134,7 @@ class ObserversCoalescingTest {
         // carrying the full 4-field automationWrite snapshot.
         e.onArrangerWriteEnabled(false);
         assertEquals(1, sink.lines.size());
-        final JsonNode payload = parseEvent(sink.lines.get(0)).get("payload");
+        final JsonNode payload = parseEvent(sink.lines.get(0), "transport.changed").get("payload");
         final JsonNode aw = payload.get("automationWrite");
         assertNotNull(aw, "transport.changed carries the automationWrite object");
         assertEquals(false, aw.get("arrangerWriteEnabled").asBoolean());
@@ -144,13 +144,13 @@ class ObserversCoalescingTest {
         // Override becomes active -> next push carries the updated snapshot.
         e.onOverrideActive(true);
         assertEquals(2, sink.lines.size());
-        final JsonNode aw2 = parseEvent(sink.lines.get(1)).get("payload").get("automationWrite");
+        final JsonNode aw2 = parseEvent(sink.lines.get(1), "transport.changed").get("payload").get("automationWrite");
         assertTrue(aw2.get("overrideActive").asBoolean());
         assertEquals("latch", aw2.get("writeMode").asText());
         // writeMode transitions emit the schema-bounded enum value.
         e.onWriteMode("touch");
         assertEquals(3, sink.lines.size());
-        assertEquals("touch", parseEvent(sink.lines.get(2)).get("payload")
+        assertEquals("touch", parseEvent(sink.lines.get(2), "transport.changed").get("payload")
                 .get("automationWrite").get("writeMode").asText());
     }
 
