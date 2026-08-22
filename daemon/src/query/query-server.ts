@@ -1029,6 +1029,27 @@ export async function refreshArrangementSnapshot(
   const grid = gridResp as { tracks?: unknown[]; sceneNames?: string[] };
   if (!Array.isArray(grid.tracks)) return null;
   const tracks = grid.tracks as ArrangementSnapshot["grid"]["tracks"];
+  // fix-04.3 (DEFECT D, daemon half): a pulled grid with ZERO tracks or ANY
+  // row missing a trackSid is INCOMPLETE — an unsynced bank or stale bridge
+  // mid-settle (e.g. a mid-bank real-but-unsynced track that the bridge's
+  // tail-trim deliberately preserved). Refuse UP FRONT (bounded log + null:
+  // no snapshot, no roles.json — boot's dependency renders the honest
+  // no-snapshot hint) instead of building a snapshot the write gate must
+  // reject. Layered with the bridge trim + the write gate, this keeps the
+  // DEFECT A all-empty poison impossible even against a stale bridge.
+  if (tracks.length === 0) {
+    console.error("[query-server] arrange.refresh launcher grid incomplete: pulled 0 tracks");
+    return null;
+  }
+  const incompleteTrackIdx = tracks.findIndex(
+    (t) => typeof t?.trackSid !== "string" || t.trackSid.length === 0,
+  );
+  if (incompleteTrackIdx !== -1) {
+    console.error(
+      `[query-server] arrange.refresh launcher grid incomplete: track ${incompleteTrackIdx} has empty trackSid`,
+    );
+    return null;
+  }
   const sceneCount = tracks.reduce((mx, t) => Math.max(mx, t.scenes?.length ?? 0), 0);
   const trackCount = tracks.length;
   const profileName = intent?.projectIntent.profile ?? "generic";
