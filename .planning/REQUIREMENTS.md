@@ -92,7 +92,7 @@ Requirements for initial release across all 4 milestones (M1 read-only context â
 ### Automation & Devices (M4)
 
 - [ ] **AUTO-01**: `bw-automation inspect` reports per-track automation salience (most expressive parameters)
-- [ ] **AUTO-02**: `bw-device macros-suggest` proposes macro/XY assignments ranked by observed expressiveness
+- [x] **AUTO-02**: `bw-device macros-suggest` proposes macro/XY assignments ranked by observed expressiveness
 - [ ] **AUTO-03**: `bw-automation propose` generates a bounded automation curve patch for a selected parameter/region (medium risk â†’ confirmation required)
 - [ ] **AUTO-04**: Device inspection and automation workflows cover third-party VST/AU plugins loaded in the Bitwig device chain, not just native Bitwig devices
 

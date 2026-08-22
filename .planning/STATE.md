@@ -6,14 +6,14 @@ current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
 stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-08-22T21:06:59.364Z"
+last_updated: "2026-08-22T21:19:24.212Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 63
-  completed_plans: 53
+  completed_plans: 55
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -102,6 +102,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 05 P01 | 10min | 2 tasks | 16 files |
 | Phase 05 P03 | 15min | 3 tasks | 9 files |
 | Phase 05 P04 | 14min | 3 tasks | 16 files |
+| Phase 05 P07 | 10min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -212,6 +213,12 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05 P04] Salience priors flow through the documented automationPriors pseudo-RawState sidecar (energy-curve raw.tracks open-typed defensive-read precedent): roleSalience = roles.json track-role confidence, energyAtMovement = mean of the arrangement energyCurve (the fold has no per-section movement spread — honest proxy)
 - [Phase ?]: [Phase 05 P04] AUTO-01 stays unchecked in REQUIREMENTS.md — code-complete end-to-end (analyzer → snapshot → op → CLI, 910/910 tests) but live-unverified until the 05-10 end-of-phase UAT (real knob turns → inspect ranking); 05-03 precedent discipline
 - [Phase ?]: [Phase 05 P04] Salience snapshot carries ONE tracks[] entry keyed by the selection-at-refresh trackSid (fold keys params by device, not track — attribution disclosed via assumptions); arrange surfaces keep serving from M3_ANALYZERS so their wire payloads stay byte-identical
+- [Phase 05]: [Phase 05 P07] macroSuggest returns {suggestions, manualHint} (not a bare array) — the empty path stays manualHint-bearing; XY pairing requires >=3 entries and yields when no alternative candidate would remain (>=1 alternative, D-05-11, outranks pairing, D-05-12)
+
+[Phase 05 P07] Uniform automationShapes weights = no bias applied AND no bias claimed — generic-profile runs stay byte-identical to profileless (ARCH-02 literal); op profile resolves from the snapshot's own profile field, unknown names degrade to unbiased ordering, never a refusal
+[Phase 05 P07] loadSalienceForRead is the single 05-04 freshness-semantics source — automation.inspect refactored onto it as device.macros_suggest was added (reuse, never fork); MEM-02 ALLOWED_QUERY_OPS extended in the same task (device.macros_suggest is the same read-only advisory class) — D-05-09/11/12 contract
+ARCH-02 enhance-never-gate + provenance honesty
+single-source discipline + the MEM-02 allowlist gate working as designed
 
 ### Pending Todos
 
@@ -245,6 +252,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T21:06:49.183Z
+Last session: 2026-08-22T21:19:09.049Z
 Stopped at: Completed 05-04-PLAN.md
 Resume file: None
