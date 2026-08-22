@@ -5,8 +5,8 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-22T20:51:08.213Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-22T21:06:59.364Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 3 of 10
+Plan: 4 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -101,6 +101,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 04.3 P07 | 6min | 3 tasks | 8 files |
 | Phase 05 P01 | 10min | 2 tasks | 16 files |
 | Phase 05 P03 | 15min | 3 tasks | 9 files |
+| Phase 05 P04 | 14min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -207,6 +208,10 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05 P03] Device.getParameter(int) is @Deprecated in extension-api:21 (javadoc replacement getRemoteControls() absent from the jar) — the locked D-05-03 surface stays behind per-index try/catch graceful degradation + a deprecated-allow marker; the PENDING live A2 probe (05-02) arbitrates window-survival vs page-based flip
 - [Phase 05]: [Phase 05 P03] isClipLauncherAutomationWriteEnabled flagged by the HTML deprecated-list but NOT annotated in the jar (javap -v verified) — allowlisted as a javadoc artifact; the schema-required launcherWriteEnabled field has no other surface
 - [Phase 05]: [Phase 05 P03] AUTO-01/AUTO-04 stay unchecked: 05-03 is code-complete but live-unverified (A2 probe + end-of-phase UAT pending) — parameter.changed deviceKey IS the AutomationScope deviceSid (deriveDeviceSid pin, load-bearing for 05-05/05-08)
+- [Phase ?]: [Phase 05 P04] Salience formula constants normalized against the 512 fold cap — the plan sketch (1.0 + 0.5·log1p) saturated past 1.0 at movementCount ≈ 20, tying macro vs device after the mandatory clamp and breaking the pinned macro-first test; structure kept, constants A8-tunable
+- [Phase ?]: [Phase 05 P04] Salience priors flow through the documented automationPriors pseudo-RawState sidecar (energy-curve raw.tracks open-typed defensive-read precedent): roleSalience = roles.json track-role confidence, energyAtMovement = mean of the arrangement energyCurve (the fold has no per-section movement spread — honest proxy)
+- [Phase ?]: [Phase 05 P04] AUTO-01 stays unchecked in REQUIREMENTS.md — code-complete end-to-end (analyzer → snapshot → op → CLI, 910/910 tests) but live-unverified until the 05-10 end-of-phase UAT (real knob turns → inspect ranking); 05-03 precedent discipline
+- [Phase ?]: [Phase 05 P04] Salience snapshot carries ONE tracks[] entry keyed by the selection-at-refresh trackSid (fold keys params by device, not track — attribution disclosed via assumptions); arrange surfaces keep serving from M3_ANALYZERS so their wire payloads stay byte-identical
 
 ### Pending Todos
 
@@ -240,6 +245,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T20:51:01.679Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-08-22T21:06:49.183Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
