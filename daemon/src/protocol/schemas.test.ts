@@ -659,6 +659,144 @@ describe("extended event/request enums (Phase 2 bridge surface)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Phase 5 (05-01 Task 1) — protocol contract extensions (schema-first,
+// ahead of any bridge emitter change): the parameter.changed event type
+// (AUTO-01 observation spine), its payload fields (deviceKey/paramIndex/
+// paramName/source/value), the transport.changed automationWrite object
+// (D-05-05 refusal vocabulary carrier), and the get.project_meta request
+// (D-05-16). additionalProperties stays false (T-2-02-E trust-spine).
+// ---------------------------------------------------------------------------
+
+describe("Phase 5 protocol extensions (parameter.changed / get.project_meta / automationWrite)", () => {
+  it("event + envelope accept a parameter.changed with the full observed payload (reader boundary)", () => {
+    const event = {
+      version: "1.0",
+      type: "parameter.changed",
+      timestamp: 1773501999,
+      payload: { deviceKey: "dev-1", paramIndex: 3, paramName: "Cutoff", source: "device_parameter", value: 0.5 },
+    };
+    const okEvent = validateEvent(event);
+    expect(okEvent, JSON.stringify(validateEvent.errors)).toBe(true);
+    // The reader validates the ENVELOPE (oneOf refs the event schema by $id) —
+    // both gates must accept the new line.
+    const okEnvelope = validateEnvelope(event);
+    expect(okEnvelope, JSON.stringify(validateEnvelope.errors)).toBe(true);
+  });
+
+  it("event accepts parameter.changed without the optional paramName", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "parameter.changed",
+      timestamp: 1,
+      payload: { deviceKey: "dev-1", paramIndex: 0, source: "remote_page", value: 0 },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event REJECTS parameter.changed with value 1.5 (outside [0,1] — T-05-02)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "parameter.changed",
+      timestamp: 1,
+      payload: { deviceKey: "dev-1", paramIndex: 3, source: "device_parameter", value: 1.5 },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("event REJECTS parameter.changed with a negative paramIndex (T-05-02)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "parameter.changed",
+      timestamp: 1,
+      payload: { deviceKey: "dev-1", paramIndex: -1, source: "device_parameter", value: 0.5 },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("event REJECTS parameter.changed with an unknown source enum value", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "parameter.changed",
+      timestamp: 1,
+      payload: { deviceKey: "dev-1", paramIndex: 3, source: "guesswork", value: 0.5 },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("event accepts transport.changed carrying the automationWrite object (D-05-05 vocabulary)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "transport.changed",
+      timestamp: 1,
+      payload: {
+        playing: true,
+        automationWrite: {
+          arrangerWriteEnabled: true,
+          launcherWriteEnabled: false,
+          overrideActive: false,
+          writeMode: "latch",
+        },
+      },
+    });
+    expect(ok, JSON.stringify(validateEvent.errors)).toBe(true);
+  });
+
+  it("event accepts all three writeMode values (latch | touch | write)", () => {
+    for (const writeMode of ["latch", "touch", "write"] as const) {
+      const ok = validateEvent({
+        version: "1.0",
+        type: "transport.changed",
+        timestamp: 1,
+        payload: {
+          automationWrite: { arrangerWriteEnabled: true, launcherWriteEnabled: true, overrideActive: true, writeMode },
+        },
+      });
+      expect(ok, `writeMode=${writeMode}`).toBe(true);
+    }
+  });
+
+  it("event REJECTS automationWrite with an unknown writeMode", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "transport.changed",
+      timestamp: 1,
+      payload: {
+        automationWrite: { arrangerWriteEnabled: true, launcherWriteEnabled: true, overrideActive: true, writeMode: "bogus" },
+      },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("event REJECTS automationWrite with an unknown extra property (additionalProperties: false)", () => {
+    const ok = validateEvent({
+      version: "1.0",
+      type: "transport.changed",
+      timestamp: 1,
+      payload: {
+        automationWrite: {
+          arrangerWriteEnabled: true,
+          launcherWriteEnabled: true,
+          overrideActive: true,
+          writeMode: "latch",
+          bogus: true,
+        },
+      },
+    });
+    expect(ok).toBe(false);
+  });
+
+  it("request accepts get.project_meta with an id (D-05-16 — additive enum member)", () => {
+    const ok = validateRequest({ version: "1.0", type: "get.project_meta", id: "req_meta_1" });
+    expect(ok, JSON.stringify(validateRequest.errors)).toBe(true);
+  });
+
+  it("envelope accepts the get.project_meta request line (reader boundary)", () => {
+    const ok = validateEnvelope({ version: "1.0", type: "get.project_meta", id: "req_meta_1" });
+    expect(ok, JSON.stringify(validateEnvelope.errors)).toBe(true);
+  });
+});
+
 describe("Pitfall 1: OBSERVATIONAL_EVENT_TYPES === event.schema.json type enum", () => {
   // RESEARCH.md lines 793-798: if these two sets drift, the reader's
   // backpressure classifier mis-classifies new push events as never-drop,
