@@ -194,4 +194,33 @@ describe("saveArrangementSnapshot (atomic, round-trip)", () => {
     expect(survivor!.pulledAt).toBe(good.pulledAt);
     expect(survivor!.grid.tracks[0]!.trackSid).toBe("trk_abc123def4567890");
   });
+
+  // ==========================================================================
+  // fix-04.3 — DEFECT D (schema half): grid.tracks carries minItems:1. An
+  // arrangement with ZERO tracks is never a persistable snapshot — an empty
+  // pull means the grid is INCOMPLETE (unsynced bank / stale bridge), and
+  // refreshArrangementSnapshot refuses it up front. minItems is the write-gate
+  // backstop so a zero-track snapshot can never reach disk through ANY path,
+  // and the shared validator refuses one hand-placed on disk at load too.
+  // ==========================================================================
+
+  it("DEFECT D: rejects a snapshot with tracks: [] at the write gate (minItems 1 — never reaches disk)", async () => {
+    const path = join(tmpRoot, "arrangement-snapshot.json");
+    const empty = minimalSnapshot();
+    empty.grid.tracks = []; // zero-track snapshot — an incomplete grid, not a song
+    await expect(saveArrangementSnapshot(path, empty)).rejects.toThrow(/save rejected|minItems|invalid/i);
+    // Nothing was written — the gate refused BEFORE atomicWriteJson.
+    await expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("DEFECT D: refuses a hand-written tracks: [] snapshot at LOAD (shared validator, bounded snapshot_invalid upstream)", async () => {
+    const path = join(tmpRoot, "arrangement-snapshot.json");
+    const empty = minimalSnapshot();
+    empty.grid.tracks = [];
+    await writeFile(path, JSON.stringify(empty), "utf8");
+    // The same compiled validator guards the load boundary — a zero-track
+    // file on disk is invalid, surfaced as the bounded snapshot_invalid
+    // refusal (DEFECT C handling), never silently loaded.
+    await expect(loadArrangementSnapshot(path)).rejects.toThrow(/arrangement-snapshot\.json/i);
+  });
 });
