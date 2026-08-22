@@ -215,9 +215,7 @@ describe("boot get.project_meta pull (D-05-16, fake bridge — NO live Bitwig)",
   const PORT_META = 17890;
   const PORT_NO_META = 17891;
 
-  it(
-    "bridge answering meta 137.0/7/4 → state.project carries 137.0 + 7/4 (Test 3)",
-    async () => {
+  it("bridge answering meta 137.0/7/4 → state.project carries 137.0 + 7/4 (Test 3)", { timeout: 15_000 }, async () => {
       const env = await makeEnv(PORT_META);
       try {
         const handle = await boot({
@@ -242,13 +240,9 @@ describe("boot get.project_meta pull (D-05-16, fake bridge — NO live Bitwig)",
       } finally {
         await dropEnv(env);
       }
-    },
-    { timeout: 15_000 },
-  );
+  });
 
-  it(
-    "bridge never answering meta → DEFAULT_PROJECT retained (120, 4/4), boot never blocked, never fabricated (Test 4)",
-    async () => {
+  it("bridge never answering meta → DEFAULT_PROJECT retained (120, 4/4), boot never blocked, never fabricated (Test 4)", { timeout: 20_000 }, async () => {
       const env = await makeEnv(PORT_NO_META);
       try {
         const handle = await boot({
@@ -288,7 +282,5 @@ describe("boot get.project_meta pull (D-05-16, fake bridge — NO live Bitwig)",
       } finally {
         await dropEnv(env);
       }
-    },
-    { timeout: 20_000 },
-  );
+  });
 });

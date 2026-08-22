@@ -14,6 +14,8 @@
 //                               public surface; the parameter-enumeration path is
 //                               resolved live. Returns an empty pages list for now.
 //   get.project_summary      -> snapshot the windowed TrackBank via Observers cache
+//   get.project-meta (05-03) -> tempo/timeSignature from the Observers pull-only
+//                               transport caches (D-05-16)
 //
 // The Bitwig-facing enumeration only runs inside Bitwig (Task 3 live). The pure
 // response builders (buildClipResponse / buildDeviceChainResponse /
@@ -130,6 +132,27 @@ public final class PullHandlers {
         return LineJson.response(id, true, Map.of("tracks", tracksPayload));
     }
 
+    /**
+     * Phase 5 Plan 05-03 (D-05-16) — pure project-meta response builder.
+     * Reads NO Bitwig state (the dispatch case passes the Observers pull-only
+     * caches), so it is JUnit-testable without a live host (the
+     * buildDeviceChainResponse precedent).
+     *
+     * <p>{@code name} is the honest empty string: Project exposes no document
+     * name in extension-api:21 (javap-verified — the ClapCapabilityView
+     * projectDocument finding above). The daemon's DEFAULT_PROJECT carries
+     * the same shape, so the boot fold (boot.ts foldProjectMeta) can overlay
+     * tempo/timeSignature without a name mismatch ever masquerading as a
+     * real project name.</p>
+     */
+    public static String buildProjectMetaResponse(final String id, final double tempo, final String timeSignature) {
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("name", "");
+        payload.put("tempo", tempo);
+        payload.put("timeSignature", timeSignature);
+        return LineJson.response(id, true, payload);
+    }
+
     /** Build the read-only Controller API evidence response for the CLAP gate. */
     static String buildClapCapabilityResponse(final String id, final ClapCapabilityView view) {
         final boolean nameAvailable = view.selectedDeviceObserved()
@@ -224,6 +247,12 @@ public final class PullHandlers {
                 case "get.selected_clip" -> outbox.offer(handleSelectedClip(id, cursorClip, observers));
                 case "get.selected_device_chain" -> outbox.offer(handleSelectedDeviceChain(id));
                 case "get.project_summary" -> outbox.offer(handleProjectSummary(id, observers));
+                // Phase 5 Plan 05-03 (D-05-16) — real project meta from the
+                // Observers pull-only transport caches. Closes the M1
+                // tempo=120 limitation (02-07 Minor 3); the request enum
+                // member landed in 05-01 (schema-first ordering, Pitfall 8).
+                case "get.project_meta" -> outbox.offer(
+                        buildProjectMetaResponse(id, observers.getTempo(), observers.getTimeSignature()));
                 case "get.clap_capabilities" -> outbox.offer(dispatchClapCapabilityRequest(type, id,
                         new ClapCapabilityView(observers.getCursorDeviceName(),
                                 !observers.getCursorDeviceName().isBlank())).orElseThrow());

@@ -17,15 +17,11 @@
 // "hello arrived." The dispatcher's hello branch is wired for forward
 // compatibility + exercised by the smoke test's fake bridge.
 //
-// M1 LIMITATION (DEFAULT_PROJECT — Minor 3 fix): the bridge's
-// get.project_summary response (PullHandlers.java:91-100, 193-200) returns
-// ONLY `{ tracks: [{slot,name}, ...] }` — it does NOT carry `version`,
-// `project`, or `selection`. Since normalize() requires a schema-valid
-// RawState, the daemon supplies defaults: name="", tempo=120,
-// timeSignature="4/4". Pulling project metadata is a Phase-3+ concern
-// (PullHandlers.java:146-150 dispatches ONLY get.selected_clip /
-// get.selected_device_chain / get.project_summary — no get.project_meta
-// handler exists today). Documented in 02-07-SUMMARY.md.
+// M1 LIMITATION CLOSED (Phase 5 Plan 05-03, D-05-16): the bridge now handles
+// get.project_meta (tempo/timeSignature from pull-only Transport observers)
+// and the connect path folds it into project state below (refreshSnapshot).
+// DEFAULT_PROJECT survives ONLY as the disconnected/lastState-absent fallback
+// and as the honest pre-fire default — never as a fabricated live value.
 
 import * as net from "node:net";
 import * as fs from "node:fs";
@@ -125,6 +121,38 @@ const LAUNCHER_GRID_PULL_TIMEOUT_MS = 90_000;
 
 /** M1 LIMITATION (Minor 3 fix): the bridge does not pull project metadata. */
 const DEFAULT_PROJECT = { name: "", tempo: 120, timeSignature: "4/4" } as const;
+
+/**
+ * Phase 5 Plan 05-03 (D-05-16) — pure fold of a get.project_meta response
+ * into the project block. Defensive on every field (the 02-03b validate-at-
+ * boundary discipline applies to the daemon's own state too): a non-positive/
+ * non-finite/wrong-typed tempo and a non-`N/M` timeSignature are REJECTED —
+ * the corresponding default survives rather than fabricating a live value.
+ * A response carrying nothing usable returns the CURRENT block unchanged
+ * (reference-equal no-op).
+ *
+ * `name` is intentionally never taken from the response: the bridge's
+ * buildProjectMetaResponse pins it to "" (Project exposes no document name
+ * in extension-api:21 — javap-verified), so the existing value (which may
+ * come from persisted state) wins.
+ */
+export function foldProjectMeta(
+  current: { name: string; tempo: number; timeSignature: string; [k: string]: unknown },
+  response: unknown,
+): { name: string; tempo: number; timeSignature: string; [k: string]: unknown } {
+  if (response === null || typeof response !== "object") return current;
+  const r = response as Record<string, unknown>;
+  const tempo =
+    typeof r.tempo === "number" && Number.isFinite(r.tempo) && r.tempo > 0 ? r.tempo : undefined;
+  const timeSignature =
+    typeof r.timeSignature === "string" && /^\d+\/\d+$/.test(r.timeSignature) ? r.timeSignature : undefined;
+  if (tempo === undefined && timeSignature === undefined) return current;
+  return {
+    ...current,
+    ...(tempo !== undefined ? { tempo } : {}),
+    ...(timeSignature !== undefined ? { timeSignature } : {}),
+  };
+}
 
 /** The baseline RawState the daemon seeds from a get.project_summary response. */
 const BASELINE_RAW_STATE: RawState = {
@@ -463,6 +491,21 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       summaryTracks = summaryTrackList;
       reconcile(observed, stableIds, Date.now());
       lastState = observed;
+
+      // Phase 5 Plan 05-03 (D-05-16) — real project meta on (re)connect.
+      // Best-effort secondary pull mirroring the D-03d clipSid reconcile
+      // discipline (03.1 P02): a failed meta pull NEVER blocks boot — the
+      // DEFAULT_PROJECT fallback (retained above) survives untouched and
+      // nothing is fabricated. Closes the M1 tempo=120 limitation.
+      try {
+        const metaResp = (await correlator.send("get.project_meta")) as unknown;
+        lastState = {
+          ...lastState,
+          project: foldProjectMeta(lastState.project, metaResp) as typeof lastState.project,
+        };
+      } catch (e) {
+        console.error("[boot] get.project_meta pull failed:", (e as Error).message);
+      }
 
       // D-03d (Phase 03.1-02): eagerly reconcile selection.clipSid on
       // (re)connect. CONTEXT.md claimed refreshSnapshot already pulled

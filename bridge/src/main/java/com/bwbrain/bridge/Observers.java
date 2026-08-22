@@ -142,6 +142,17 @@ public final class Observers {
             new java.util.concurrent.atomic.AtomicLong(0L);
     private final java.util.concurrent.atomic.AtomicInteger bankObservationCount =
             new java.util.concurrent.atomic.AtomicInteger(0);
+    // Phase 5 Plan 05-03 (D-05-16) — PULL-ONLY transport meta caches (tempo +
+    // time signature) feeding the get.project_meta response. These observers
+    // NEVER offer an event line (the sceneNames :358-371 pull-only precedent):
+    // they fire on the controller thread, cache the latest value on EVERY fire
+    // (including the registration boot fire — the pull path wants the current
+    // value, not just changes), and PullHandlers.handleProjectMeta reads the
+    // snapshot when building the response. The honest pre-fire defaults mirror
+    // the daemon's DEFAULT_PROJECT (boot.ts:127) so an unregistered/unfired
+    // cache never fabricates a live value.
+    private volatile double tempo = 120.0;
+    private volatile String timeSignature = "4/4";
 
     public Observers(final Outbox outbox, final int bankSize) {
         this.outbox = outbox;
@@ -195,6 +206,11 @@ public final class Observers {
         // every track's clipLauncherSlotBank() returns null.
         wireClipLauncherSlotsEager(host, trackBank, sceneCount);
         wireWalkerReadySignal(cursorClip);
+        // Phase 5 Plan 05-03 Task 1 (D-05-16) — PULL-ONLY transport meta
+        // observers (tempo + time signature). init()-time registration like
+        // every other observer group (Pitfall 7 — post-init registration
+        // throws at runtime).
+        wireTransportMeta(transport);
     }
 
     /**
@@ -298,6 +314,31 @@ public final class Observers {
             playing = isPlaying;
             outbox.offer(LineJson.event("transport.changed",
                     mapOf("playing", isPlaying), ts()));
+        });
+    }
+
+    /**
+     * Phase 5 Plan 05-03 Task 1 (D-05-16) — wire the PULL-ONLY tempo +
+     * time-signature observers. Non-deprecated accessors verified via javap
+     * against extension-api:21 this session: {@code Transport.tempo()} (the
+     * {@code getTempo()} form IS deprecated) returns a Parameter whose value
+     * observers follow the {@code RangedValue extends
+     * Value<DoubleValueChangedCallback>} surface; {@code Transport
+     * .timeSignature()} (the {@code getTimeSignature()} form IS deprecated)
+     * returns a {@code TimeSignatureValue extends
+     * Value<StringValueChangedCallback>} whose {@code get()} renders "4/4".
+     *
+     * <p>PULL-ONLY (the wireSceneBank :358-371 precedent): the cache writes on
+     * EVERY fire — including the registration boot fire (the pull path wants
+     * the current value) — and NEVER offers an event line. There is no
+     * skipFirstFire guard because there is nothing to suppress.</p>
+     */
+    private void wireTransportMeta(final Transport transport) {
+        transport.tempo().addValueObserver((DoubleValueChangedCallback) (double bpm) -> {
+            tempo = bpm;
+        });
+        transport.timeSignature().addValueObserver((StringValueChangedCallback) (String sig) -> {
+            timeSignature = sig == null || sig.isEmpty() ? "4/4" : sig;
         });
     }
 
@@ -450,6 +491,17 @@ public final class Observers {
     public String getCursorTrackName() { return cursorTrackName; }
     public String getCursorDeviceName() { return cursorDeviceName; }
     public boolean isPlaying() { return playing; }
+    /**
+     * Phase 5 Plan 05-03 (D-05-16) — pull-only tempo cache for the
+     * {@code get.project_meta} response. Defaults to the honest 120.0
+     * (DEFAULT_PROJECT mirror) until the transport observer fires.
+     */
+    public double getTempo() { return tempo; }
+    /**
+     * Phase 5 Plan 05-03 (D-05-16) — pull-only time-signature cache for the
+     * {@code get.project_meta} response. Defaults to the honest "4/4".
+     */
+    public String getTimeSignature() { return timeSignature; }
     public Map<Integer, String> getBankTrackNames() { return bankTrackNames; }
     public int getBankSize() { return bankSize; }
     /** Phase 4 Plan 04-01 — scene-name cache snapshot for the D-12 grid response. */
