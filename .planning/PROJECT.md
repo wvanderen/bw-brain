@@ -15,6 +15,7 @@ The assistant reliably understands and describes the selected Bitwig context (cl
 - [x] Thin CLAP companion works in Bitwig in together and separate hosting modes, including persistent identity, confirmed scope, Analyze, proposal review, existing-edit approval, bounded live MIDI, Stop, reconnect, Save As fork, and transparent audio/MIDI pass-through (Phase 04.2).
 - [x] Pi 0.84 runs headlessly inside the daemon with project-scoped sessions and bounded tools; it has no direct Bitwig, socket, filesystem, apply, arm-token, or raw-audio authority (Phase 04.2).
 - [x] Controller/daemon trust spine remains authoritative for project mutation and daemon-authoritative journal/revert behavior (Phases 3, 03.1, 04.2).
+- [x] CLAP-native arrangement review exposes populated scene, energy, repetition, role, assumption, and advisory transition evidence with durable freshness and CLI recovery parity (Phase 04.3).
 
 ### Active
 
@@ -30,7 +31,7 @@ The assistant reliably understands and describes the selected Bitwig context (cl
 - [ ] Edit only through a patch/diff model: scope → operations → rationale → reversibility → risk class, with preview before apply
 - [ ] Generate musically sane, motif-preserving MIDI transforms (subtle variation, counterline, voice-leading cleanup)
 - [ ] Propose bounded automation and macro-exposure targets for device chains
-- [ ] Complete the CLAP-first product surface for arrangement review and device/automation workflows; keep legacy Pi skills and the CLI as secondary headless interfaces
+- [ ] Complete the CLAP-first product surface for device/automation workflows; keep legacy Pi skills and the CLI as secondary headless interfaces
 - [ ] Enforce guardrails: no background edits, no edit without a patch object, every patch gets an undo label, every suggestion states assumptions, risk-gated apply flow
 
 ### Out of Scope
@@ -95,6 +96,7 @@ The assistant reliably understands and describes the selected Bitwig context (cl
 | Java bridge from day one (no JS prototyping) | Official Bitwig extension path; sturdier long-running bridge. Spike (Phase 1) confirmed JS control-surface `host` exposes NO networking/file I/O — JS is unusable for the transport, so Java `.bwextension` is mandatory, not just preferred | ✓ Phase 1 — JS prototyping ruled out; Java pivot proven live |
 | No MCP — thin JSON-Lines bridge | Matches "small toolbelt over large tool registries"; keeps the contract inspectable and composable | — Pending |
 | VST/AU params: A1 NEGATED — `CursorDevice` exposes no `getRemoteControls()` in extension-api:21 | Live Surge XT probe (Phase 2 UAT, 2026-06-29) confirmed VST params do NOT surface via CursorRemoteControlsPage; `bw-device inspect` returns empty pages by design. `cursorDevice.getParameter(int)` direct-enumeration is the documented fallback | ✓ Phase 2 — NEGATED; fallback deferred to Phase 5 (device workflows) |
+| Arrangement labels remain confidence-gated while independent scene/energy/repetition/role evidence proves capture health | Preserves the local-first honesty contract: omit weak labels instead of guessing, without misreporting a populated launcher as empty | ✓ Phase 04.3 live-verified 2026-08-22 |
 
 ## Evolution
 
@@ -114,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-20 after Phase 04.2 verification and CLAP-first product rebaseline*
+*Last updated: 2026-08-22 after Phase 04.3 live verification and CLAP-first product rebaseline completion*

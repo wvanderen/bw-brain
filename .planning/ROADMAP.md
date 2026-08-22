@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Arrangement Intelligence (M3)** - Section/repetition/energy/transition analysis + track-role classification + Pi /review — project-level critique (observation/suggestion only) (completed 2026-07-07)
 - [x] **Phase 04.1: CLAP Capability & Host Evidence Gate** - Complete with direct live MIDI sample-offset evidence and reconciled gate traceability
 - [x] **Phase 04.2: Hybrid CLAP Companion Product** - Complete thin CLAP companion with two-mode macOS host evidence for D-01–D-16 (completed 2026-08-20)
-- [~] **Phase 04.3: CLAP-First Product Rebaseline** - Reconcile product ownership, bring arrangement review into CLAP, retire obsolete external-Pi UX assumptions, and prepare Phase 5 (executed 2026-08-21; verification returned gaps_found — DEFECT A/B/C gap closure 04.3-06..08 in flight; RB-03/UX-03 open)
+- [x] **Phase 04.3: CLAP-First Product Rebaseline** - Reconcile product ownership, bring arrangement review into CLAP, retire obsolete external-Pi UX assumptions, and prepare Phase 5 (completed and live-verified 2026-08-22; 12/12 focused UAT rows passed; RB-03/UX-03 complete)
 - [ ] **Phase 5: Automation & Device Workflows (M4)** - CLAP-native device/automation inspection and proposals across native and third-party chains
 
 ## Phase Details
@@ -267,7 +267,7 @@ Plans:
   4. Local-first behavior is explicit and testable: raw audio and mutation authority remain local; only bounded confirmed context may reach an explicitly configured remote reasoning provider.
   5. Phase 5 has a CLAP-native device/automation specification that reuses the verified proposal, approval, pre-flight, controller, and journal paths.
 
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 **UI hint:** yes
 **Research needed:** map existing arrangement analyzers and legacy UAT to the Phase 04.2 proposal/session seams; determine the smallest readable arrangement presentation in the hosted editor.
 
@@ -295,7 +295,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 — the live re-run needs all three defects closed)*
 
-- [ ] 04.3-08-PLAN.md — [GAP CLOSURE] Freshness-verified live re-run of 04.3-UAT row 1 + joined-flow detection acceptance in Bitwig 6.0.11 on macOS; honest ledger verdict/approval update + RB-03/UX-03 completion (autonomous: false — blocking live checkpoint, Wave 5)
+- [x] 04.3-08-PLAN.md — [GAP CLOSURE] Freshness-verified live re-run of 04.3-UAT row 1 + joined-flow detection acceptance in Bitwig 6.0.11 on macOS; honest ledger verdict/approval update + RB-03/UX-03 completion (autonomous: false — blocking live checkpoint, Wave 5)
 
 ### Phase 5: Automation & Device Workflows (M4)
 
@@ -329,5 +329,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 4. Arrangement Intelligence (M3) | 6/6 | Complete   | 2026-07-07 |
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
-| 04.3. CLAP-First Product Rebaseline | 7/8 | In Progress|  |
+| 04.3. CLAP-First Product Rebaseline | 8/8 | Complete    | 2026-08-22 |
 | 5. Automation & Device Workflows (M4) | 0/TBD | Not started | - |

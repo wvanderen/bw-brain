@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04.3
-current_phase_name: clap-first-product-rebaseline-and-roadmap-reconciliation
-status: executing
-stopped_at: "Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)"
-last_updated: "2026-08-22T00:12:46.677Z"
-last_activity: 2026-08-21
-last_activity_desc: "Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)"
+current_phase: 5
+current_phase_name: M4
+status: ready_to_plan
+stopped_at: "Phase 04.3 complete, ready to discuss/plan Phase 5"
+last_updated: "2026-08-22T15:31:02.836Z"
+last_activity: 2026-08-22
+last_activity_desc: Phase 04.3 complete, transitioned to Phase 5
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 53
-  completed_plans: 50
+  completed_plans: 51
   percent: 67
 ---
 
@@ -21,25 +21,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-20)
+See: .planning/PROJECT.md (updated 2026-08-22)
 
 **Core value:** The assistant reliably understands and describes the selected Bitwig context and can only change the project through small, previewable, reversible, daemon-authoritative patches — so it never wrecks the song. Accurate first; creative later.
-**Current focus:** Phase 04.3 — clap-first-product-rebaseline-and-roadmap-reconciliation
+**Current focus:** Phase 5 — Automation & Device Workflows (M4)
 
 ## Current Position
 
-Phase: 04.3 (clap-first-product-rebaseline-and-roadmap-reconciliation) — EXECUTING
-Plan: 8 of 8 (next: 04.3-07 daemon halves of DEFECT A/B/C; 01–06 complete)
-Status: Ready to execute
-Last activity: 2026-08-21 — Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
+Phase: 5 — Automation & Device Workflows (M4)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-22 — Phase 04.3 complete, transitioned to Phase 5
 
-Progress: [█████████░] 48/53 defined plans complete; Phase 5 unplanned
+Progress: [████████████████████] 51/51 defined plans complete; Phase 5 unplanned
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 32
+- Total plans completed: 40
 - Average duration: ~17 min
 - Total execution time: ~2.5 hours
 
@@ -54,10 +54,11 @@ Progress: [█████████░] 48/53 defined plans complete; Phase 5
 | 4. Arrangement Intelligence (M3) | 6/6 | — | — |
 | 04.1 CLAP Capability & Host Evidence Gate | 4/4 | 4 days elapsed across gated sessions | — |
 | 04.2 Hybrid CLAP Companion Product | 11/11 | ~2h plus live UAT | — |
-| 04.3 CLAP-First Product Rebaseline | 0/TBD | — | — |
+| 04.3 CLAP-First Product Rebaseline | 8/8 | — | — |
 | 5. Automation & Device Workflows (M4) | 0/TBD | — | — |
 | 02 | 8 | - | - |
 | 03.1 | 6 | - | - |
+| 04.3 | 8 | - | - |
 
 **Recent Trend:**
 
@@ -213,7 +214,7 @@ Recent decisions affecting current work:
 - [Phase 04.3]: The CLAP editor is the primary producer UX; Pi is daemon-managed and headless; the CLI remains the stable secondary automation, diagnostic, and recovery contract.
 - [Phase 04.3]: Local-first means DAW authority, raw state, persistence, and mutation remain local; explicit reasoning may use a local or remote provider with bounded confirmed context, never raw audio.
 - [Phase 04.3]: Phase 4 arrangement analyzers are retained, while external Pi `/review` UI acceptance is superseded by a CLAP-native arrangement review and proposal flow.
-- [Phase 04.3 — OPEN, routes to /gsd-plan-phase 4.3 --gaps] Live arrangement UAT (2026-08-21) failed row 1: every detection dimension empty. DEFECT A (bridge/daemon): get.launcher_clips walk races bank sync and exceeds the 3000ms pull timeout — snapshot has empty trackSids (tracks 4-7) and all 128 cells hasContent:false; late bridge responses dropped by correlator. DEFECT B (daemon): snapshot write path persists schema-invalid content (no save validation). DEFECT C (daemon): loadArrangementSnapshot throw unhandled on the arrange.review path — one bad snapshot file crashes the daemon (arrangement-snapshot.ts:246, query-server.ts:1114/1208; boot resilient, query fatal). RB-03/UX-03 acceptance blocked on closure + live re-run.
+- [Phase 04.3 — RESOLVED 2026-08-22] Live arrangement UAT passed 12/12 after defects A–K were closed. Populated launcher evidence, post-edit freshness, CLI parity, bounded corrupt-snapshot refusal, and refresh recovery were verified in Bitwig Studio 6.0.11; RB-03/UX-03 complete.
 
 ### Roadmap Evolution
 
@@ -232,6 +233,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T00:12:42.733Z
-Stopped at: Completed 04.3-06-PLAN.md (DEFECT A bridge half: bank-sync settle wait)
+Last session: 2026-08-22T15:31:02.836Z
+Stopped at: Phase 04.3 complete, ready to discuss/plan Phase 5
 Resume file: None
