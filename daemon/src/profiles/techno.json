@@ -12,6 +12,18 @@
     "polyphony": 0.15,
     "pitchCentroid": 0.20
   },
+  "automationShapes": {
+    "shapeBias": {
+      "ramp_up": 0.8,
+      "ramp_down": 0.8,
+      "dip_recover": 0.6,
+      "rise_fall": 1.2,
+      "slow_cycle": 1.5,
+      "hold_then_move": 1.0
+    },
+    "depthRange": [0.2, 0.9],
+    "rateRange": [0.125, 2.0]
+  },
   "sectionLabels": [
     { "label": "drop", "position": "middle", "energyRange": [0.85, 1.0] },
     { "label": "break", "position": "any", "energyRange": [0.3, 0.6] },

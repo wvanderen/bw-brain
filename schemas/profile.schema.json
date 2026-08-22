@@ -77,6 +77,43 @@
         "pitchCentroid": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
+    "automationShapes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shapeBias", "depthRange", "rateRange"],
+      "description": "Phase 5 (D-05-13): bias for the fixed six-shape automation vocabulary (ramp_up, ramp_down, dip_recover, rise_fall, slow_cycle, hold_then_move). Bias values are relative weights (>= 0, no normalization constraint); depthRange constrains curve depth in [0,1]; rateRange constrains rate in cycles/bar (>= 0; min <= max is a consumer-side check — Ajv 2020-12 has no native cross-item ordering, mirroring the energyWeights sum precedent).",
+      "$comment": "ARCH-02: this field is OPTIONAL — generic core runs literally without it. Curve generation (05-08) gates on field-presence (ctx.profile?.automationShapes ?? DEFAULT) and the bias ENHANCES shape choice, never gates it (D-05-13: genre profiles bias, they never refuse).",
+      "properties": {
+        "shapeBias": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ramp_up", "ramp_down", "dip_recover", "rise_fall", "slow_cycle", "hold_then_move"],
+          "description": "Relative preference weight per shape name (the fixed D-05-13 shape set). Uniform weights = no bias.",
+          "properties": {
+            "ramp_up": { "type": "number", "minimum": 0 },
+            "ramp_down": { "type": "number", "minimum": 0 },
+            "dip_recover": { "type": "number", "minimum": 0 },
+            "rise_fall": { "type": "number", "minimum": 0 },
+            "slow_cycle": { "type": "number", "minimum": 0 },
+            "hold_then_move": { "type": "number", "minimum": 0 }
+          }
+        },
+        "depthRange": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Curve depth bounds [min, max] in [0,1] (normalized automation depth)."
+        },
+        "rateRange": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Curve rate bounds [min, max] in cycles/bar (e.g. 0.125 = one cycle per 8 bars)."
+        }
+      }
+    },
     "sectionLabels": {
       "type": "array",
       "items": {

@@ -62,6 +62,36 @@ export interface Profile {
     pitchCentroid: number;
   };
   /**
+   * Phase 5 (D-05-13): bias for the fixed six-shape automation vocabulary (ramp_up, ramp_down, dip_recover, rise_fall, slow_cycle, hold_then_move). Bias values are relative weights (>= 0, no normalization constraint); depthRange constrains curve depth in [0,1]; rateRange constrains rate in cycles/bar (>= 0; min <= max is a consumer-side check — Ajv 2020-12 has no native cross-item ordering, mirroring the energyWeights sum precedent).
+   */
+  automationShapes?: {
+    /**
+     * Relative preference weight per shape name (the fixed D-05-13 shape set). Uniform weights = no bias.
+     */
+    shapeBias: {
+      ramp_up: number;
+      ramp_down: number;
+      dip_recover: number;
+      rise_fall: number;
+      slow_cycle: number;
+      hold_then_move: number;
+    };
+    /**
+     * Curve depth bounds [min, max] in [0,1] (normalized automation depth).
+     *
+     * @minItems 2
+     * @maxItems 2
+     */
+    depthRange: [number, number];
+    /**
+     * Curve rate bounds [min, max] in cycles/bar (e.g. 0.125 = one cycle per 8 bars).
+     *
+     * @minItems 2
+     * @maxItems 2
+     */
+    rateRange: [number, number];
+  };
+  /**
    * D-07 vocabulary for section labeling. Generic ships [intro, build, peak, breakdown, outro]; techno REPLACES with [drop, break, roll]. Position+energy heuristics map a detected cluster to a label.
    */
   sectionLabels?: {

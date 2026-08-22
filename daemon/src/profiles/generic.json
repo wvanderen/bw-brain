@@ -25,6 +25,18 @@
     "polyphony": 0.20,
     "pitchCentroid": 0.20
   },
+  "automationShapes": {
+    "shapeBias": {
+      "ramp_up": 1.0,
+      "ramp_down": 1.0,
+      "dip_recover": 1.0,
+      "rise_fall": 1.0,
+      "slow_cycle": 1.0,
+      "hold_then_move": 1.0
+    },
+    "depthRange": [0.0, 1.0],
+    "rateRange": [0.125, 4.0]
+  },
   "sectionLabels": [
     { "label": "intro", "position": "start", "energyRange": [0.0, 0.4] },
     { "label": "build", "position": "any", "energyRange": [0.3, 0.7] },
