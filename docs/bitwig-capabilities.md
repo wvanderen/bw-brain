@@ -196,6 +196,73 @@ target envelope is ambiguous, Phase 4 pins clip-vs-track explicitly per device
 parameter type. No native workaround is loaded as a default — the daemon always
 issues a labelled edit so the user can revert.
 
+### Automation Write Probe — 2026-08-22 (template prepared; results PENDING)
+
+> **Status: PENDING live probe — Phase 5 Plan 05-02 Task 2 (BLOCKING
+> human-verify).** Every `Observed:` field in this subsection is filled ONLY
+> from the producer's live Bitwig session (Bitwig Studio 6.0.11, THROWAWAY
+> project, third-party VST/AU on the selected track) via the script
+> `spike/automation-write-probe.js` (throwaway — threat T-05-05; nothing
+> imports it). Nothing is inferred; cells the human does not exercise are
+> recorded as **UNVERIFIED**, never guessed.
+
+#### Matrix evidence — one row per cell
+
+| # | Transport | Automation write | Variants exercised | Observed: value before→after | Observed: envelope points landed (clip vs track) | Observed: playhead relation | Verdict |
+|---|-----------|------------------|--------------------|------------------------------|--------------------------------------------------|------------------------------|---------|
+| 1 | playing | not armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 2 | playing | arranger armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 3 | playing | launcher armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 4 | stopped | not armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 5 | stopped | arranger armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 6 | stopped | launcher armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+
+#### set vs setImmediately vs setRaw comparison (per cell, ≥2 transitions each)
+
+- _Observed (PENDING):_ differences between the three write variants under
+  each matrix cell — value-after, whether an envelope point appeared, whether
+  any variant threw.
+
+#### Normalization verdict (assumption A1)
+
+- _Observed (PENDING):_ does feeding `0.75` land ~3/4 of the parameter range
+  (normalized 0..1) or somewhere else (raw scale)? Record the probed
+  parameter's displayed value before/after.
+
+#### Clip-vs-track envelope targeting per parameter type (D-05-06)
+
+- _Observed (PENDING):_ for the probed VST/AU parameter — did points land in
+  the arranger track envelope, the launcher clip envelope, both, or neither?
+  Per parameter type where distinguishable; still-ambiguous parameter types
+  are named refuse-with-named-reason targets (never a guess-write).
+
+#### Remote-page creation-site finding
+
+- _Observed (PENDING):_ knob names from
+  `cursorDevice.createCursorRemoteControlsPage(8)` vs
+  `cursorTrack.channel().createCursorRemoteControlsPage(8)` — which site
+  surfaces the producer's macro knobs.
+
+#### Refusal vocabulary table (D-05-05 — placeholder until observed)
+
+| Named reason | Triggering Transport state combination | Status |
+|--------------|----------------------------------------|--------|
+| `transport_stopped` | _PENDING — observed condition that produces this refusal_ | derived after probe |
+| `automation_write_disabled/arranger` | _PENDING_ | derived after probe |
+| `automation_write_disabled/launcher` | _PENDING_ | derived after probe |
+| `automation_override_active` | _PENDING_ | derived after probe |
+| `ambiguous_target` | _PENDING (D-05-06 — parameter types still ambiguous after probing)_ | derived after probe |
+| `wrong_device_targeted` | _PENDING (cursor device ≠ intended target)_ | derived after probe |
+| `state_disconnected` | bridge/daemon disconnected (not live-probe-observable; daemon-side gate) | daemon-side |
+
+#### Execute-semantics consequence row (D-05-08 — binding for 05-05/05-06)
+
+- _Observed (PENDING):_ does an approved bounded curve write **instantly**
+  (points appear at once under the observed conditions) or require **armed
+  real-time capture** (points record at the playhead during playback across
+  the region), or both depending on state? 05-05's pre-flight gates and
+  05-06's bridge execution implement whatever is recorded here.
+
 ---
 
 ## 4. Bank Paging
@@ -234,6 +301,22 @@ track follow bank scrolls? 8-remote-parameters-per-page confirmed?
 `trackBank.scrollPageForwards()`; observe whether `cursorTrack` follows.
 
 **Observed:** **TODO-in-app** (Plan 03 Task 2). Single-pass acceptable.
+
+### Parameter indexing probe (AUTO-04 / A2) — 2026-08-22 (template prepared; results PENDING)
+
+> **Status: PENDING live probe — Phase 5 Plan 05-02 Task 2.** Filled only from
+> the producer's live session via `spike/automation-write-probe.js`
+> (`WALK …` log lines: `getParameter(0..127)` walk with `exists()`-termination
+> on the selected VST/AU).
+
+- _Observed (PENDING):_ `getParameter(0..127)` **termination index** for the
+  probed VST/AU (first index where `exists()` reports absent; `>=128` if the
+  window never terminates).
+- _Observed (PENDING):_ **bound parameter names** (first window of the walk).
+- _Observed (PENDING):_ **full-list vs page-locked verdict** — termination
+  ~8/16 suggests page-locked indexing; a large/no termination suggests the
+  device's full parameter list. This decides the 05-03 bounded-enumeration
+  window (D-05-03).
 
 **Mitigation:** DRAFT (pending observation) — the daemon reconciles the
 windowed-N bank view via the STATE-04 fingerprint mapping (name + neighbors +
