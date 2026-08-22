@@ -155,6 +155,9 @@ describe("renderDeviceReview (05-09 bounded text render)", () => {
   it("renders the explicit NO SALIENCE SNAPSHOT marker when pulledAt is null (never a fabricated timestamp)", () => {
     const evidence = populatedEvidence();
     evidence.pulledAt = null;
+    // A null-pulledAt evidence carries the no-snapshot assumption claim
+    // (mirrors saliencePulledAtAssumption(null)) — never a stale timestamp.
+    evidence.assumptions = [{ claim: "no salience snapshot loaded — move a knob and run `bw-automation inspect --refresh` while connected", confidence: 1.0, source: "default" }];
     const joined = renderDeviceReview(evidence).join("\n");
     expect(joined).toContain("NO SALIENCE SNAPSHOT");
     expect(joined).not.toContain(`pulled at ${PULLED_AT}`);
@@ -163,17 +166,17 @@ describe("renderDeviceReview (05-09 bounded text render)", () => {
   it("splits an oversized ranked list at line boundaries into contiguous ≤512 chunks", () => {
     const evidence = populatedEvidence();
     const many: DeviceReviewEvidence["salience"] = [];
+    // Fixture Filter Cutoff (0.83) + 40 generated entries at 0.80..0.41 —
+    // the fixture entry stays rank 1 under the bounded top-8 cap.
     for (let i = 0; i < 40; i++) {
-      many.push(param({ paramKey: `dev_aaaaaaaaaaaaaaa1:device_parameter:${i}`, paramIndex: i, paramName: `Param ${i}`, salience: 0.9 - i * 0.01 }));
+      many.push(param({ paramKey: `dev_aaaaaaaaaaaaaaa1:device_parameter:${i}`, paramIndex: i, paramName: `Param ${i}`, salience: 0.8 - i * 0.01 }));
     }
-    evidence.salience = many;
+    evidence.salience = [param({ salience: 0.83 }), ...many];
     const chunks = renderDeviceReview(evidence);
     expect(chunks.length).toBeGreaterThan(2);
     for (const chunk of chunks) expect(chunk.length).toBeLessThanOrEqual(MAX_CHUNK_CHARS);
     // Line integrity: a rendered ranked line is a COMPLETE line (no mid-line cut).
-    expect(chunks.join("\n").split("\n")).toContain(
-      expect.stringMatching(/^\s+1\.\sFilter Cutoff\s+▇▇\s+salience=0\.83/),
-    );
+    expect(chunks.join("\n").split("\n").some((l) => /^\s+1\.\sFilter Cutoff\s+▇▇\s+salience=0\.83/.test(l))).toBe(true);
   });
 
   it("is deterministic for identical input", () => {

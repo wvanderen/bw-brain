@@ -2,7 +2,8 @@ import type { ApprovalRequest } from "../proposals/approval-store.js";
 import type { ProposalRevision, ProposalScope } from "../proposals/proposal-store.js";
 import { PiRuntimeFailure } from "../sessions/pi-runtime.js";
 import { renderArrangementReview, renderArrangementReviewHint } from "../transforms/arrangement-review-render.js";
-import type { ArrangementReviewOutcome } from "../query/query-server.js";
+import { renderDeviceReview, renderDeviceReviewHint } from "../transforms/device-review-render.js";
+import type { ArrangementReviewOutcome, DeviceReviewOutcome } from "../query/query-server.js";
 
 type DispatchResult = { ok: true; armedPhrase?: object } | { ok: false; error: string } | object;
 type AnalysisErrorCode = "analysis_auth_required" | "analysis_model_unavailable" | "analysis_proposal_required" | "analysis_failed";
@@ -18,6 +19,14 @@ type Dependencies = {
    * refuses not_implemented rather than guessing.
    */
   reviewArrangement?(request: { scope: ProposalScope; refresh: boolean }): Promise<ArrangementReviewOutcome>;
+  /**
+   * 05-09: deterministic device-review evidence (UX-04/SC#5). Implemented in
+   * boot via assembleDeviceReviewEvidence + refreshSalienceSnapshot (the
+   * query-server single sources) — the exact optional-dependency injection
+   * precedent of reviewArrangement. Optional: an unwired dependency refuses
+   * not_implemented rather than guessing.
+   */
+  deviceReview?(request: { scope: ProposalScope; refresh: boolean }): Promise<DeviceReviewOutcome>;
   getProposal(proposalId: string, revision?: number): ProposalRevision | undefined;
   issueApproval(proposal: ProposalRevision): object;
   consumeApproval(request: ApprovalRequest): Promise<DispatchResult>;
@@ -81,6 +90,28 @@ export class ActionDispatch {
       const texts = outcome.kind === "no-snapshot"
         ? [renderArrangementReviewHint()]
         : renderArrangementReview(outcome.evidence);
+      let delivered = true;
+      texts.slice(0, 65_536).forEach((text, sequence) => {
+        delivered = this.deps.sendTo(connectionId, { type: "conversation.chunk", requestId, sequence, text }) && delivered;
+      });
+      return this.deps.sendTo(connectionId, { type: "analysis.complete", requestId, status: "ok" }) && delivered;
+    }
+    if (message.type === "device.review") {
+      // 05-09 (UX-04): deterministic, provider-free device review — the
+      // arrangement.review ladder copied verbatim (the analyze/Pi dependency
+      // is NEVER invoked on this path; SC#5). Automation proposals do NOT
+      // ride this branch — they keep using the existing proposal/approval
+      // branches below unchanged (RB-04).
+      const requestId = String(message.requestId ?? "");
+      if (!this.deps.deviceReview) return this.deps.sendTo(connectionId, { type: "action.error", error: "not_implemented" });
+      this.deps.sendTo(connectionId, { type: "analysis.status", requestId, status: "running", scope });
+      const outcome = await this.deps.deviceReview({ scope, refresh: message.refresh === true });
+      if (outcome.kind === "refusal") {
+        return this.deps.sendTo(connectionId, { type: "action.error", error: outcome.reason });
+      }
+      const texts = outcome.kind === "no-snapshot"
+        ? [renderDeviceReviewHint()]
+        : renderDeviceReview(outcome.evidence);
       let delivered = true;
       texts.slice(0, 65_536).forEach((text, sequence) => {
         delivered = this.deps.sendTo(connectionId, { type: "conversation.chunk", requestId, sequence, text }) && delivered;

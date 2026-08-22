@@ -72,6 +72,15 @@ import {
   refreshArrangementSnapshot,
   type ArrangementReviewOutcome,
 } from "../query/query-server.js";
+// Phase 5 Plan 05-09 — device-review evidence assembly + macro single source
+// (the injected deviceReview dependency follows the reviewArrangement seam).
+import {
+  assembleDeviceReviewEvidence,
+  buildMacroSuggestions,
+  refreshSalienceSnapshot,
+  type DeviceReviewOutcome,
+} from "../query/query-server.js";
+import { loadSalienceSnapshot, type SalienceSnapshot } from "../state/salience-snapshot.js";
 import type { ProposalScope } from "../proposals/proposal-store.js";
 import type { Assumption } from "../state/analyzer-registry.js";
 
@@ -258,6 +267,98 @@ export function createArrangementReviewDependency(
     }
     return assembleArrangementReviewEvidence({
       snap,
+      intent: options.intent(),
+      freshness,
+      refresh: request.refresh,
+      snapshotConfigured: true,
+    });
+  };
+}
+
+/** Options for {@link createDeviceReviewDependency} (05-09 Task 2). */
+export interface DeviceReviewDependencyOptions {
+  /** Path to .bw-brain/salience-snapshot.json (absent → not_implemented). */
+  salienceSnapshotPath?: string;
+  /** Path to .bw-brain/roles.json — the roleSalience prior on refresh. */
+  rolesPath?: string;
+  /** Path to .bw-brain/arrangement-snapshot.json — the energyAtMovement prior on refresh. */
+  arrangementSnapshotPath?: string;
+  intent: () => ProjectIntent | null;
+  /** Freshness source (the watchdog) — drives the disconnected+refresh refusal. */
+  freshness: () => "live" | "stale" | "disconnected";
+  /** Live folded state — the refresh source (parameters + selection) + the chain fallback cache. */
+  state: () => RawState | null;
+  /** The existing daemon→bridge get.selected_device_chain pull (chain summary). */
+  pullDeviceChain: () => Promise<unknown>;
+}
+
+/**
+ * 05-09 Task 2 — the injected device-review dependency consumed by
+ * ActionDispatch's device.review branch (UX-04/SC#5). Mirrors
+ * {@link createArrangementReviewDependency} exactly: the refusal ladder
+ * (unconfigured / disconnected+refresh / corrupt-without-refresh), the
+ * refresh via the shared refreshSalienceSnapshot (query-server single
+ * source), then assembleDeviceReviewEvidence with the chain from the
+ * existing device-chain read (fresh pull when live + cursor, the folded
+ * cache otherwise — handleDeviceInspect semantics) and macros from the
+ * macroSuggest single source. Deterministic: zero Pi on this path.
+ *
+ * Scope gating is NOT repeated here — ActionDispatch's confirmed-scope gate
+ * has already run before this dependency is invoked.
+ */
+export function createDeviceReviewDependency(
+  options: DeviceReviewDependencyOptions,
+): (request: { scope: ProposalScope; refresh: boolean }) => Promise<DeviceReviewOutcome> {
+  return async (request) => {
+    void request.scope; // evidence is snapshot-scoped; peer scope gating happened in ActionDispatch
+    if (!options.salienceSnapshotPath) return { kind: "refusal", reason: "not_implemented" };
+    const freshness = options.freshness();
+    // A fresh analysis needs the folded parameter movements — hard-refuse
+    // instead of guessing from a possibly-stale snapshot while disconnected.
+    if (freshness === "disconnected" && request.refresh) return { kind: "refusal", reason: "state_disconnected" };
+    let snap: SalienceSnapshot | null = null;
+    // The arrangement DEFECT C discipline: distinguish INVALID from ABSENT —
+    // an invalid file (without refresh) refuses visibly with snapshot_invalid;
+    // an absent file keeps the honest no-snapshot outcome via snap null below.
+    let loadFailed = false;
+    try {
+      snap = await loadSalienceSnapshot(options.salienceSnapshotPath);
+    } catch (e) {
+      console.error("[boot] salience snapshot load failed:", (e as Error).message);
+      loadFailed = true;
+    }
+    if (request.refresh) {
+      // A refresh proceeds past a corrupted file — the fresh analysis replaces it.
+      const state = options.state();
+      snap = await refreshSalienceSnapshot({
+        parameters: state?.parameters,
+        trackKey: state?.selection.trackSid ?? "",
+        salienceSnapshotPath: options.salienceSnapshotPath,
+        rolesPath: options.rolesPath,
+        arrangementSnapshotPath: options.arrangementSnapshotPath,
+        intent: options.intent(),
+      });
+    } else if (loadFailed) {
+      return { kind: "refusal", reason: "snapshot_invalid" };
+    }
+    // Chain summary: fresh pull when live + a cursor selection exists (the
+    // handleDeviceInspect gate); every failure/no-cursor case serves the
+    // folded devices cache — honest degradation, never fabricated.
+    const state = options.state();
+    const hasCursor = !!state?.selection.deviceSid || !!state?.selection.trackSid;
+    let chain: unknown[] = (state?.devices as unknown[] | undefined) ?? [];
+    if (freshness !== "disconnected" && hasCursor) {
+      try {
+        const fresh = (await options.pullDeviceChain()) as { devices?: unknown };
+        if (Array.isArray(fresh?.devices)) chain = fresh.devices;
+      } catch (e) {
+        console.error("[boot] device-review chain pull failed; serving folded cache:", (e as Error).message);
+      }
+    }
+    return assembleDeviceReviewEvidence({
+      snap,
+      chain,
+      macros: snap ? buildMacroSuggestions(snap).suggestions : [],
       intent: options.intent(),
       freshness,
       refresh: request.refresh,
@@ -720,6 +821,19 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       intent: () => intent,
       freshness: () => watchdog.tick(),
       pullLauncherGrid: () => correlator.send("get.launcher_clips", {}, { timeoutMs: LAUNCHER_GRID_PULL_TIMEOUT_MS }),
+    }),
+    // 05-09 (UX-04/SC#5): the deterministic device review — same injection
+    // seam as reviewArrangement. The salience refresh reuses the live
+    // parameter folds; the chain reuses the existing device-chain pull; the
+    // macros come from the macroSuggest single source (query-server).
+    deviceReview: createDeviceReviewDependency({
+      salienceSnapshotPath,
+      rolesPath,
+      arrangementSnapshotPath,
+      intent: () => intent,
+      freshness: () => watchdog.tick(),
+      state: () => lastState,
+      pullDeviceChain: () => correlator.send("get.selected_device_chain"),
     }),
     getProposal: (proposalId, revision) => proposals.get(proposalId, revision),
     issueApproval: (proposal) => approvals.issue(proposal),

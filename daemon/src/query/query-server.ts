@@ -1519,14 +1519,15 @@ async function loadSalienceForRead(
  * Build the advisory macro/XY suggestions from a salience snapshot (the
  * macroSuggest single source — the device.macros_suggest op AND the 05-09
  * device-review evidence assembly both call THIS, so the drawer is populated
- * identically to the CLI surface).
+ * identically to the CLI surface). Exported for boot.ts's injected
+ * device-review dependency (the same single-source call).
  *
  * The profile comes from the SNAPSHOT's own `profile` field (provenance
  * honesty — the snapshot records which profile fed the ranking). An unknown
  * profile name degrades to the unbiased ordering with a logged warning
  * (ARCH-02 enhance-never-gate — never a refusal).
  */
-function buildMacroSuggestions(snap: SalienceSnapshot): ReturnType<typeof macroSuggest> {
+export function buildMacroSuggestions(snap: SalienceSnapshot): ReturnType<typeof macroSuggest> {
   let profile: Profile | undefined;
   try {
     profile = loadProfile(snap.profile);
