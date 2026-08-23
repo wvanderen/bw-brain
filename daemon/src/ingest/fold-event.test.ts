@@ -165,6 +165,22 @@ describe("foldEvent (PURE event -> RawState fold for the 5 event types)", () => 
     expect(original).toEqual(before); // purity
   });
 
+  it("device.name_changed {name, deviceSid} -> selection.deviceSid folded (05-05 gate live-identity input)", () => {
+    const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
+    const original = baselineState({ devices: [] });
+    const out = foldEvent(original, { type: "device.name_changed", payload: { name: "Surge XT", deviceSid: "dev_0123456789abcdef" } }, ctx);
+    expect((out.selection as { deviceSid?: string }).deviceSid).toBe("dev_0123456789abcdef");
+    // The devices-array fold still happens alongside.
+    expect(out.devices).toEqual([{ name: "Surge XT", cursor: true }]);
+  });
+
+  it("device.name_changed {name} without deviceSid -> selection.deviceSid untouched (defensive)", () => {
+    const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
+    const original = baselineState({ devices: [], selection: { deviceSid: "dev_ffffffffffffffff" } });
+    const out = foldEvent(original, { type: "device.name_changed", payload: { name: "Vital" } }, ctx);
+    expect((out.selection as { deviceSid?: string }).deviceSid).toBe("dev_ffffffffffffffff");
+  });
+
   it("transport.changed {playing} -> project.transport.playing set AND existing transport fields preserved (spread gate)", () => {
     const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
     const original = baselineState({
@@ -302,6 +318,21 @@ describe("foldEvent (PURE event -> RawState fold for the 5 event types)", () => 
       lastMovedAt: 1000,
     });
     expect(original).toEqual(before); // purity
+  });
+
+  it("parameter.changed ALSO folds deviceKey -> selection.deviceSid (belt-and-braces: same fingerprint as the salience-derived scopes)", () => {
+    const ctx: FoldContext = { summaryTracks: [], stableIds: emptyStableIds() };
+    const original = baselineState();
+    const out = foldEvent(
+      original,
+      {
+        type: "parameter.changed",
+        timestamp: 1000,
+        payload: { deviceKey: "dev_0123456789abcdef", paramIndex: 0, paramName: "M1: Shape", source: "remote_page", value: 0.5 },
+      },
+      ctx,
+    );
+    expect((out.selection as { deviceSid?: string }).deviceSid).toBe("dev_0123456789abcdef");
   });
 
   it("parameter.changed second event with delta > epsilon -> movementCount incremented ONCE; lastValue/min/max updated", () => {
