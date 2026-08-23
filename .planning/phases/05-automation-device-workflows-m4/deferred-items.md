@@ -54,16 +54,14 @@
 
 ## 05-08 (2026-08-23)
 
-- **Daemon apply-wire scope threading STILL OPEN (carried from 05-06).** This
-  plan deliberately does not own the apply path: Task 2's acceptance criteria
-  pin approval-store.ts / proposal-dispatch.ts / edit-service.ts as UNTOUCHED
-  (RB-04 — construction only, authority reused), so
-  `boot.ts`'s `applyPatchOverBridge` still sends `{undoLabel, operations}`
-  without `payload.scope`. automation.propose mints candidates whose apply
-  rides `bw-edit apply` → the existing spine, which will surface apply_failed
-  for automation ops until the scope rides the wire (bridge half is
-  forward-compatible per 05-06). Owner: the apply-path plan (05-10 UAT will
-  trip it; a gap-close there or a dedicated plan threads it).
+- **Daemon apply-wire scope threading — CLOSED 2026-08-23 (orchestrator gap
+  fix, RED→GREEN, suite 1050/1050).** `applyPatchOverBridge` now takes an
+  optional third `scope` arg; `applyAutomation` + `revertAutomation` pass the
+  AutomationScope and `boot.ts` sends `payload.scope` on the wire. The same
+  fix threads the bridge's `capturedPriorValue` response field through boot.ts
+  (previously dropped — every automation apply would have refused
+  `prior_unavailable`). Clip path unchanged (2-arg call). Original entries
+  below retained for history:
 
 - **previewPatch (patch-resolve.ts resolveOps) remains note-only for
   automation ops — KNOWN GAP from 05-05, honestly not wired here.** This
