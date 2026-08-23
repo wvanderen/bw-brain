@@ -6,14 +6,14 @@ current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
 stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-08-23T00:14:29.747Z"
+last_updated: "2026-08-23T14:50:50.708Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 63
-  completed_plans: 57
+  completed_plans: 58
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -105,6 +105,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 05 P07 | 10min | 2 tasks | 9 files |
 | Phase 05 P09 | 10min | 2 tasks | 12 files |
 | Phase 05 P02 | 3h 43m elapsed (blocking human-verify + 3 live sessions; continuation ~5 min) | 3 tasks | 3 files |
+| Phase 5 P05 | 16min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -228,6 +229,9 @@ single-source discipline + the MEM-02 allowlist gate working as designed
 - [Phase ?]: [Phase 05 P02] Automation-write refusal vocabulary is evidence-final: automation_write_disabled (write-arm off) is the operative pre-flight gate; transport_stopped RETIRED as a refusal trigger (armed+stopped writes points, latch) — the dated §3 vocabulary table supersedes 05-05-PLAN's transport-gate prose
 - [Phase ?]: [Phase 05 P02] Clip/launcher-targeted automation stays ambiguous_target-refused — launcher-armed cells UNVERIFIED (launchWrite stayed 0 across all 21 steps; D-05-06 probe-pins-refuse-rest, never a guess-write)
 - [Phase ?]: [Phase 05 P02] JS write surface = device-site CursorRemoteControlsPage parameter (Surge XT M1-M8; set/setImmediately/setRaw normalized 0..1 + touch; ASYNC value readback — bridge must not verify writes synchronously); Device.getParameter(int) JS-NEGATED live — Java-side graceful-degradation check flagged for 05-10 UAT
+- [Phase 5]: 05-05: write-arm (not transport) is the operative automation pre-flight gate — transport_stopped retired per the 2026-08-22 live probe; unarmed/unobserved arm refuses automation_write_disabled before dispatch
+- [Phase 5]: 05-05: automation ops floor at medium risk by op kind (D-05-10) — remote_page macro targets medium not high, never self-declared low
+- [Phase 5]: 05-05: prior honesty — bridge automation responses must carry capturedPriorValue or the daemon refuses prior_unavailable and journals nothing (never a guessed inverse)
 
 ### Pending Todos
 
