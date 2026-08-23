@@ -719,6 +719,14 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
       // false -> true: bridge (re)connect — refresh the snapshot + rebind.
       controllerCorrelation.onControllerReconnect(correlator);
       await refreshSnapshot();
+    } else if (connected && lastState === null) {
+      // Gap-closure (live 2026-08-23 UAT): the connect-transition snapshot
+      // can fail its 3s get.project_summary (a raced/slow bridge) — and with
+      // prevConnected now true it would NEVER retry: every event after was
+      // dropped ("arrived before first snapshot") while pulls kept answering,
+      // leaving freshness stale + folds empty forever. Retry on each poll
+      // tick (2.5s) until the baseline exists.
+      void refreshSnapshot().catch(() => { /* logged inside */ });
     }
     prevConnected = connected;
   };

@@ -463,7 +463,13 @@ public final class Observers {
         // wireParameterWindow precedent: a host that still rejects it degrades
         // project-meta to daemon defaults instead of killing init().
         try {
-            transport.tempo().value().addValueObserver((DoubleValueChangedCallback) (double bpm) -> {
+            // Live 2026-08-23 follow-up: .value() observers deliver NORMALIZED
+            // [0,1] (tempo cached as 0.193… — not BPM). addRawValueObserver
+            // (non-deprecated, RangedValue surface) delivers NATIVE-UNIT
+            // values: BPM for tempo. (Macro knobs read raw==normalized
+            // because their native range IS 0..1 — consistent with the
+            // 2026-08-22 probe's setRaw readbacks.)
+            transport.tempo().addRawValueObserver((DoubleValueChangedCallback) (double bpm) -> {
                 tempo = bpm;
             });
         } catch (final Throwable e) {
