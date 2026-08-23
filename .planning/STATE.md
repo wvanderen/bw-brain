@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
-stopped_at: Completed 05-09-PLAN.md
-last_updated: "2026-08-22T21:31:36.088Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-08-23T00:14:29.747Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 63
-  completed_plans: 56
+  completed_plans: 57
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -104,6 +104,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 05 P04 | 14min | 3 tasks | 16 files |
 | Phase 05 P07 | 10min | 2 tasks | 9 files |
 | Phase 05 P09 | 10min | 2 tasks | 12 files |
+| Phase 05 P02 | 3h 43m elapsed (blocking human-verify + 3 live sessions; continuation ~5 min) | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -224,6 +225,9 @@ single-source discipline + the MEM-02 allowlist gate working as designed
 - [Phase ?]: [Phase 05 P09] deviceReview rides the generic ConversationChunkReceived reducer — no new reducer case; device-review-N tokens use their own atomic sequence
 - [Phase ?]: [Phase 05 P09] createDeviceReviewDependency mirrors createArrangementReviewDependency (no connected-bootstrap; refresh from live folds; chain pull + folded fallback; macros via exported buildMacroSuggestions single source)
 - [Phase ?]: [Phase 05 P09] UX-04 stays unchecked — code-complete end-to-end (965/965 daemon + 9/9 ctest) but live-unverified until 05-10 UAT (05-03/05-04 precedent)
+- [Phase ?]: [Phase 05 P02] Automation-write refusal vocabulary is evidence-final: automation_write_disabled (write-arm off) is the operative pre-flight gate; transport_stopped RETIRED as a refusal trigger (armed+stopped writes points, latch) — the dated §3 vocabulary table supersedes 05-05-PLAN's transport-gate prose
+- [Phase ?]: [Phase 05 P02] Clip/launcher-targeted automation stays ambiguous_target-refused — launcher-armed cells UNVERIFIED (launchWrite stayed 0 across all 21 steps; D-05-06 probe-pins-refuse-rest, never a guess-write)
+- [Phase ?]: [Phase 05 P02] JS write surface = device-site CursorRemoteControlsPage parameter (Surge XT M1-M8; set/setImmediately/setRaw normalized 0..1 + touch; ASYNC value readback — bridge must not verify writes synchronously); Device.getParameter(int) JS-NEGATED live — Java-side graceful-degradation check flagged for 05-10 UAT
 
 ### Pending Todos
 
@@ -257,6 +261,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-22T21:31:36.080Z
-Stopped at: Completed 05-09-PLAN.md
+Last session: 2026-08-23T00:14:29.740Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
