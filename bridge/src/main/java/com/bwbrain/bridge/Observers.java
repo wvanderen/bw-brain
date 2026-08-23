@@ -142,6 +142,17 @@ public final class Observers {
     // (trackBank.getItemAt(t).clipLauncherSlotBank()...). Set in register();
     // null in tests.
     private TrackBank trackBankRef;
+    // Phase 5 Plan 05-06 — the init-created CursorRemoteControlsPage retained
+    // so the pull-handler's cursorDeviceParameterWriter can resolve the
+    // LIVE-PROVEN write surface (2026-08-22 probe: page knob Parameters are
+    // the only verified touch/set path — capabilities §3). Reusing the single
+    // init-created page (NOT creating one per apply request) honors both the
+    // eager-init-only registration constraint (capabilities §7 fix 3) and the
+    // probe's creation-site finding (page created at init, knobs M1-M8).
+    // volatile: assigned once in register() (controller/init thread), read by
+    // the bw-brain-pull thread at apply time — the trackBankRef publication
+    // pattern with the safe-publication upgrade.
+    private volatile CursorRemoteControlsPage remotePageRef;
     // Phase 4 Plan 04-01 — D-01 cursor-walk ready-signal. The walker arms a
     // one-shot CountDownLatch before each slot.select(); the cursorClip
     // loopLength observer (NO skipFirstFire — every fire is a real move)
@@ -538,6 +549,12 @@ public final class Observers {
      */
     private void wireRemotePage(final CursorDevice cursorDevice) {
         final CursorRemoteControlsPage page = cursorDevice.createCursorRemoteControlsPage(0);
+        // Phase 5 Plan 05-06: retain the page — the pull-handler's parameter
+        // writer resolves page knobs (the live-proven write surface) from THIS
+        // handle; a per-apply createCursorRemoteControlsPage call would both
+        // accumulate pages across a session and exercise an unverified
+        // post-init creation path.
+        this.remotePageRef = page;
         page.getName().addValueObserver((StringValueChangedCallback) (String name) -> {
             remotePageName = name == null ? "" : name;
         });
@@ -813,6 +830,15 @@ public final class Observers {
     }
     /** Phase 4 Plan 04-01 — the wired TrackBank reference for walker bindings. */
     TrackBank getTrackBank() { return trackBankRef; }
+
+    /**
+     * Phase 5 Plan 05-06 — the init-created remote-controls page (the
+     * live-proven automation write surface, capabilities §3 2026-08-22).
+     * Package-private: consumed by PullHandlers.cursorDeviceParameterWriter
+     * to resolve {@code page.getParameter(i)} knobs for touch/set writes.
+     * Null on the test path (no Bitwig host).
+     */
+    CursorRemoteControlsPage getRemotePage() { return remotePageRef; }
 
     // --- Phase 5 Plan 05-03 Task 3 getters: device-chain response assembly ---
 

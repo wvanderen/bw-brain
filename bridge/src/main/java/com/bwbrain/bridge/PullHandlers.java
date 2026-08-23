@@ -23,8 +23,10 @@
 package com.bwbrain.bridge;
 
 import com.bitwig.extension.controller.api.CursorDevice;
+import com.bitwig.extension.controller.api.CursorRemoteControlsPage;
 import com.bitwig.extension.controller.api.NoteStep;
 import com.bitwig.extension.controller.api.ClipLauncherSlotBank;
+import com.bitwig.extension.controller.api.Parameter;
 import com.bitwig.extension.controller.api.PinnableCursorClip;
 import com.bitwig.extension.controller.api.Track;
 import com.bitwig.extension.controller.api.TrackBank;
@@ -36,6 +38,7 @@ import java.io.InputStreamReader;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -340,13 +343,17 @@ public final class PullHandlers {
                                 observers.getCursorTrackName(),
                                 observers.getCursorDeviceName(),
                                 !observers.getCursorDeviceName().isBlank())).orElseThrow());
-                // Phase 3 Plan 03-02 — apply.patch: 3-case primitive dispatch
+                // Phase 3 Plan 03-02 — apply.patch: primitive op dispatch
                 // (D-01 / Pitfall 7). The handler NEVER branches on the
-                // semantic-intent metadata field — it stays three-case forever.
-                // Phase 5 Plan 05-03: cursorDevice is now IN scope (Pitfall 3
-                // plumbing) but deliberately NOT consumed here yet — the
-                // automation write path lands in 05-06 behind the probe.
-                case "apply.patch" -> outbox.offer(handleApplyPatch(id, req, cursorClip));
+                // semantic-intent metadata field — dispatch is on the
+                // primitive op discriminant ONLY, never on transform intent
+                // (the former "3-case forever" count is retired deliberately:
+                // Phase 5 (05-05/05-06) added the three automation kinds to
+                // the union; the invariant is the discriminant-only dispatch,
+                // not the case count). Phase 5 Plan 05-06: cursorDevice +
+                // observers now feed the ParameterWriter (the automation
+                // half of the SAME mutation path — no new request type).
+                case "apply.patch" -> outbox.offer(handleApplyPatch(id, req, cursorClip, cursorDevice, observers));
                 // Phase 4 Plan 04-01 (D-01) — launcher grid cursor-walk. Additive
                 // to the dispatch switch (sibling to get.selected_clip). The
                 // handler delegates to LauncherGridWalker.walkGrid; the walker
@@ -537,33 +544,144 @@ public final class PullHandlers {
     }
 
     /**
-     * Pure primitive-op dispatch — the 3-CASE-FOREVER spine (D-01 / Pitfall 7).
+     * Phase 5 Plan 05-06 — functional interface for the automation parameter
+     * write surface (the NoteStepWriter sibling, AUTO-03 bridge half). The pure
+     * {@link #applyOps} helper calls this for the three automation op kinds;
+     * the production {@link #handleApplyPatch} wires it to the cursorDevice /
+     * remote-page Parameter surface, and the JUnit test injects a recording
+     * implementation (no Mockito).
      *
-     * <p>Switches ONLY on the primitive op discriminant ({@code add_note} /
-     * {@code remove_note} / {@code update_note_field}); NEVER reads the semantic-
-     * intent metadata field (Pitfall 7 — the bridge handler is three-case forever;
-     * new transforms emit the SAME primitives). Each op maps to a single
-     * {@link NoteStepWriter#write} call via the beatsPerColumn -> grid column
-     * mapping; an out-of-range cell (writer throws) increments {@code failed}
-     * without crashing the handler.</p>
+     * <p>Binding spec — docs/bitwig-capabilities.md §3 (2026-08-22 live
+     * probe, SUPERSEDES any earlier plan prose):</p>
+     * <ul>
+     *   <li>write surface = {@code Parameter.touch(boolean)} +
+     *       {@code SettableRangedValue.set(double)}; all variants (set /
+     *       setImmediately / setRaw) executed cleanly against Surge XT
+     *       macros M1–M8 with {@code touch(true)} before /
+     *       {@code touch(false)} after;</li>
+     *   <li>values are NORMALIZED 0..1 end-to-end (Pitfall 6): the probe
+     *       confirmed {@code set(0.25)} lands 0.25 (readback
+     *       0.24999999999999956) — {@link #setValue} takes the op's value
+     *       verbatim, NO scale conversion happens anywhere except at this
+     *       boundary, and here the conversion is the identity (the
+     *       cursorClipWriter velocity ÷127 comment is the conversion-at-
+     *       boundary style precedent);</li>
+     *   <li>execution semantics per the §3 execute-semantics consequence row
+     *       (D-05-08): an approved curve writes INSTANTLY when write-arm is
+     *       ON — transport playing OR stopped (latch; STEP#1 was
+     *       stopped/arranger-armed and wrote). The bridge therefore performs
+     *       NO transport-state gating or reporting: write-arm is a
+     *       daemon-side pre-flight (05-05 automation_write_disabled fires
+     *       BEFORE dispatch — an unarmed write is a silent envelope no-op and
+     *       is never issued); a stopped-transport write is exactly as valid
+     *       as a playing one and is never "reported" as a side behavior;</li>
+     *   <li>value readback is ASYNC (the written value surfaces in the NEXT
+     *       observer tick; during playback the knob follows the recorded
+     *       envelope) — the writer MUST NOT verify a write via synchronous
+     *       {@code value().get()} readback. {@link #capture} is the ONE
+     *       sanctioned value read: the PRIOR value BEFORE any write (D-05-07
+     *       / Pitfall 11), returned in the apply response as
+     *       {@code capturedPriorValue} so the daemon can freeze the
+     *       author-aware inverse.</li>
+     * </ul>
+     */
+    interface ParameterWriter {
+        /**
+         * Read the parameter's CURRENT value BEFORE any write (D-05-07 /
+         * Pitfall 11 — prior capture strictly precedes touch/setValue).
+         * Throwing signals "prior unavailable" — the per-op try/catch in
+         * {@link #applyOps} increments {@code failed} and the response omits
+         * {@code capturedPriorValue} (the daemon then refuses
+         * {@code prior_unavailable} and journals nothing — never a guessed
+         * inverse).
+         */
+        double capture(int paramIndex);
+
+        /**
+         * Touch (or un-touch) the parameter for automation recording — the
+         * hardware-knob emulation the probe exercised per write step
+         * (touch(true) → set → touch(false)).
+         */
+        void touch(int paramIndex, boolean touched);
+
+        /**
+         * Set the parameter to a NORMALIZED [0,1] value via
+         * {@code SettableRangedValue.set(double)} (Pitfall 6 — no scaling;
+         * the op's value crosses verbatim).
+         */
+        void setValue(int paramIndex, double normalizedValue);
+    }
+
+    /**
+     * Pure primitive-op dispatch — the trust-spine seam (D-01 / Pitfall 7 +
+     * Pitfall 10).
      *
-     * <p>Package-private so {@link PullHandlersApplyPatchTest} can exercise the
-     * dispatch with a recording writer (no live Bitwig).</p>
+     * <p>Switches ONLY on the primitive op discriminant — the three note kinds
+     * ({@code add_note} / {@code remove_note} / {@code update_note_field}) and,
+     * since Phase 5 (05-05/05-06), the three automation kinds
+     * ({@code set_parameter_value} / {@code automation_points} /
+     * {@code remove_automation_points}); it NEVER reads the semantic-intent
+     * metadata field (dispatch on the primitive op discriminant only, never on
+     * transform intent — new transforms emit the SAME primitives). The former
+     * "3-case forever" count is RETIRED deliberately: the case count follows
+     * the PrimitiveOp union; the invariant is the discriminant-only
+     * dispatch.</p>
+     *
+     * <p>Per-op try/catch failed-count discipline (unchanged): a note op maps
+     * to a single {@link NoteStepWriter#write} call via the beatsPerColumn →
+     * grid column mapping; an automation op maps to a
+     * capture-then-touch/set/touch(false) sequence on {@link ParameterWriter}
+     * (the §3 consequence-row semantics — see the interface javadoc). A
+     * throwing op (grid out of range, unavailable write surface, unverified
+     * removal) increments {@code failed} without crashing the handler.</p>
+     *
+     * <p>Package-private so {@link PullHandlersApplyPatchTest} /
+     * {@link PullHandlersAutomationTest} can exercise the dispatch with
+     * recording writers (no live Bitwig).</p>
      *
      * @param id             the echoed request id.
      * @param ops            the operations JSON array ({payload.operations}).
      * @param beatsPerColumn loopBeats / GRID_W (start-beats -> grid column).
      * @param writer         the NoteStep write surface (production = cursorClip; test = recording).
-     * @return the JSON-Lines response ({applied, failed} payload).
+     * @return the JSON-Lines response ({applied, failed} payload; automation
+     *         patches additionally carry {capturedPriorValue}).
      */
     static String applyOps(final String id, final JsonNode ops, final double beatsPerColumn,
                            final NoteStepWriter writer) {
+        // Legacy note-only overload (Phase 3 callers + ApplyPatchTest): no
+        // parameter writer — an automation op in this path fails honestly
+        // per-op (parameter_writer_unavailable), never a silent no-op.
+        return applyOps(id, ops, beatsPerColumn, writer, null, -1);
+    }
+
+    /**
+     * Full dispatch (Phase 5 Plan 05-06): note ops → {@code noteWriter};
+     * automation ops → {@code parameterWriter} against the patch's SINGLE
+     * target index (the AutomationScope carries the only target — ops carry
+     * values only, D-05-14 single-target-by-construction; the scope arrives
+     * in the apply.patch payload alongside the ops).
+     *
+     * @param parameterWriter the Parameter write surface (production =
+     *                        cursorDevice/remote-page-backed; test = recording;
+     *                        null = surface unavailable).
+     * @param paramIndex      the patch scope's single target parameter index
+     *                        (-1 when the payload carried no AutomationScope).
+     */
+    static String applyOps(final String id, final JsonNode ops, final double beatsPerColumn,
+                           final NoteStepWriter noteWriter,
+                           final ParameterWriter parameterWriter, final int paramIndex) {
         if (ops == null || !ops.isArray() || ops.isEmpty()) {
             return LineJson.responseError(id, "invalid_patch");
         }
         int applied = 0;
         int failed = 0;
         final List<Map<String, Object>> failureDetails = new ArrayList<>();
+        // D-05-07 / Pitfall 11: the parameter's prior value is captured on the
+        // FIRST automation op, strictly BEFORE any touch/setValue, and frozen
+        // into the response as capturedPriorValue (the daemon's journal-freeze
+        // contract from 05-05 Task 3 — absent ⇒ daemon refuses prior_unavailable
+        // and journals nothing; never guessed here).
+        Double capturedPrior = null;
         for (final JsonNode opNode : ops) {
             final String opType = opNode.path("op").asText("");
             try {
@@ -572,7 +690,7 @@ public final class PullHandlers {
                         final JsonNode n = opNode.path("note");
                         final int x = (int) Math.round(n.path("start").asDouble() / beatsPerColumn);
                         final int y = n.path("pitch").asInt();
-                        writer.write(x, y, n.path("velocity").asDouble(), n.path("length").asDouble());
+                        noteWriter.write(x, y, n.path("velocity").asDouble(), n.path("length").asDouble());
                         applied++;
                     }
                     case "remove_note" -> {
@@ -580,7 +698,7 @@ public final class PullHandlers {
                         final int x = (int) Math.round(n.path("start").asDouble() / beatsPerColumn);
                         final int y = n.path("pitch").asInt();
                         // velocity 0 = no note (mirrors the read heuristic at line 173).
-                        writer.write(x, y, 0.0, 0.0);
+                        noteWriter.write(x, y, 0.0, 0.0);
                         applied++;
                     }
                     case "update_note_field" -> {
@@ -590,13 +708,70 @@ public final class PullHandlers {
                         final JsonNode after = opNode.path("after");
                         final int x = (int) Math.round(after.path("start").asDouble() / beatsPerColumn);
                         final int y = after.path("pitch").asInt();
-                        writer.write(x, y, after.path("velocity").asDouble(), after.path("length").asDouble());
+                        noteWriter.write(x, y, after.path("velocity").asDouble(), after.path("length").asDouble());
                         applied++;
+                    }
+                    // ----------------------------------------------------------
+                    // Phase 5 Plan 05-06 — the three automation kinds (05-05
+                    // schema wire field names). Dispatch stays discriminant-
+                    // ONLY: these cases read op values/points, never intent.
+                    // ----------------------------------------------------------
+                    case "set_parameter_value" -> {
+                        if (parameterWriter == null) {
+                            throw new IllegalStateException("parameter_writer_unavailable: "
+                                    + "no Parameter write surface is wired (cursorDevice/observers absent)");
+                        }
+                        if (capturedPrior == null) {
+                            capturedPrior = parameterWriter.capture(paramIndex);
+                        }
+                        // D-05-08: INSTANT write — the write-arm pre-flight is
+                        // daemon-side (05-05); the §3 consequence row pins
+                        // immediate dispatch (armed writes land at the authored
+                        // values with transport playing OR stopped).
+                        parameterWriter.touch(paramIndex, true);
+                        parameterWriter.setValue(paramIndex, opNode.path("value").asDouble());
+                        parameterWriter.touch(paramIndex, false);
+                        applied++;
+                    }
+                    case "automation_points" -> {
+                        if (parameterWriter == null) {
+                            throw new IllegalStateException("parameter_writer_unavailable: "
+                                    + "no Parameter write surface is wired (cursorDevice/observers absent)");
+                        }
+                        if (capturedPrior == null) {
+                            capturedPrior = parameterWriter.capture(paramIndex);
+                        }
+                        // Ascending beat order (authored-curve semantics — the
+                        // probe wrote its steps in order; wire order is
+                        // daemon-chosen so the writer, not the sender, owns
+                        // temporal ordering). One touch→set→touch(false) per
+                        // point — the probe's exact per-write sequence.
+                        final List<JsonNode> points = new ArrayList<>();
+                        opNode.path("points").forEach(points::add);
+                        points.sort(Comparator.comparingDouble(p -> p.path("beat").asDouble()));
+                        for (final JsonNode point : points) {
+                            parameterWriter.touch(paramIndex, true);
+                            parameterWriter.setValue(paramIndex, point.path("value").asDouble());
+                            parameterWriter.touch(paramIndex, false);
+                        }
+                        applied++;
+                    }
+                    case "remove_automation_points" -> {
+                        // Doc-pinned honesty (capabilities §3, 2026-08-22): the
+                        // probe verified WRITES ONLY (touch/set on armed
+                        // parameters) — NO automation-point removal surface was
+                        // observed, and D-05-06 pins probe-pins-refuse-rest.
+                        // The honest refusal is the per-op failure below —
+                        // NEVER a silent no-op and NEVER a pretend write.
+                        throw new UnsupportedOperationException(
+                                "removal_surface_unverified: no automation-point removal surface is "
+                                        + "live-verified in extension-api:21 (capabilities §3 2026-08-22 probe "
+                                        + "verified writes only; D-05-06 probe-pins-refuse-rest)");
                     }
                     default -> failed++; // unknown op — daemon pre-validates; defensive
                 }
             } catch (final Exception e) {
-                failed++; // grid out of range, etc. — do not crash the handler
+                failed++; // grid out of range, writer/surface failure, unverified removal — never crash the handler
                 final Map<String, Object> fd = new LinkedHashMap<>();
                 fd.put("op", opType);
                 fd.put("start", opNode.path("note").path("start").asDouble(opNode.path("after").path("start").asDouble()));
@@ -610,6 +785,12 @@ public final class PullHandlers {
         payload.put("applied", applied);
         payload.put("failed", failed);
         payload.put("failures", failureDetails);
+        if (capturedPrior != null) {
+            // Present ONLY for automation patches (a note patch's response is
+            // byte-identical to Phase 3). The daemon refuses prior_unavailable
+            // when this field is absent on an automation apply (05-05).
+            payload.put("capturedPriorValue", capturedPrior);
+        }
         return LineJson.response(id, failed == 0, payload);
     }
 
@@ -617,23 +798,43 @@ public final class PullHandlers {
      * Bridge-facing apply.patch handler: read the loop length, compute
      * beatsPerColumn, and delegate to {@link #applyOps} with a writer backed by
      * {@code cursorClip.getStep(x,y,0)} NoteStep setters (capabilities §2 VERIFIED:
-     * NoteStep exposes setVelocity / setDuration / etc.).
+     * NoteStep exposes setVelocity / setDuration / etc.) PLUS — Phase 5 Plan
+     * 05-06 — a {@link ParameterWriter} for the automation kinds, bound to the
+     * patch scope's single target.
+     *
+     * <p>Automation target binding: ops carry values ONLY; the patch's single
+     * {@code AutomationScope} (05-05 schema: {@code deviceSid}, {@code paramIndex},
+     * {@code paramSource}, {@code region}) carries the only target. The scope
+     * arrives in the apply.patch payload alongside the operations (the
+     * edit.schema.json payload is additionalProperties:true). When the payload
+     * carries no scope (note patches — and the daemon's wire send until 05-08
+     * threads it through), {@code paramIndex} is -1 and any automation op
+     * fails honestly per-op (the writer throws on the unresolvable index) —
+     * never a silent no-op.</p>
      *
      * <p>Falls back to 1.0 beat/column when the loop length is 0/unknown
      * (BridgeExtension.java:64 default is 16x128 launcher clip).</p>
      */
     private static String handleApplyPatch(final String id, final JsonNode req,
-                                            final PinnableCursorClip cursorClip) {
-        final JsonNode ops = req.path("payload").path("operations");
+                                            final PinnableCursorClip cursorClip,
+                                            final CursorDevice cursorDevice,
+                                            final Observers observers) {
+        final JsonNode payload = req.path("payload");
+        final JsonNode ops = payload.path("operations");
+        final JsonNode scope = payload.path("scope");
+        final int paramIndex = scope.path("paramIndex").asInt(-1);
+        final String paramSource = scope.path("paramSource").asText("");
+        final ParameterWriter parameterWriter =
+                cursorDeviceParameterWriter(cursorDevice, observers, paramSource);
         final double loopBeats;
         try {
             loopBeats = cursorClip.getLoopLength().get();
         } catch (final Exception e) {
             // Loop length unavailable — fall back to 1 beat/column.
-            return applyOps(id, ops, 1.0, cursorClipWriter(cursorClip));
+            return applyOps(id, ops, 1.0, cursorClipWriter(cursorClip), parameterWriter, paramIndex);
         }
         final double beatsPerColumn = loopBeats > 0 ? loopBeats / GRID_W : 1.0;
-        return applyOps(id, ops, beatsPerColumn, cursorClipWriter(cursorClip));
+        return applyOps(id, ops, beatsPerColumn, cursorClipWriter(cursorClip), parameterWriter, paramIndex);
     }
 
     /** Build a NoteStepWriter backed by the live cursor clip's NoteStep setters. */
@@ -648,6 +849,79 @@ public final class PullHandlers {
             final NoteStep step = cursorClip.getStep(0, x, y);
             step.setVelocity(Math.max(0.0, Math.min(1.0, velocity / 127.0)));
             step.setDuration(duration);
+        };
+    }
+
+    /**
+     * Phase 5 Plan 05-06 — build a {@link ParameterWriter} backed by the plumbed
+     * {@code cursorDevice} + the Observers-retained remote page, selecting the
+     * write surface by the patch scope's {@code paramSource} (05-05 schema):
+     * <ul>
+     *   <li>{@code remote_page} — the LIVE-PROVEN surface (capabilities §3,
+     *       2026-08-22 probe: Surge XT macros M1–M8 via
+     *       {@code CursorRemoteControlsPage.getParameter(int)}; RemoteControl
+     *       IS-A Parameter, non-deprecated). The page handle is the ONE page
+     *       Observers created at init — no post-init page creation, no
+     *       per-apply accumulation.</li>
+     *   <li>{@code device_parameter} — the deprecated int-indexed device
+     *       window ({@code getParameter(int)} on the cursor device; D-05-03
+     *       locked A1-NEGATED fallback — no non-deprecated direct enumeration
+     *       exists in extension-api:21). The JS API hard-throws this surface
+     *       (§4 A2); whether the JAVA host degrades gracefully per-index or
+     *       throws is flagged for the 05-10 UAT — every call is inside the
+     *       per-op try/catch, so either way it degrades honestly to a failed
+     *       op with a named error.</li>
+     * </ul>
+     * Normalization (Pitfall 6 — the boundary conversion comment, the
+     * cursorClipWriter ÷127 style precedent): values cross the bridge boundary
+     * as NORMALIZED [0,1] matching {@code Parameter.set(double)}. The
+     * 2026-08-22 probe CONFIRMED set takes normalized values (set(0.25) →
+     * readback 0.24999999999999956; 0.75/0.5 verbatim) — so the conversion at
+     * this boundary is the IDENTITY; the daemon's [0,1] contract crosses
+     * verbatim and no other layer ever converts.
+     *
+     * <p>Returns null when no surface is resolvable (null cursorDevice /
+     * observers — the reconnect-test path); automation ops then fail honestly
+     * per-op via {@link #applyOps}.</p>
+     */
+    private static ParameterWriter cursorDeviceParameterWriter(final CursorDevice cursorDevice,
+                                                                final Observers observers,
+                                                                final String paramSource) {
+        if (cursorDevice == null || observers == null) {
+            return null;
+        }
+        return new ParameterWriter() {
+            @Override
+            public double capture(final int paramIndex) {
+                return resolve(paramIndex).value().get();
+            }
+
+            @Override
+            public void touch(final int paramIndex, final boolean touched) {
+                resolve(paramIndex).touch(touched);
+            }
+
+            @Override
+            public void setValue(final int paramIndex, final double normalizedValue) {
+                // Normalized verbatim — see the factory javadoc (Pitfall 6).
+                resolve(paramIndex).set(normalizedValue);
+            }
+
+            private Parameter resolve(final int paramIndex) {
+                if ("remote_page".equals(paramSource)) {
+                    final CursorRemoteControlsPage page = observers.getRemotePage();
+                    if (page == null) {
+                        throw new IllegalStateException("remote_page surface unavailable: "
+                                + "the init-created page is not wired (pre-init or degraded host)");
+                    }
+                    return page.getParameter(paramIndex);
+                }
+                if ("device_parameter".equals(paramSource)) {
+                    return cursorDevice.getParameter(paramIndex); // deprecated-allow: D-05-03 locked A1-NEGATED fallback — no non-deprecated direct enumeration exists in extension-api:21; the JS API hard-throws this surface (capabilities §4 A2, 2026-08-22) and the Java host behavior is flagged for the 05-10 UAT — per-op try/catch degrades honestly either way
+                }
+                throw new IllegalStateException("unknown_param_source: '" + paramSource
+                        + "' (expected remote_page or device_parameter per the 05-05 AutomationScope schema)");
+            }
         };
     }
 
