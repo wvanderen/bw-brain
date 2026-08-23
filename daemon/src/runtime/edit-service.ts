@@ -148,7 +148,7 @@ export function automationApplyFields(
 export class EditService {
   constructor(private readonly deps: {
     candidateStore: CandidateStore; patchHistory: PatchHistory;
-    applyPatchOverBridge: (undoLabel: string, operations: PrimitiveOp[]) => Promise<{ applied: number; failed: number; capturedPriorValue?: number }>;
+    applyPatchOverBridge: (undoLabel: string, operations: PrimitiveOp[], scope?: Patch["scope"]) => Promise<{ applied: number; failed: number; capturedPriorValue?: number }>;
     pullSelectedClip?: () => Promise<unknown>; now?: () => number;
   }) {}
 
@@ -214,10 +214,12 @@ export class EditService {
     if (!input.force && (candidate.risk === "medium" || candidate.risk === "high") && !input.confirm) {
       return { ok: false, error: "confirmation_required", assumptions };
     }
-    // D-05-08: immediate dispatch after the gates.
+    // D-05-08: immediate dispatch after the gates. The AutomationScope rides
+    // the wire (bridge resolves targets from payload.scope.{paramIndex,
+    // paramSource} — ops carry values only).
     const operations = candidate.operations as PrimitiveOp[];
     let applied: { applied: number; failed: number; capturedPriorValue?: number };
-    try { applied = await this.deps.applyPatchOverBridge(candidate.undoLabel ?? "bw-edit apply", operations); }
+    try { applied = await this.deps.applyPatchOverBridge(candidate.undoLabel ?? "bw-edit apply", operations, scope); }
     catch { return { ok: false, error: "apply_failed", assumptions: [] }; }
     if (applied.failed > 0) return { ok: true, payload: { ok: false, error: "apply_failed", ...applied }, assumptions };
     // Prior honesty (D-05-07 / T-05-15): no capturedPriorValue → no honest
@@ -291,7 +293,9 @@ export class EditService {
     }
     const undoLabel = `revert ${entry.undoLabel ?? patchId}`;
     let applied: { applied: number; failed: number };
-    try { applied = await this.deps.applyPatchOverBridge(undoLabel, entry.inverseOperations); }
+    // Scope rides the wire so the frozen inverse re-targets the SAME param
+    // (entry.scope is the original AutomationScope for automation reverts).
+    try { applied = await this.deps.applyPatchOverBridge(undoLabel, entry.inverseOperations, entry.scope); }
     catch { return { ok: false, error: "apply_failed", assumptions: [] }; }
     if (applied.failed > 0) return { ok: true, payload: { ok: false, error: "apply_failed", ...applied }, assumptions };
     const now = (this.deps.now ?? Date.now)();

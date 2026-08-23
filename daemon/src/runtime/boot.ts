@@ -63,6 +63,7 @@ import { ProposalStore, type ProposalInput } from "../proposals/proposal-store.j
 import { ApprovalStore } from "../proposals/approval-store.js";
 import { ProposalDispatch } from "../proposals/proposal-dispatch.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
+import type { Patch } from "../gen/patch.js";
 import type { ProjectIntent } from "../gen/intent.js";
 // Phase 4 Plan 04-05 — arrangement snapshot + roles stores (D-03 / ARRANGE-05).
 import { saveArrangementSnapshot, loadArrangementSnapshot, type ArrangementSnapshot } from "../state/arrangement-snapshot.js";
@@ -746,15 +747,20 @@ export async function boot(opts: BootOptions = {}): Promise<BootHandle> {
   //     the journal persists at `<socketDir>/patch-history.jsonl`.
   const candidateStore = new CandidateStore();
   const patchHistory = new PatchHistory(join(dirname(socketPath), "patch-history.jsonl"));
-  const applyPatchOverBridge = (undoLabel: string, operations: PrimitiveOp[]): Promise<{ applied: number; failed: number }> =>
+  // Phase 5 gap-closure (deferred-items 05-06/05-08): the AutomationScope
+  // rides the wire when present (the bridge resolves automation targets from
+  // payload.scope.{paramIndex, paramSource}); the clip path omits it. The
+  // bridge's capturedPriorValue (the D-05-07 prior freeze) threads through —
+  // dropping it made every automation apply refuse prior_unavailable.
+  const applyPatchOverBridge = (undoLabel: string, operations: PrimitiveOp[], scope?: Patch["scope"]): Promise<{ applied: number; failed: number; capturedPriorValue?: number }> =>
     correlator
-      .send("apply.patch", { undoLabel, operations })
+      .send("apply.patch", scope ? { undoLabel, operations, scope } : { undoLabel, operations })
       .then((resp) => {
-        const r = resp as { applied?: number; failed?: number; failures?: unknown[] };
+        const r = resp as { applied?: number; failed?: number; failures?: unknown[]; capturedPriorValue?: number };
         if ((r.failures?.length ?? 0) > 0) {
           console.error(`[debug apply.patch] ${r.failures!.length} failure(s): ${JSON.stringify(r.failures)}`);
         }
-        return { applied: r.applied ?? 0, failed: r.failed ?? 0 };
+        return { applied: r.applied ?? 0, failed: r.failed ?? 0, ...(typeof r.capturedPriorValue === "number" ? { capturedPriorValue: r.capturedPriorValue } : {}) };
       });
   const editService = new EditService({ candidateStore, patchHistory, applyPatchOverBridge, pullSelectedClip: () => correlator.send("get.selected_clip") });
   const projectRoot = join(dirname(socketPath), "projects");

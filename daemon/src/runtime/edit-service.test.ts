@@ -199,7 +199,7 @@ describe("EditService automation + legacy revert (Test 8)", () => {
     const { service: s1, bridge: b1 } = revertService(entry);
     const ok = await s1.revert(autoState() as any, null, "live", "pt_auto2");
     expect(ok.ok).toBe(true);
-    expect(b1).toHaveBeenCalledWith("revert auto swell", entry.inverseOperations);
+    expect(b1).toHaveBeenCalledWith("revert auto swell", entry.inverseOperations, AUTO_SCOPE);
 
     const { service: s2, bridge: b2 } = revertService(entry);
     const refused = await s2.revert(autoState({ deviceSid: "dev_aaaaaaaaaaaaaaaa" }) as any, null, "live", "pt_auto2");
@@ -247,8 +247,10 @@ describe("EditService automation apply — scope rides the wire (deferred-items 
     await service.apply(autoState() as any, null, "live", { patchId: "pt_auto1", confirm: true });
     const entry = append.mock.calls[0][0];
     expect(entry.automationBinding).toMatchObject({ deviceSid: AUTO_SCOPE.deviceSid, priorValue: 0.25 });
+    // The revert path reads the journal — serve the entry the apply just wrote.
+    (service as any).deps.patchHistory.find = vi.fn(async () => entry);
     bridge.mockClear();
-    const reverted = await service.revert(autoState() as any, "pt_auto1");
+    const reverted = await service.revert(autoState() as any, null, "live", "pt_auto1");
     expect(reverted.ok).toBe(true);
     expect(bridge).toHaveBeenCalledTimes(1);
     const [, , scope] = bridge.mock.calls[0];
