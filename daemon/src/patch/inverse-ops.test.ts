@@ -153,3 +153,125 @@ describe("noteKey (identity scheme — D-01/D-03)", () => {
     expect(noteKey(60, 0)).not.toBe(noteKey(61, 0));
   });
 });
+
+// ============================================================================
+// Phase 5 Plan 05-05 Task 2 — the AUTHOR-AWARE automation inverse (D-05-07).
+//
+// Unlike note ops (per-op self-inverting), a parameter write's inverse needs
+// the apply-time PRIOR value — revert restores the prior parameter value and
+// removes exactly the authored points. NO envelope read, NO re-derivation
+// from live state: the inverse references ONLY the authored points frozen in
+// the patch itself + the priorValue captured at apply time.
+// ============================================================================
+
+import { buildAutomationInverse, type AutomationOp, type AutomationPoint } from "./inverse-ops.js";
+
+/** Deterministic automation-op reducer (test-only simulation of the write surface). */
+function applyAutomationOps(
+  state: { points: AutomationPoint[]; value: number },
+  ops: AutomationOp[],
+): { points: AutomationPoint[]; value: number } {
+  let s = { value: state.value, points: [...state.points] };
+  for (const op of ops) {
+    if (op.op === "set_parameter_value") s = { ...s, value: op.value };
+    else if (op.op === "automation_points") s = { ...s, points: [...s.points, ...op.points] };
+    else s = { ...s, points: s.points.filter((p) => !op.points.some((q) => q.beat === p.beat)) };
+  }
+  return s;
+}
+
+describe("buildAutomationInverse (05-05 Task 2 — D-05-07 author-aware inverse)", () => {
+  const P: AutomationPoint[] = [
+    { beat: 0, value: 0 },
+    { beat: 4, value: 0.5 },
+    { beat: 12, value: 1 },
+  ];
+
+  it("returns [remove exactly P, set priorValue] for [automation_points P, set 0.8] with prior 0.25 (Test 1)", () => {
+    const ops: AutomationOp[] = [
+      { op: "automation_points", points: P },
+      { op: "set_parameter_value", value: 0.8 },
+    ];
+    expect(buildAutomationInverse(ops, 0.25)).toStrictEqual([
+      { op: "remove_automation_points", points: P },
+      { op: "set_parameter_value", value: 0.25 },
+    ]);
+  });
+
+  it("round-trip: applying the original ops then the inverse leaves the authored-point set EMPTY and the value at PRIOR (Test 1)", () => {
+    const ops: AutomationOp[] = [
+      { op: "automation_points", points: P },
+      { op: "set_parameter_value", value: 0.8 },
+    ];
+    const prior = 0.25;
+    const afterApply = applyAutomationOps({ points: [], value: prior }, ops);
+    expect(afterApply.points).toHaveLength(3);
+    expect(afterApply.value).toBe(0.8);
+    const afterRevert = applyAutomationOps(afterApply, buildAutomationInverse(ops, prior) as AutomationOp[]);
+    expect(afterRevert.points).toStrictEqual([]);
+    expect(afterRevert.value).toBe(prior);
+  });
+
+  it("the inverse references ONLY the authored points — no envelope read, no re-derivation (Test 2, structural)", () => {
+    const ops: AutomationOp[] = [
+      { op: "automation_points", points: P },
+      { op: "set_parameter_value", value: 0.8 },
+    ];
+    const inverse = buildAutomationInverse(ops, 0.25);
+    const removeOp = inverse.find((o) => o.op === "remove_automation_points") as {
+      op: "remove_automation_points";
+      points: AutomationPoint[];
+    };
+    // Exactly the input points — same members, same order, nothing derived.
+    expect(removeOp.points).toStrictEqual(P);
+    // No other point-carrying ops sneak in.
+    expect(inverse.filter((o) => o.op === "automation_points")).toStrictEqual([]);
+  });
+
+  it("re-adds points the patch REMOVED (the removed points are in the op itself) and restores prior LAST", () => {
+    const ops: AutomationOp[] = [
+      { op: "remove_automation_points", points: P },
+    ];
+    const inverse = buildAutomationInverse(ops, 0.4);
+    expect(inverse).toStrictEqual([
+      { op: "automation_points", points: P },
+      { op: "set_parameter_value", value: 0.4 },
+    ]);
+    // The prior-value restore is always the FINAL op (replay ends at prior).
+    const ops2: AutomationOp[] = [
+      { op: "automation_points", points: P },
+      { op: "remove_automation_points", points: [{ beat: 4, value: 0.5 }] },
+    ];
+    const inverse2 = buildAutomationInverse(ops2, 0.1);
+    expect(inverse2[inverse2.length - 1]).toStrictEqual({ op: "set_parameter_value", value: 0.1 });
+  });
+
+  it("inverseOps sequencing for NOTE ops is untouched — reverse-then-invert still holds (Test 3)", () => {
+    // Existing INV-3 property covers this; this pins the coexistence explicitly:
+    // widening PrimitiveOp with the automation kinds must not alter note-op inverses.
+    const n1: Note = { key: noteKey(60, 0), pitch: 60, start: 0, length: 0.5, velocity: 100 };
+    const n2: Note = { key: noteKey(64, 1), pitch: 64, start: 1, length: 0.25, velocity: 90 };
+    const ops: PrimitiveOp[] = [
+      { op: "add_note", note: n1 },
+      { op: "remove_note", note: n2 },
+    ];
+    expect(inverseOps(ops)).toStrictEqual([
+      { op: "add_note", note: n2 },
+      { op: "remove_note", note: n1 },
+    ]);
+  });
+
+  it("per-op inverseOp is UNDEFINED for automation kinds — honest throw, never a guessed prior (D-05-07)", () => {
+    expect(() => inverseOp({ op: "set_parameter_value", value: 0.5 })).toThrow(/buildAutomationInverse/);
+    expect(() => inverseOp({ op: "automation_points", points: P })).toThrow(/buildAutomationInverse/);
+    expect(() => inverseOp({ op: "remove_automation_points", points: P })).toThrow(/buildAutomationInverse/);
+  });
+
+  it("module purity: inverse-ops.ts imports NOTHING beyond types (no fs/net/timer)", async () => {
+    const source = await import("node:fs").then((fs) => fs.promises.readFile(new URL("./inverse-ops.ts", import.meta.url), "utf8"));
+    const imports = source.match(/^import .*$/gm) ?? [];
+    for (const line of imports) {
+      expect(line).toMatch(/^import type /);
+    }
+  });
+});
