@@ -582,7 +582,13 @@ public final class Observers {
      * path keyed by page-slot index with source="remote_page".
      */
     private void wireRemotePage(final CursorDevice cursorDevice) {
-        final CursorRemoteControlsPage page = cursorDevice.createCursorRemoteControlsPage(0);
+        // Live 2026-08-23: the int argument is the page SIZE (knob count), NOT
+        // a page index — passing 0 created a zero-slot page and
+        // getParameter(0) threw "Parameter slotIndex (=0) must be in the range
+        // 0 to -1" at init (extension BLOCKING). The 2026-08-22 JS probe
+        // called createCursorRemoteControlsPage(8) and got the 8-knob page
+        // (Surge XT M1–M8) — mirror it with REMOTE_PAGE_SIZE.
+        final CursorRemoteControlsPage page = cursorDevice.createCursorRemoteControlsPage(REMOTE_PAGE_SIZE);
         // Phase 5 Plan 05-06: retain the page — the pull-handler's parameter
         // writer resolves page knobs (the live-proven write surface) from THIS
         // handle; a per-apply createCursorRemoteControlsPage call would both
@@ -593,9 +599,12 @@ public final class Observers {
             remotePageName = name == null ? "" : name;
         });
         for (int i = 0; i < REMOTE_PAGE_SIZE; i++) {
-            final var knob = page.getParameter(i); // RemoteControl IS-A Parameter; non-deprecated
             final int slot = i;
             try {
+                // Inside the guard (wireParameterWindow precedent): a host or
+                // device state that rejects slot proxies keeps the slot
+                // unbound; init() survives.
+                final var knob = page.getParameter(i); // RemoteControl IS-A Parameter; non-deprecated
                 knob.exists().addValueObserver((BooleanValueChangedCallback) (boolean has) -> {
                     remoteBound.put(slot, has);
                 });
