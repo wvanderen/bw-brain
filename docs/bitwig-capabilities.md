@@ -17,12 +17,17 @@
 > **What remains TODO-in-app:** the **behavioral** half of the two D-01 DEEP
 > probes — Undo coalescing timing + per-note-vs-batch undo step count (§1), and
 > the live NoteStep round-trip / launcher-vs-arranger / free-beat-positioning
-> (§2) — plus the Automation target envelope (§3). These need a running probe in
-> Bitwig with a selected clip. They refine Phase 3 edit design but do NOT gate
-> Phase 2 (read-only) and do NOT gate the now-confirmed transport.
+> (§2). The Automation target envelope (§3) is now **probe-resolved live
+> (2026-08-22)** — write semantics pinned by the Phase 5 Plan 05-02 probe;
+> launcher-armed cells remain UNVERIFIED (see §3). The remaining items need a
+> running probe in Bitwig with a selected clip. They refine Phase 3 edit design
+> but do NOT gate Phase 2 (read-only) and do NOT gate the now-confirmed
+> transport.
 >
 > **Plan:** 01-schema-ipc-spike / 03.
-> **Last updated:** 2026-06-26 (live SC#1 round-trip + Java extension pivot).
+> **Last updated:** 2026-08-22 (§3 Automation Write + §4 A2 live probe
+> transcribed — Phase 5 Plan 05-02); 2026-06-26 (live SC#1 round-trip + Java
+> extension pivot).
 
 ## Header — API version + JsApi surface (open questions A6 + A2)
 
@@ -176,92 +181,210 @@ note) and that is recorded here.
 
 **Priority:** standard, single-pass (D-01 — not a deep-verify item).
 
-**Verified surface `[VERIFIED: AGENTS.md]`:** `AutomatableParameter.set(value,
-...)`, `Automation` envelope, clip automation.
+**Verified surface `[CORRECTED 2026-08-22 — Phase 5 RESEARCH Pitfall 1 + live
+probe]`:** the original citation — "`AutomatableParameter.set(value, ...)`,
+`Automation` envelope" — was **STALE**: no such classes exist in
+extension-api:21 (javap + in-app Javadoc 6.0.11 both confirm; `Parameter`'s
+only subinterfaces are `RemoteControl` and `Send`). The real write surface is
+**`Parameter`** (extends `SettableRangedValue`: `set(double)`,
+`setImmediately(double)`, `setRaw(double)`) plus **`Parameter.touch(boolean)`**
+— documented as "Touch (or un-touch) the value for automation recording" — and
+**`Transport`**'s complete automation-write state (`automationWriteMode()`,
+`isArrangerAutomationWriteEnabled()`,
+`isClipLauncherAutomationWriteEnabled()`, `isAutomationOverrideActive()`,
+`isPlaying()`). In the JS scripting API the reachable write path runs through a
+**device-site `CursorRemoteControlsPage` parameter** —
+`cursorDevice.getParameter(int)` is JS-blocked outright (§4 A2).
 
 **Design question (RESEARCH.md Probe 3):** clip automation vs track automation
-— which does `AutomatableParameter.set()` write to? Does writing require
+— which envelope does the parameter write target? Does writing require
 record-mode / transport-play?
 
-**Probe recipe:** `cursorDevice.getParameter(0).set(value)` under
-transport-play vs not; observe which envelope moves.
+**Probe recipe:** write against the device-site remote-page parameter (e.g.
+Surge XT "M1") under transport-play vs stopped × write-armed vs not; observe
+which envelope moves.
 
-**Observed:** **TODO-in-app** (Plan 03 Task 2). Single-pass is acceptable here
-per D-01.
+**Observed:** **VERIFIED LIVE 2026-08-22** (see the dated probe subsection
+below). Headline: all three write variants (`set` / `setImmediately` /
+`setRaw`, normalized 0..1) execute with zero throws; envelope points land at
+exactly the target values **iff automation write is ARMED** — transport
+play/stop is NOT the gate (armed + stopped writes points, latch mode). Every
+armed cell exercised landed points on the **arranger track automation lane**
+(track automation, consistent with arrWrite being the armed mode);
+launcher/clip targeting is **UNVERIFIED** (launchWrite never armed) and stays
+refused with a named reason per D-05-06. Value readback is ASYNC (the written
+value surfaces in the next observer tick, not synchronously in-step).
 
-**Mitigation:** DRAFT (pending observation) — if writing automation requires
-transport-play, Phase 4 (Automation & Device Workflows) gates automation
-writes behind an explicit transport-state check (no silent no-ops); if the
-target envelope is ambiguous, Phase 4 pins clip-vs-track explicitly per device
-parameter type. No native workaround is loaded as a default — the daemon always
-issues a labelled edit so the user can revert.
+**Mitigation:** **FINAL (evidence-derived 2026-08-22) — REVISES the D-05-05
+draft wording.** The draft anticipated gating automation writes behind a
+transport-state check (`transport_stopped`-class refusal) if writing required
+transport-play. The live probe shows the operative gate is **write-arm, not
+transport**: armed + stopped writes points; not-armed (playing OR stopped)
+moves only the current value — a silent no-op on the envelope. The daemon's
+pre-flight refusal vocabulary therefore centers on
+`automation_write_disabled` (arranger/launcher write-arm off) and
+`transport_stopped` is RETIRED as a refusal trigger (vocabulary table below).
+Clip-vs-track: only the arranger-arm/track-lane combination is verified;
+clip-targeted automation remains `ambiguous_target`-refused pending live
+evidence (D-05-06 — never a guess-write). No native workaround is loaded as a
+default — the daemon always issues a labelled edit so the user can revert.
 
-### Automation Write Probe — 2026-08-22 (template prepared; results PENDING)
+### Automation Write Probe — 2026-08-22 (LIVE — results recorded)
 
-> **Status: PENDING live probe — Phase 5 Plan 05-02 Task 2 (BLOCKING
-> human-verify).** Every `Observed:` field in this subsection is filled ONLY
-> from the producer's live Bitwig session (Bitwig Studio 6.0.11, THROWAWAY
-> project, third-party VST/AU on the selected track) via the script
-> `spike/automation-write-probe.control.js` (throwaway — threat T-05-05; nothing
-> imports it). Nothing is inferred; cells the human does not exercise are
-> recorded as **UNVERIFIED**, never guessed.
+> **Status: OBSERVED LIVE 2026-08-22 — Phase 5 Plan 05-02 Task 2 (BLOCKING
+> human-verify, executed by the producer across three live sessions).** Every
+> `Observed:` field in this subsection is transcribed from the producer's live
+> Bitwig session (Bitwig Studio 6.0.11, macOS, Surge XT on the "Surge XT"
+> track, THROWAWAY project) via the throwaway script
+> `spike/automation-write-probe.control.js` (threat T-05-05; nothing imports
+> it). Nothing is inferred; cells the producer did not exercise are recorded
+> as **UNVERIFIED**, never guessed.
+
+#### Probe fixes required during the live session
+
+The Task-1 probe did not load cleanly as written; the live sessions drove
+three fix commits (`7dbde0b` → `c5f3001` → `cc73913`, all preserved in git
+history — the producer later removed the working-tree copy, recoverable from
+`cc73913`):
+
+1. **Script naming** — Bitwig refused to load the script until it was renamed
+   with the `.control.js` suffix (controller-script naming standard).
+2. **API version** — `loadAPI(1)` produced: "This cannot be called when
+   specifying API version 1. This is only available for APIs after version
+   2" — probe pinned to `loadAPI(21)`.
+3. **Write target** — steps originally targeted `cursorDevice.getParameter(0)`,
+   which hard-throws in the JS API (§4 A2 below); retargeted to remote-page
+   knob 0 (Surge XT "M1").
+4. **Value readback** — value readback threw "Either call markInterested() or
+   add at least one observer in init" — fixed by adding
+   `p.value().addValueObserver` at init (observer-cached readback).
 
 #### Matrix evidence — one row per cell
 
+21 steps executed across cells — stopped/arranger-armed,
+stopped/not-armed, playing/arranger-armed, playing/not-armed (with an
+override on/off mix); launcher-armed cells were never exercised. Each step:
+touch(true) → {set 0.75 | setImmediately 0.25 | setRaw 0.50} → touch(false),
+cycling variants; `automationWriteMode` observed "latch".
+
 | # | Transport | Automation write | Variants exercised | Observed: value before→after | Observed: envelope points landed (clip vs track) | Observed: playhead relation | Verdict |
 |---|-----------|------------------|--------------------|------------------------------|--------------------------------------------------|------------------------------|---------|
-| 1 | playing | not armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
-| 2 | playing | arranger armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
-| 3 | playing | launcher armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
-| 4 | stopped | not armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
-| 5 | stopped | arranger armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
-| 6 | stopped | launcher armed | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| 1 | playing | not armed | all three, zero throws | knob current value moved; async readback (written value surfaces NEXT step) | NONE — silent no-op on the envelope | n/a (no points) | no write — write-arm is the gate, not transport |
+| 2 | playing | arranger armed | all three, zero throws | envelope points landed at exactly the target values | **ARRANGER TRACK automation lane** (track automation) | producer inspected envelopes: points at exactly the target values (ahead/behind not separately reported) | WRITES |
+| 3 | playing | launcher armed | — | — | — | — | **UNVERIFIED** — launchWrite never armed (stayed 0 in all 21 steps) |
+| 4 | stopped | not armed | all three, zero throws | knob current value moved only | NONE — silent no-op on the envelope | n/a (no points) | no write — silent side behavior D-05-05 refuses to allow silently |
+| 5 | stopped | arranger armed | all three, zero throws — STEP#1 was stopped/arranger-armed and wrote | envelope points landed at exactly the target values | **ARRANGER TRACK automation lane** | points recorded with transport STOPPED (latch mode) | WRITES — armed+stopped writes points |
+| 6 | stopped | launcher armed | — | — | — | — | **UNVERIFIED** — launchWrite never armed |
+
+**Core write-arm evidence:** only armed cells wrote points. Cells with
+arrWrite lit (INCLUDING transport STOPPED) recorded points; stopped +
+not-armed steps moved only the knob's current value — a silent no-op on the
+envelope. **Transport state is NOT the gate — write-arm is.**
 
 #### set vs setImmediately vs setRaw comparison (per cell, ≥2 transitions each)
 
-- _Observed (PENDING):_ differences between the three write variants under
-  each matrix cell — value-after, whether an envelope point appeared, whether
-  any variant threw.
+- _Observed (2026-08-22):_ all three variants — `Parameter.set(0.75)`,
+  `setImmediately(0.25)`, `setRaw(0.5)` — executed against page knob M1 with
+  ZERO throws (touch(true) before, touch(false) after each). Producer
+  inspected the envelopes and confirmed envelope points landed at exactly the
+  target values, on the ARRANGER TRACK automation lane. No behavioral
+  difference between the variants was observed at this evidence level: all
+  three land points at exact target values when armed; all three are silent
+  current-value moves when not armed.
 
 #### Normalization verdict (assumption A1)
 
-- _Observed (PENDING):_ does feeding `0.75` land ~3/4 of the parameter range
-  (normalized 0..1) or somewhere else (raw scale)? Record the probed
-  parameter's displayed value before/after.
+- _Observed (2026-08-22):_ **CONFIRMED — `set(double)` takes normalized
+  0..1 values mapping to the parameter range.** 0.25 target → next-step
+  before-read `0.24999999999999956` (≈ exact); the 0.75 and 0.5 targets
+  appear verbatim in readbacks. (Producer first-session note: got Surge
+  params out through remote controls and recorded automation manually.)
 
 #### Clip-vs-track envelope targeting per parameter type (D-05-06)
 
-- _Observed (PENDING):_ for the probed VST/AU parameter — did points land in
-  the arranger track envelope, the launcher clip envelope, both, or neither?
-  Per parameter type where distinguishable; still-ambiguous parameter types
-  are named refuse-with-named-reason targets (never a guess-write).
+- _Observed (2026-08-22):_ with arranger write armed, points landed on the
+  **ARRANGER TRACK automation lane** (track automation) — consistent with
+  arrWrite being the armed mode. **Launcher/clip automation: UNVERIFIED** —
+  launchWrite was never armed during the session (stayed 0 in all 21 steps).
+  Per D-05-06 (probe pins, refuse rest): clip-targeted automation stays
+  refused with a named reason (`ambiguous_target`) pending evidence — never a
+  guess-write.
 
 #### Remote-page creation-site finding
 
-- _Observed (PENDING):_ knob names from
-  `cursorDevice.createCursorRemoteControlsPage(8)` vs
-  `cursorTrack.channel().createCursorRemoteControlsPage(8)` — which site
-  surfaces the producer's macro knobs.
+- _Observed (2026-08-22):_ `cursorDevice.createCursorRemoteControlsPage(size)`
+  — **WORKS.** Surge XT exposes 8 macros M1–M8, all `exists=1`. Page knob
+  NAMES reflect macro mapping targets: knob 0 read "M1: -" unmapped, then
+  "M1: Shape" after the producer mapped it.
+- _Observed (2026-08-22):_ `cursorTrack.channel()` — **DOES NOT EXIST in the
+  JS API:** `TypeError: invokeMember (channel) on
+  com.bitwig.flt.control_surface.proxy.CursorTrackProxy failed due to: Unknown
+  identifier: channel`. The track-site page is uncreatable from JS.
 
-#### Refusal vocabulary table (D-05-05 — placeholder until observed)
+#### Transport / automation-write gate observers (live)
+
+- _Observed (2026-08-22):_ all five work and logged transition lines
+  correctly — `playing`, `isArrangerAutomationWriteEnabled`,
+  `isClipLauncherAutomationWriteEnabled`, `isAutomationOverrideActive`,
+  `automationWriteMode` (observed value: "latch").
+
+#### Additional behavioral observations
+
+- _Observed (2026-08-22):_ **value readback timing is ASYNC** — within a step
+  valueBefore==valueAfter; the written value appears in the NEXT step's
+  before (STEP#2 target=0.25 → STEP#3 before=0.25). During playback the knob
+  follows the recorded envelope (observed interpolated values 0.375,
+  0.39633357524871826, 0.395…).
+- _Observed (2026-08-22):_ automation override **latches on once engaged**
+  (override=1 from mid-session onward) and stays observable.
+
+#### Refusal vocabulary table (D-05-05 — FINAL, evidence-derived 2026-08-22)
 
 | Named reason | Triggering Transport state combination | Status |
 |--------------|----------------------------------------|--------|
-| `transport_stopped` | _PENDING — observed condition that produces this refusal_ | derived after probe |
-| `automation_write_disabled/arranger` | _PENDING_ | derived after probe |
-| `automation_write_disabled/launcher` | _PENDING_ | derived after probe |
-| `automation_override_active` | _PENDING_ | derived after probe |
-| `ambiguous_target` | _PENDING (D-05-06 — parameter types still ambiguous after probing)_ | derived after probe |
-| `wrong_device_targeted` | _PENDING (cursor device ≠ intended target)_ | derived after probe |
+| `transport_stopped` | **RETIRED as a refusal trigger (2026-08-22 live evidence).** Transport state is NOT the write gate — armed + stopped writes points (latch mode; STEP#1 was stopped/arranger-armed and wrote). Retained in this table only to record the retirement: do NOT gate on `isPlaying`. | retired |
+| `automation_write_disabled/arranger` | arranger write-arm OFF (`isArrangerAutomationWriteEnabled` = 0) at apply time — **THE operative gate**: not-armed writes are silent envelope no-ops (current-value move only), so the daemon refuses BEFORE dispatch (D-05-05 — no silent no-ops). | FINAL — primary pre-flight gate for track/arranger-targeted automation |
+| `automation_write_disabled/launcher` | launcher write-arm OFF (`isClipLauncherAutomationWriteEnabled` = 0) — applies to clip-targeted automation; the launcher-armed write path itself is UNVERIFIED live (launchWrite stayed 0 across all 21 steps). | FINAL as a gate; the armed-launcher behavior it guards is UNVERIFIED |
+| `automation_override_active` | `isAutomationOverrideActive` = 1 — observed to latch on once engaged (override=1 from mid-session onward) and stay observable. Informational/consistency signal for the gate ladder (05-05 owns precedence); not observed to block writes. | observed live |
+| `ambiguous_target` | clip-vs-track targeting unverifiable for the requested parameter/lane mode — concretely: clip/launcher-targeted automation remains UNVERIFIED (launcher-armed cells never exercised), so clip-targeted writes refuse with this named reason pending live evidence (D-05-06 — never a guess-write). | FINAL — clip-targeted automation refused pending evidence |
+| `wrong_device_targeted` | cursor device ≠ intended target (scope check: candidate automationBinding.deviceSid vs live folded selected-device identity — 05-05's generalization of the previewClipSid compare). Not live-probe-observable; daemon-side compare. | daemon-side scope check |
 | `state_disconnected` | bridge/daemon disconnected (not live-probe-observable; daemon-side gate) | daemon-side |
+
+> **Binding note for 05-05/05-06 (2026-08-22):** the gate ladder keys on the
+> **write-arm state** (`state.transport.automationWrite`), not on playing.
+> Where 05-05-PLAN prose anticipated "transport_stopped when automationWrite
+> shows not playing", this dated table supersedes it: playing-while-unarmed is
+> exactly as unwritten as stopped-while-unarmed, and stopped-while-armed
+> writes. The refusal that fires for an unarmed apply is
+> `automation_write_disabled` (arranger or launcher variant).
 
 #### Execute-semantics consequence row (D-05-08 — binding for 05-05/05-06)
 
-- _Observed (PENDING):_ does an approved bounded curve write **instantly**
-  (points appear at once under the observed conditions) or require **armed
-  real-time capture** (points record at the playhead during playback across
-  the region), or both depending on state? 05-05's pre-flight gates and
-  05-06's bridge execution implement whatever is recorded here.
+- _Observed (2026-08-22):_ an approved bounded curve writes **INSTANTLY when
+  write-arm is ON** — points appear at once at exactly the authored target
+  values, with transport either playing OR stopped (latch mode). No
+  bar-boundary launch machinery and no real-time-capture-across-region
+  requirement was observed for the armed-arranger path — D-05-08's
+  "execute-immediately-subject-to-the-gate" is literal: immediate dispatch
+  after the write-arm pre-flight, points land at the authored values.
+  NOT-armed is a silent no-op — therefore the `automation_write_disabled`
+  pre-flight refusal is mandatory BEFORE dispatch (never issue a write that
+  will silently no-op). Launcher/clip-targeted execution semantics:
+  **UNVERIFIED** (refused pending evidence per D-05-06). Additional binding
+  observation for 05-06: value readback is ASYNC (valueBefore==valueAfter
+  within a step; the written value surfaces in the NEXT observer tick) — the
+  bridge must not verify a write via synchronous `value().get()` readback,
+  and during playback the knob follows the recorded envelope (readback ≠
+  authored value while interpolation is active).
+
+#### Java-side getParameter(int) follow-up (end-of-phase UAT item)
+
+- The JS API blocks `Device.getParameter(int)` outright (§4 A2 below). The
+  JAVA extension-api path in 05-03 compiled with a deprecation warning and
+  graceful per-index try/catch — whether the Java host behaves identically
+  (graceful per-index degradation vs the JS hard-throw) is a SEPARATE live
+  check flagged for the end-of-phase UAT (05-10). The JS verdict below stands
+  until that runs.
 
 ---
 
@@ -302,21 +425,30 @@ track follow bank scrolls? 8-remote-parameters-per-page confirmed?
 
 **Observed:** **TODO-in-app** (Plan 03 Task 2). Single-pass acceptable.
 
-### Parameter indexing probe (AUTO-04 / A2) — 2026-08-22 (template prepared; results PENDING)
+### Parameter indexing probe (AUTO-04 / A2) — 2026-08-22 (LIVE — verdict recorded)
 
-> **Status: PENDING live probe — Phase 5 Plan 05-02 Task 2.** Filled only from
-> the producer's live session via `spike/automation-write-probe.control.js`
-> (`WALK …` log lines: `getParameter(0..127)` walk with `exists()`-termination
-> on the selected VST/AU).
+> **Status: OBSERVED LIVE 2026-08-22 — Phase 5 Plan 05-02 Task 2** via
+> `spike/automation-write-probe.control.js` (`WALK …` log lines), Surge XT
+> selected on the "Surge XT" track.
 
-- _Observed (PENDING):_ `getParameter(0..127)` **termination index** for the
-  probed VST/AU (first index where `exists()` reports absent; `>=128` if the
-  window never terminates).
-- _Observed (PENDING):_ **bound parameter names** (first window of the walk).
-- _Observed (PENDING):_ **full-list vs page-locked verdict** — termination
-  ~8/16 suggests page-locked indexing; a large/no termination suggests the
-  device's full parameter list. This decides the 05-03 bounded-enumeration
-  window (D-05-03).
+- _Observed (2026-08-22):_ **`Device.getParameter(int)` in the JS API:
+  NEGATED (live).** Every call hard-throws: `Hru: This has been deprecated
+  since API version 2: Use remote controls instead`. This is not graceful
+  degradation — the JS API blocks the surface outright, so no exists()-termination
+  index is observable from JS.
+- _Observed (2026-08-22):_ the **128-window walk bound 128 slots but ALL
+  names stayed "?" with exists never observed true** — the walk provides
+  nothing in the JS API (no bound parameter names observable; the
+  exists()-termination count is therefore unobservable from JS).
+- _Observed (2026-08-22):_ **full-list vs page-locked verdict: UNOBSERVABLE
+  from the JS API** (the indexed surface is blocked). The JS-side parameter
+  surface is the **remote-controls page** (device-site
+  `createCursorRemoteControlsPage` — Surge XT exposes 8 macros M1–M8, §3).
+  NOTE: the JAVA extension-api path in 05-03 compiled with a deprecation
+  warning and graceful per-index try/catch — whether the Java host behaves
+  identically (graceful per-index degradation vs the JS hard-throw) is a
+  separate live check flagged for the **end-of-phase UAT (05-10)**; the JS
+  verdict above stands until that runs.
 
 **Mitigation:** DRAFT (pending observation) — the daemon reconciles the
 windowed-N bank view via the STATE-04 fingerprint mapping (name + neighbors +
