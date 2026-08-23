@@ -400,8 +400,17 @@ public final class Observers {
         cursorDevice.name().addValueObserver((StringValueChangedCallback) (String name) -> {
             cursorDeviceName = name == null ? "" : name;
             if (skip.getAndSet(false)) { return; }
+            // Phase 5 gap-closure (deferred-items 05-05): the payload carries
+            // the deviceSid fingerprint computed from the SAME caches the
+            // parameter.changed deviceKey uses (deriveDeviceSid), so the
+            // daemon's selection.deviceSid fold and the salience-derived
+            // AutomationScopes agree by construction. The 05-05
+            // wrong_device_targeted pre-flight reads it as the live identity.
             outbox.offer(LineJson.event("device.name_changed",
-                    mapOf("name", cursorDeviceName), ts()));
+                    mapOf(
+                        "name", cursorDeviceName,
+                        "deviceSid", deriveDeviceSid(cursorTrackName, cursorDeviceName, cursorDevicePosition)),
+                    ts()));
         });
         // Phase 5 Plan 05-03 Task 2 — chain position of the cursor device
         // (PULL-ONLY): the third deviceSid fingerprint input. Device.position()

@@ -159,20 +159,28 @@ export function foldEvent(
     case "device.name_changed": {
       const name = typeof p.name === "string" ? p.name : undefined;
       if (name === undefined) return state;
+      // Phase 5 gap-closure (deferred-items 05-05): fold the cursor device's
+      // deviceSid into selection — the 05-05 wrong_device_targeted gate reads
+      // it as the live selected-device identity (undefined → ambiguous_target
+      // fail-closed). The bridge computes the fingerprint with the SAME
+      // deriveDeviceSid caches parameter.changed deviceKey uses, so the two
+      // folds agree by construction.
+      const deviceSid = typeof p.deviceSid === "string" ? p.deviceSid : undefined;
       const devices = (state.devices ?? []) as unknown as { name?: string; cursor?: boolean; [k: string]: unknown }[];
       // M1: push/update a {name, cursor:true} entry — the snapshot/reconcile
       // path is the canonical device list; this fold keeps the cursor-device
       // name fresh between snapshots. The on-demand device-chain pull
       // (query-server.ts) surfaces the `pages` array separately.
       const existingIdx = devices.findIndex((d) => d.cursor === true);
+      const selection = deviceSid === undefined ? state.selection : { ...state.selection, deviceSid } as typeof state.selection;
       if (existingIdx >= 0) {
         const next = devices.slice();
         next[existingIdx] = { ...devices[existingIdx], name };
-        return { ...state, devices: next as unknown as RawState["devices"] };
+        return { ...state, devices: next as unknown as RawState["devices"], selection };
       }
       const next = devices.slice();
       next.push({ name, cursor: true });
-      return { ...state, devices: next as unknown as RawState["devices"] };
+      return { ...state, devices: next as unknown as RawState["devices"], selection };
     }
 
     case "transport.changed": {
@@ -260,7 +268,12 @@ export function foldEvent(
         const { [stalestKey as string]: _evicted, ...rest } = nextMap;
         nextMap = rest;
       }
-      return { ...state, parameters: nextMap };
+      // Belt-and-braces (deferred-items 05-05): deviceKey IS the selected
+      // device's deviceSid fingerprint — fold it into selection so the 05-05
+      // wrong_device_targeted compare stays fresh on parameter movement
+      // (consistent by construction with the salience-derived scopes).
+      const selection = { ...state.selection, deviceSid: deviceKey } as typeof state.selection;
+      return { ...state, parameters: nextMap, selection };
     }
 
     default:
