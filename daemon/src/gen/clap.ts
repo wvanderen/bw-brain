@@ -4354,4 +4354,14 @@ export type ClapTelemetryMessage =
         clipSid?: string;
       };
       refresh?: boolean;
+    }
+  | {
+      type: "device.review";
+      requestId: string;
+      scope: {
+        projectId: string;
+        instanceId: string;
+        clipSid?: string;
+      };
+      refresh?: boolean;
     };

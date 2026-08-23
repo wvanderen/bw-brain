@@ -47,6 +47,10 @@ export interface Event {
      */
     clipSid?: string;
     /**
+     * STATE-04 fingerprint of the cursor device (Phase 5 gap-closure, the clipSid discipline applied to devices). Populated by the bridge on every device.name_changed event (deriveDeviceSid — the SAME fingerprint parameter.changed deviceKey uses); the daemon folds it into selection.deviceSid, the 05-05 wrong_device_targeted pre-flight's live-identity input. Pre-fix bridges omit it (backward-compat NO-OP in fold-event.ts).
+     */
+    deviceSid?: string;
+    /**
      * Device identity key for parameter.changed (Phase 5) — identifies the device in the selected track's chain whose parameter moved (D-05-02).
      */
     deviceKey?: string;
