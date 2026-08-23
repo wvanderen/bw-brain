@@ -219,6 +219,205 @@ describe("patch.schema.json (EDIT-01 — Patch contract validator)", () => {
   });
 });
 
+// ============================================================================
+// Phase 5 Plan 05-05 Task 1 — AutomationScope + automation op kinds + D-05-14
+// bounds + the TS-level scope↔op pairing rule (03-01 precedent: cross-property
+// rules are TS/runtime, NOT JSON Schema).
+// ============================================================================
+
+/** The canonical valid AutomationScope (dev_ + 16 hex, per the 05-03 fingerprint). */
+function automationScope(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    deviceSid: "dev_0123456789abcdef",
+    paramIndex: 5,
+    paramSource: "device_parameter",
+    region: { startBar: 0, lengthBars: 8 },
+    ...overrides,
+  };
+}
+
+/** N distinct automation points (beat i, value cycling within [0,1]). */
+function automationPoints(n: number): { beat: number; value: number }[] {
+  return Array.from({ length: n }, (_, i) => ({ beat: i, value: (i % 8) / 8 }));
+}
+
+/** A canonical valid automation Patch (single automation_points op). */
+function validAutomationPatch(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    patchId: "pt_00000000-0000-4000-8000-000000000000",
+    undoLabel: "open the filter over 8 bars",
+    scope: automationScope(),
+    operations: [{ op: "automation_points", points: automationPoints(4) }],
+    rationale: "bounded filter sweep on the selected device macro",
+    reversibility: "manual-inverse",
+    risk: "medium",
+    ...overrides,
+  };
+}
+
+describe("patch.schema.json automation extension (05-05 Task 1 — D-05-14 bounds)", () => {
+  it("VALIDATES an automation patch: AutomationScope + 64-point automation_points op (Test 1)", () => {
+    const patch = validAutomationPatch({
+      operations: [{ op: "automation_points", points: automationPoints(64) }],
+    });
+    expect(validatePatch(patch), JSON.stringify(validatePatch.errors)).toBe(true);
+    expect(() => validatePatchOrThrow(patch)).not.toThrow();
+  });
+
+  it("REJECTS 65 points (maxItems 64 — D-05-14, Test 2)", () => {
+    const patch = validAutomationPatch({
+      operations: [{ op: "automation_points", points: automationPoints(65) }],
+    });
+    expect(validatePatch(patch)).toBe(false);
+  });
+
+  it("REJECTS an empty points array (minItems 1)", () => {
+    const patch = validAutomationPatch({
+      operations: [{ op: "automation_points", points: [] }],
+    });
+    expect(validatePatch(patch)).toBe(false);
+  });
+
+  it("REJECTS region lengthBars 17; lengthBars 16 VALIDATES (D-05-14, Test 3)", () => {
+    const tooLong = validAutomationPatch({
+      scope: automationScope({ region: { startBar: 0, lengthBars: 17 } }),
+    });
+    expect(validatePatch(tooLong)).toBe(false);
+    const max = validAutomationPatch({
+      scope: automationScope({ region: { startBar: 4, lengthBars: 16 } }),
+    });
+    expect(validatePatch(max), JSON.stringify(validatePatch.errors)).toBe(true);
+  });
+
+  it("REJECTS out-of-[0,1] values in points AND in set_parameter_value (Pitfall 6, Test 4)", () => {
+    expect(
+      validatePatch(
+        validAutomationPatch({
+          operations: [{ op: "automation_points", points: [{ beat: 0, value: 1.5 }] }],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      validatePatch(
+        validAutomationPatch({
+          operations: [{ op: "automation_points", points: [{ beat: 0, value: -0.1 }] }],
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      validatePatch(
+        validAutomationPatch({ operations: [{ op: "set_parameter_value", value: 1.5 }] }),
+      ),
+    ).toBe(false);
+    expect(
+      validatePatch(
+        validAutomationPatch({ operations: [{ op: "set_parameter_value", value: -0.1 }] }),
+      ),
+    ).toBe(false);
+  });
+
+  it("VALIDATES set_parameter_value and remove_automation_points kinds at bounds", () => {
+    expect(
+      validatePatch(validAutomationPatch({ operations: [{ op: "set_parameter_value", value: 0 }] })),
+      JSON.stringify(validatePatch.errors),
+    ).toBe(true);
+    expect(
+      validatePatch(validAutomationPatch({ operations: [{ op: "set_parameter_value", value: 1 }] })),
+    ).toBe(true);
+    expect(
+      validatePatch(
+        validAutomationPatch({
+          operations: [{ op: "remove_automation_points", points: automationPoints(64) }],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("REJECTS a malformed deviceSid (not ^dev_[0-9a-f]{16}$)", () => {
+    expect(validatePatch(validAutomationPatch({ scope: automationScope({ deviceSid: "dev_short" }) }))).toBe(false);
+    expect(
+      validatePatch(validAutomationPatch({ scope: automationScope({ deviceSid: "trk_0123456789abcdef" }) })),
+    ).toBe(false);
+  });
+
+  it("REJECTS paramIndex 128 / -1 (0..127) and an unknown paramSource", () => {
+    expect(validatePatch(validAutomationPatch({ scope: automationScope({ paramIndex: 128 }) }))).toBe(false);
+    expect(validatePatch(validAutomationPatch({ scope: automationScope({ paramIndex: -1 }) }))).toBe(false);
+    expect(
+      validatePatch(validAutomationPatch({ scope: automationScope({ paramSource: "macro_knob" }) })),
+    ).toBe(false);
+  });
+
+  it("REJECTS a negative startBar and additionalProperties in the automation scope", () => {
+    expect(
+      validatePatch(validAutomationPatch({ scope: automationScope({ region: { startBar: -1, lengthBars: 4 } }) })),
+    ).toBe(false);
+    expect(
+      validatePatch(validAutomationPatch({ scope: automationScope({ clipSid: "clip_0123456789abcdef" }) })),
+    ).toBe(false);
+  });
+
+  it("REJECTS automation target fields on ops — a second parameter target is structurally unrepresentable (Test 7)", () => {
+    // The scope carries the ONLY target (deviceSid+paramIndex); ops carry
+    // values/points only. Structurally: no op kind has target fields.
+    const ops = [
+      { op: "automation_points", points: automationPoints(2) },
+      { op: "remove_automation_points", points: automationPoints(2) },
+      { op: "set_parameter_value", value: 0.5 },
+    ];
+    for (const op of ops) {
+      expect("deviceSid" in op).toBe(false);
+      expect("paramIndex" in op).toBe(false);
+      expect("paramSource" in op).toBe(false);
+    }
+    // ...and an op that smuggles a target field is schema-rejected (closed shapes).
+    expect(
+      validatePatch(
+        validAutomationPatch({
+          operations: [
+            { op: "set_parameter_value", value: 0.5, paramIndex: 6 } as unknown as Record<string, unknown>,
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("existing clip fixtures still VALIDATE byte-identically (no clip-contract regression, Test 8)", () => {
+    // The canonical clip fixture + the region-scoped fixture from the Phase 3
+    // suite re-validate unchanged — the ClipScope shape is field-for-field
+    // identical after the Scope -> oneOf restructure.
+    expect(validatePatch(validPatch()), JSON.stringify(validatePatch.errors)).toBe(true);
+    expect(
+      validatePatch(validPatch({ scope: { clipSid: "clip_0123456789abcdef", region: { start: 0, end: 4 } } })),
+    ).toBe(true);
+  });
+});
+
+describe("validatePatchOrThrow scope↔op pairing (05-05 Task 1 — TS-level rule, 03-01 precedent)", () => {
+  it("REJECTS a note op under an AutomationScope (Test 5)", () => {
+    const patch = validAutomationPatch({
+      operations: [{ op: "add_note", note: validNote() }],
+    });
+    expect(() => validatePatchOrThrow(patch)).toThrow(/pairing/);
+  });
+
+  it("REJECTS an automation op under a ClipScope (Test 6)", () => {
+    const patch = validPatch({
+      operations: [{ op: "automation_points", points: automationPoints(2) }],
+    });
+    expect(() => validatePatchOrThrow(patch)).toThrow(/pairing/);
+  });
+
+  it("REJECTS a mixed note+automation op sequence under either scope", () => {
+    const mixedOps = [
+      { op: "automation_points", points: automationPoints(2) },
+      { op: "add_note", note: validNote() },
+    ];
+    expect(() => validatePatchOrThrow(validAutomationPatch({ operations: mixedOps }))).toThrow(/pairing/);
+    expect(() => validatePatchOrThrow(validPatch({ operations: mixedOps }))).toThrow(/pairing/);
+  });
+});
+
 describe("validatePatchOrThrow", () => {
   it("returns the typed Patch on valid input", () => {
     const patch = validatePatchOrThrow(validPatch());
