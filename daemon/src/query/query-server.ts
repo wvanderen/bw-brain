@@ -41,13 +41,14 @@ import type { Patch } from "../gen/patch.js";
 import type { Note } from "../cli/diff-logic.js";
 import type { PrimitiveOp } from "../patch/inverse-ops.js";
 import type { StateDiff } from "../cli/diff-logic.js";
-import { validatePatchOrThrow } from "../patch/patch-schema.js";
+import { validatePatchOrThrow, isAutomationScope } from "../patch/patch-schema.js";
 import { previewPatch } from "../patch/patch-resolve.js";
 import { classifyRisk, ScopeMismatchError } from "../patch/risk-classifier.js";
 import { inverseOps } from "../patch/inverse-ops.js";
 import type { CandidateStore } from "../patch/candidate-store.js";
 import type { PatchHistory, PatchHistoryEntry } from "../patch/patch-history.js";
 import type { EditService, EditResult } from "../runtime/edit-service.js";
+import { automationPreFlight, automationApplyFields } from "../runtime/edit-service.js";
 // Phase 3 Plan 03-04 — midi.* creative/cleanup dispatch (MIDI-02..05).
 import type { Profile } from "../gen/profile.js";
 import { loadProfile } from "../profiles/profile-loader.js";
@@ -162,10 +163,14 @@ export interface QueryServerDeps {
   /**
    * Phase 3 Plan 03-02 — daemon→bridge apply.patch round-trip (D-03). Sends
    * `{undoLabel, operations}` over the loopback TCP via correlator.send +
-   * awaits the bridge's {applied, failed} response. Absent when M2 edit ops
-   * are not wired (edit.apply/revert return not_implemented).
+   * awaits the bridge's {applied, failed} response. Phase 5 (05-05): an
+   * AUTOMATION apply response additionally carries `capturedPriorValue` (the
+   * normalized prior parameter value captured by the bridge at write time —
+   * D-05-07); the automation apply path REFUSES prior_unavailable without it.
+   * Absent when M2 edit ops are not wired (edit.apply/revert return
+   * not_implemented).
    */
-  applyPatchOverBridge?: (undoLabel: string, operations: PrimitiveOp[]) => Promise<{ applied: number; failed: number }>;
+  applyPatchOverBridge?: (undoLabel: string, operations: PrimitiveOp[]) => Promise<{ applied: number; failed: number; capturedPriorValue?: number }>;
   /**
    * Phase 4 Plan 04-05 — daemon→bridge get.launcher_clips pull (D-01). Used by
    * arrange.refresh + the boot reconnect path to re-enumerate the launcher grid.
@@ -763,6 +768,20 @@ async function handleEditApply(
     safeSendErr(deps.transport, freshness, "candidate_not_found");
     return;
   }
+  // Phase 5 (05-05): AUTOMATION candidates run the probe-derived named-refusal
+  // gate ladder (D-05-05/06) via the SAME pure helpers EditService.apply uses
+  // (lockstep — one gate vocabulary across both apply surfaces). The ladder
+  // runs BEFORE the clip gate below: an automation write targets a device,
+  // never a clip, so the previewClipSid compare does not apply to it.
+  const automationScope = isAutomationScope(candidate.scope) ? candidate.scope : undefined;
+  const automationScoped = automationScope !== undefined;
+  if (automationScoped) {
+    const refusal = automationPreFlight(state, automationScope);
+    if (refusal) {
+      safeSendErr(deps.transport, freshness, refusal.error, refusal.details);
+      return;
+    }
+  }
   // D-04 (Phase 03.1 Plan 03): apply pre-flight — refuse when the cursor clip's
   // live clipSid ≠ the preview-time clipSid captured at mint. The gate fires
   // BEFORE the risk gate + the bridge round-trip — no mutation on refusal.
@@ -772,7 +791,9 @@ async function handleEditApply(
   const liveClipSid = state.selection.clipSid ?? "";
   const previewClipSid = candidate.previewClipSid;
   const applyAssumptions: Assumption[] = [...liveAssumptions(state, intent)];
-  if (previewClipSid === undefined || previewClipSid === "") {
+  if (automationScoped) {
+    // Automation targeting was verified device-side above; no clip compare.
+  } else if (previewClipSid === undefined || previewClipSid === "") {
     // Pre-Plan-03 candidate (no previewClipSid stamped). Surface honestly.
     applyAssumptions.push({
       claim: "applying a pre-clipSid candidate; cursor clip unverified",
@@ -807,9 +828,12 @@ async function handleEditApply(
     }
   }
 
-  // D-03: compute inverseOps at APPLY time (INV-14) — frozen into the journal.
-  const inverseOperations = inverseOps(ops);
-  let applied: { applied: number; failed: number };
+  // D-03 (clip path): compute inverseOps at APPLY time (INV-14) — frozen into
+  // the journal. Phase 5 (05-05): automation ops are NOT per-op invertible
+  // (D-05-07) — their author-aware inverse is built AFTER the bridge reports
+  // the captured prior value, below.
+  const inverseOperations = automationScoped ? [] : inverseOps(ops);
+  let applied: { applied: number; failed: number; capturedPriorValue?: number };
   try {
     applied = await deps.applyPatchOverBridge(candidate.undoLabel ?? "bw-edit apply", ops);
   } catch {
@@ -827,16 +851,37 @@ async function handleEditApply(
     );
     return;
   }
+  // Phase 5 (05-05) prior honesty (D-05-07 / T-05-15): an automation apply
+  // REQUIRES the bridge-reported capturedPriorValue — refuse prior_unavailable
+  // rather than guess an inverse. Journal NOTHING; the candidate is retained
+  // for inspection (lockstep with EditService.applyAutomation).
+  let frozenInverse: PrimitiveOp[] = inverseOperations;
+  let automationBinding: PatchHistoryEntry["automationBinding"];
+  if (automationScope !== undefined) {
+    if (typeof applied.capturedPriorValue !== "number") {
+      safeSendErr(deps.transport, freshness, "prior_unavailable", {
+        hint: "the bridge apply response omitted capturedPriorValue — revert is unavailable for this write (use Bitwig ⌘Z); the candidate is retained for inspection",
+      });
+      return;
+    }
+    const fields = automationApplyFields(automationScope, ops, applied.capturedPriorValue);
+    frozenInverse = fields.inverseOperations;
+    automationBinding = fields.automationBinding;
+  }
   // Success: append the durable journal entry (INV-14 inverse at apply time) +
   // evict the ephemeral candidate.
   const entry: PatchHistoryEntry = {
     ...candidate,
-    inverseOperations,
+    inverseOperations: frozenInverse,
     appliedAt: Date.now(),
-    stateHashBefore: `clip:${state.selection.clipSid ?? ""}`,
+    stateHashBefore: automationScope
+      ? `automation:${automationScope.deviceSid}:${automationScope.paramIndex}`
+      : `clip:${state.selection.clipSid ?? ""}`,
     // D-05 (Phase 03.1 Plan 03): stamp the apply-time clipSid so the revert
-    // pre-flight can compare it to the live state.selection.clipSid.
-    clipSid: liveClipSid,
+    // pre-flight can compare it to the live state.selection.clipSid. Automation
+    // entries carry the automationBinding instead — an automation write never
+    // targeted a clip.
+    ...(automationScope ? { automationBinding } : { clipSid: liveClipSid }),
   };
   try {
     await deps.patchHistory.append(entry);
@@ -1938,7 +1983,37 @@ async function handleEditRevert(
   const liveClipSid = state.selection.clipSid ?? "";
   const entryClipSid = entry.clipSid;
   const revertAssumptions: Assumption[] = [...liveAssumptions(state, intent)];
-  if (entryClipSid === undefined) {
+  // Phase 5 (05-05): AUTOMATION entries revert against the DEVICE identity and
+  // skip the clip compare entirely (an automation write never targeted a clip).
+  // Lockstep with EditService.revertAutomation: a verifiable mismatch refuses
+  // wrong_device_targeted; an unverifiable live identity AND/OR a missing
+  // automationBinding are caveated, NOT refused (the clipSid migration
+  // precedent — revert is the recovery path).
+  if (isAutomationScope(entry.scope)) {
+    const liveDeviceSid = state.selection.deviceSid;
+    if (liveDeviceSid !== undefined && liveDeviceSid !== entry.scope.deviceSid) {
+      safeSendErr(deps.transport, freshness, "wrong_device_targeted", {
+        expectedDeviceSid: entry.scope.deviceSid,
+        actualDeviceSid: liveDeviceSid,
+        hint: "re-select the device you applied this patch to (or use Bitwig ⌘Z)",
+      });
+      return;
+    }
+    if (liveDeviceSid === undefined) {
+      revertAssumptions.push({
+        claim: "live selected-device identity unverifiable from folds; reverting without a device compare",
+        confidence: 0.5,
+        source: "selection",
+      });
+    }
+    if (entry.automationBinding === undefined) {
+      revertAssumptions.push({
+        claim: "reverting a pre-automationBinding journal entry; prior-value provenance unverified",
+        confidence: 0.5,
+        source: "selection",
+      });
+    }
+  } else if (entryClipSid === undefined) {
     // Pre-fix journal entry (no clipSid stamped at apply time). Caveated, NOT refused.
     revertAssumptions.push({
       claim: "reverting a pre-clipSid journal entry; cursor clip unverified",
@@ -1991,7 +2066,12 @@ async function handleEditRevert(
     stateHashBefore: entry.stateHashBefore,
     // D-05 (Phase 03.1 Plan 03): the revert entry ALSO carries the live clipSid
     // (reverting-the-revert re-applies the original — the live clipSid must match).
-    clipSid: liveClipSid,
+    // Phase 5 (05-05): automation revert entries carry NEITHER a clipSid NOR an
+    // automationBinding — the revert's own "prior" would be the post-apply
+    // envelope value, which the async-readback probe evidence says we do not
+    // hold (a revert-of-the-revert walks the caveated path — honest, never a
+    // guessed prior).
+    ...(isAutomationScope(entry.scope) ? {} : { clipSid: liveClipSid }),
   };
   try {
     await deps.patchHistory.append(revertEntry);

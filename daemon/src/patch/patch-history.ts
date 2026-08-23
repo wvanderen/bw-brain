@@ -53,6 +53,27 @@ export interface PatchHistoryEntry extends Patch {
    * refused, path (D-05 migration policy: preserves the recovery path).
    */
   clipSid?: string;
+  /**
+   * Phase 5 (05-05, D-05-07): the automation binding stamped at apply time —
+   * the targeted parameter + the bridge-captured PRIOR value. The frozen
+   * `inverseOperations` on the same entry is the author-aware inverse built
+   * from that prior ({@link ../patch/inverse-ops.ts buildAutomationInverse});
+   * this field is the audit/identity record the revert-side device compare
+   * reads. Undefined on legacy (pre-Phase-5) entries AND on note-clip entries
+   * by construction — the revert gate treats `undefined` as a caveated, NOT
+   * refused, path (the clipSid migration precedent directly above: preserves
+   * the recovery path; the caveat is surfaced in assumptions[]).
+   */
+  automationBinding?: {
+    /** The targeted device's stable fingerprint (the deviceKey equivalence pin). */
+    deviceSid: string;
+    /** The single targeted parameter index (0..127, D-05-14). */
+    paramIndex: number;
+    /** The write surface the index addresses (maps 1:1 to the event `source`). */
+    paramSource: "device_parameter" | "remote_page";
+    /** The parameter's normalized prior value, captured by the bridge at apply time. */
+    priorValue: number;
+  };
 }
 
 /** Rotate (compact) the journal once it exceeds this size. 10 MB default. */

@@ -27,6 +27,17 @@ export type RiskClass = "low" | "medium" | "high";
 const RISK_ORDER: readonly RiskClass[] = ["low", "medium", "high"] as const;
 
 /**
+ * The automation op discriminants (Phase 5 05-05 — mirrors the AUTOMATION_OPS
+ * set in patch-schema.ts; duplicated deliberately to keep this module's only
+ * import a type import, preserving purity discipline).
+ */
+const AUTOMATION_KINDS: ReadonlySet<string> = new Set([
+  "set_parameter_value",
+  "automation_points",
+  "remove_automation_points",
+]);
+
+/**
  * Inputs to {@link classifyRisk}. The classifier is pure over this struct.
  */
 export interface RiskInput {
@@ -112,6 +123,7 @@ function opStart(op: PrimitiveOp): number | undefined {
  *     {@link ScopeMismatchError} when any op's note start is outside
  *     [region.start, region.end). The thrown message names the offending start.
  *  2. FLOOR (op count): >20 → high, >5 → medium, else low.
+ *  2b. FLOOR (automation, D-05-10): any automation op → at least medium.
  *  3. belowBar (D-09) → floor = high.
  *  4. multiTrack (D-02 backstop) → floor = high.
  *  5. RESULT = max(declared, floor) — the daemon NEVER downgrades.
@@ -145,6 +157,18 @@ export function classifyRisk(input: RiskInput): RiskClass {
   if (n > 20) floor = "high";
   else if (n > 5) floor = "medium";
   else floor = "low";
+
+  // 2b. D-05-10 (Phase 5 05-05): any automation op floors the risk at MEDIUM.
+  // An automation write targets ONE explicitly selected control with a
+  // producer-visible blast radius (the envelope lane) — the same class as a
+  // selected param. Macro-source targets (paramSource remote_page) are medium,
+  // NOT high. The class is fixed by op KIND, never self-declared: D-10's
+  // cleanup-transform self-declared-low precedent does NOT extend here (the
+  // author cannot talk an automation patch below medium; INV-10 keeps upgrades
+  // like belowBar/multiTrack/op-count intact via the max() below).
+  if (input.operations.some((op) => AUTOMATION_KINDS.has(op.op))) {
+    if (RISK_ORDER.indexOf(floor) < RISK_ORDER.indexOf("medium")) floor = "medium";
+  }
 
   // 3. belowBar (D-09) forces high.
   if (input.belowBar) floor = "high";
