@@ -231,6 +231,75 @@ export type Envelope = {
                   velocity: number;
                 };
               }
+            | {
+                op: "set_parameter_value";
+                /**
+                 * Normalized target value (Pitfall 6 — the Parameter.set contract takes 0..1).
+                 */
+                value: number;
+              }
+            | {
+                op: "automation_points";
+                /**
+                 * D-05-14: at most 64 authored points per op.
+                 *
+                 * @minItems 1
+                 * @maxItems 64
+                 */
+                points: [
+                  {
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  },
+                  ...{
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  }[]
+                ];
+              }
+            | {
+                op: "remove_automation_points";
+                /**
+                 * D-05-14: at most 64 points per op.
+                 *
+                 * @minItems 1
+                 * @maxItems 64
+                 */
+                points: [
+                  {
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  },
+                  ...{
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  }[]
+                ];
+              }
           ),
           ...(
             | {
@@ -293,6 +362,75 @@ export type Envelope = {
                   length: number;
                   velocity: number;
                 };
+              }
+            | {
+                op: "set_parameter_value";
+                /**
+                 * Normalized target value (Pitfall 6 — the Parameter.set contract takes 0..1).
+                 */
+                value: number;
+              }
+            | {
+                op: "automation_points";
+                /**
+                 * D-05-14: at most 64 authored points per op.
+                 *
+                 * @minItems 1
+                 * @maxItems 64
+                 */
+                points: [
+                  {
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  },
+                  ...{
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  }[]
+                ];
+              }
+            | {
+                op: "remove_automation_points";
+                /**
+                 * D-05-14: at most 64 points per op.
+                 *
+                 * @minItems 1
+                 * @maxItems 64
+                 */
+                points: [
+                  {
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  },
+                  ...{
+                    /**
+                     * Position in beats (region-relative >= 0).
+                     */
+                    beat: number;
+                    /**
+                     * Normalized target value (Pitfall 6 — 0..1).
+                     */
+                    value: number;
+                  }[]
+                ];
               }
           )[]
         ];

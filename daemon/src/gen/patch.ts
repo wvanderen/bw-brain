@@ -17,21 +17,49 @@ export interface Patch {
    */
   undoLabel?: string;
   /**
-   * D-02: P3 patches target a single cursor clip (multi-clip/multi-track deferred). clipSid MUST match the live cursor clip.
+   * D-02/Phase 5: a patch targets EXACTLY ONE scope variant — a single cursor clip (ClipScope) OR a single device parameter (AutomationScope). The scope↔op pairing (note ops require ClipScope; automation ops require AutomationScope) is enforced at the TS layer by validatePatchOrThrow (03-01 precedent — pure 2020-12 cannot express cross-property rules).
    */
-  scope: {
-    /**
-     * The cursor clip's stable id (16 hex chars after the 'clip_' prefix).
-     */
-    clipSid: string;
-    /**
-     * D-11 region-aware transform target. Default (absent) is whole clip. When present, the transform operates ONLY within [start, end) beats; motif signature is computed over the region with the full clip as context.
-     */
-    region?: {
-      start: number;
-      end: number;
-    };
-  };
+  scope:
+    | {
+        /**
+         * The cursor clip's stable id (16 hex chars after the 'clip_' prefix).
+         */
+        clipSid: string;
+        /**
+         * D-11 region-aware transform target. Default (absent) is whole clip. When present, the transform operates ONLY within [start, end) beats; motif signature is computed over the region with the full clip as context.
+         */
+        region?: {
+          start: number;
+          end: number;
+        };
+      }
+    | {
+        /**
+         * The target device's stable fingerprint id (16 hex chars after the 'dev_' prefix). IDENTICAL to the parameter.changed payload deviceKey (the cross-plan equivalence pin).
+         */
+        deviceSid: string;
+        /**
+         * The single targeted parameter index (D-05-14 bound: 0..127).
+         */
+        paramIndex: number;
+        /**
+         * The write surface the index addresses. remote_page = the live-proven CursorRemoteControlsPage knob path (05-02); device_parameter = the cursorDevice.getParameter(int) path (Java-side graceful degradation, live check flagged for the 05-10 UAT). Maps 1:1 to the parameter.changed payload source field.
+         */
+        paramSource: "device_parameter" | "remote_page";
+        /**
+         * D-05-14: the authored region is bounded to ≤ 16 bars starting at an arranger bar.
+         */
+        region: {
+          /**
+           * First arranger bar (0-based).
+           */
+          startBar: number;
+          /**
+           * Region length in bars. D-05-14 hard bound: 1..16.
+           */
+          lengthBars: number;
+        };
+      };
   /**
    * Non-empty array of primitive ops (D-01 hybrid catalog — primitives canonical). The bridge consumes ONLY primitive ops; transformIntent is metadata the bridge NEVER reads (Pitfall 7).
    *
@@ -100,6 +128,75 @@ export interface Patch {
             velocity: number;
           };
         }
+      | {
+          op: "set_parameter_value";
+          /**
+           * Normalized target value (Pitfall 6 — the Parameter.set contract takes 0..1).
+           */
+          value: number;
+        }
+      | {
+          op: "automation_points";
+          /**
+           * D-05-14: at most 64 authored points per op.
+           *
+           * @minItems 1
+           * @maxItems 64
+           */
+          points: [
+            {
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            },
+            ...{
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            }[]
+          ];
+        }
+      | {
+          op: "remove_automation_points";
+          /**
+           * D-05-14: at most 64 points per op.
+           *
+           * @minItems 1
+           * @maxItems 64
+           */
+          points: [
+            {
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            },
+            ...{
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            }[]
+          ];
+        }
     ),
     ...(
       | {
@@ -163,10 +260,79 @@ export interface Patch {
             velocity: number;
           };
         }
+      | {
+          op: "set_parameter_value";
+          /**
+           * Normalized target value (Pitfall 6 — the Parameter.set contract takes 0..1).
+           */
+          value: number;
+        }
+      | {
+          op: "automation_points";
+          /**
+           * D-05-14: at most 64 authored points per op.
+           *
+           * @minItems 1
+           * @maxItems 64
+           */
+          points: [
+            {
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            },
+            ...{
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            }[]
+          ];
+        }
+      | {
+          op: "remove_automation_points";
+          /**
+           * D-05-14: at most 64 points per op.
+           *
+           * @minItems 1
+           * @maxItems 64
+           */
+          points: [
+            {
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            },
+            ...{
+              /**
+               * Position in beats (region-relative >= 0).
+               */
+              beat: number;
+              /**
+               * Normalized target value (Pitfall 6 — 0..1).
+               */
+              value: number;
+            }[]
+          ];
+        }
     )[]
   ];
   /**
-   * D-01 metadata. Human/audit readability. The bridge NEVER branches on this field (Pitfall 7) — new transforms emit the SAME primitives, the bridge stays 3-case forever.
+   * D-01 metadata. Human/audit readability. The bridge NEVER branches on this field (Pitfall 7) — new transforms emit the SAME primitive kinds, and dispatch stays discriminant-only forever (the retired '3-case forever' count is deliberate: Phase 5 added the automation op kinds; the branch count grows with the union, transformIntent never grows a branch).
    */
   transformIntent?: {
     /**

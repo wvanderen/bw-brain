@@ -35,13 +35,24 @@ export interface RiskInput {
   /** The resolved primitive ops (used for the op-count floor + region check). */
   operations: PrimitiveOp[];
   /**
-   * The patch's declared scope. When `region` is present, classifyRisk enforces
-   * that every op's note start is within [region.start, region.end) (INV-9).
+   * The patch's declared scope (Phase 5 05-05: EITHER the clip variant OR the
+   * automation variant of the Scope oneOf). When the CLIP variant carries a
+   * `region`, classifyRisk enforces that every op's note start is within
+   * [region.start, region.end) (INV-9). The automation variant's bar-region
+   * is bounded at the schema layer (D-05-14) — the classifier adds the
+   * automation→medium floor (D-05-10), not containment math.
    */
-  scopeDeclared: {
-    clipSid: string;
-    region?: { start: number; end: number };
-  };
+  scopeDeclared:
+    | {
+        clipSid: string;
+        region?: { start: number; end: number };
+      }
+    | {
+        deviceSid: string;
+        paramIndex: number;
+        paramSource: "device_parameter" | "remote_page";
+        region: { startBar: number; lengthBars: number };
+      };
   /**
    * D-09 below-bar override marker. true forces risk = high (a below-motif-
    * threshold near-miss the producer explicitly allowed via --allow-below-bar).
@@ -75,8 +86,8 @@ export class ScopeMismatchError extends Error {
   }
 }
 
-/** Extract the start position an op references (for region containment). */
-function opStart(op: PrimitiveOp): number {
+/** Extract the start position a note op references (for region containment). */
+function opStart(op: PrimitiveOp): number | undefined {
   switch (op.op) {
     case "add_note":
       return op.note.start;
@@ -85,6 +96,11 @@ function opStart(op: PrimitiveOp): number {
     case "update_note_field":
       // Identity-stable: before.start === after.start (Pitfall 2); use after.
       return op.after.start;
+    default:
+      // Automation kinds carry beats-in-region, not clip-note starts — the
+      // INV-9 containment check is note-op semantics (and the scope↔op
+      // pairing already guarantees automation ops never ride a clip scope).
+      return undefined;
   }
 }
 
@@ -107,12 +123,15 @@ function opStart(op: PrimitiveOp): number {
  * classifyRisk({ declared: "low", operations: ops, scopeDeclared: { clipSid }, belowBar: false })
  */
 export function classifyRisk(input: RiskInput): RiskClass {
-  // 1. Scope containment (INV-9) — hard error before any risk math.
-  if (input.scopeDeclared.region) {
-    const { start: rStart, end: rEnd } = input.scopeDeclared.region;
+  // 1. Scope containment (INV-9) — hard error before any risk math. NOTE-op
+  // semantics only: the clip variant's optional beats-region. Automation-scope
+  // patches take the D-05-14 schema bounds instead (no containment math here).
+  const clipRegion = "clipSid" in input.scopeDeclared ? input.scopeDeclared.region : undefined;
+  if (clipRegion) {
+    const { start: rStart, end: rEnd } = clipRegion;
     for (const op of input.operations) {
       const noteStart = opStart(op);
-      if (noteStart < rStart || noteStart >= rEnd) {
+      if (noteStart !== undefined && (noteStart < rStart || noteStart >= rEnd)) {
         throw new ScopeMismatchError(
           `scope_mismatch: op touches note at ${noteStart} outside declared region [${rStart}, ${rEnd})`,
         );

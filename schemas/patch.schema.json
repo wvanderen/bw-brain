@@ -3,7 +3,7 @@
   "$id": "https://bw-brain.local/schemas/patch.schema.json",
   "title": "Patch",
   "description": "EDIT-01 patch contract. scope → operations → rationale → reversibility → risk. Primitive CRUD ops are canonical (D-01); transformIntent rides as metadata the bridge NEVER branches on. Source: CONTEXT.md D-01/D-02/D-03/D-11 + RESEARCH.md §Code Examples 'schemas/patch.schema.json sketch'.",
-  "$comment": "TRUST-SPINE CONTRACT. Reused by: (1) edit.schema.json operations.items -> $ref patch.schema.json#/$defs/PrimitiveOp (the bridge apply.patch envelope tightens its operations element to this union); (2) the daemon in-memory candidate store (D-05); (3) patch-history.jsonl entries (D-03 durable undo spine). undoLabel is LIFTED into Patch for durable history so revert has the label without needing the envelope. Source-of-truth decisions: D-01 (hybrid catalog — primitives canonical, transformIntent is metadata), D-02 (single cursor-clip scope), D-03 (self-inverting primitives — update_note_field carries before+after so inverse = swap), D-11 (region-aware transform target — scope.region optional). Pitfall 2 invariant: update_note_field before.key === after.key is enforced at the TS layer (the gen type union conveys it); a pitch change is ALWAYS remove_note+add_note, NEVER update_note_field on pitch.",
+  "$comment": "TRUST-SPINE CONTRACT. Reused by: (1) edit.schema.json operations.items -> $ref patch.schema.json#/$defs/PrimitiveOp (the bridge apply.patch envelope tightens its operations element to this union); (2) the daemon in-memory candidate store (D-05); (3) patch-history.jsonl entries (D-03 durable undo spine). undoLabel is LIFTED into Patch for durable history so revert has the label without needing the envelope. Source-of-truth decisions: D-01 (hybrid catalog — primitives canonical, transformIntent is metadata), D-02 (single cursor-clip scope), D-03 (self-inverting primitives — update_note_field carries before+after so inverse = swap), D-11 (region-aware transform target — scope.region optional). Pitfall 2 invariant: update_note_field before.key === after.key is enforced at the TS layer (the gen type union conveys it); a pitch change is ALWAYS remove_note+add_note, NEVER update_note_field on pitch. Phase 5 (05-05): the bridge NEVER branches on transformIntent; it dispatches ONLY on the primitive op discriminant (Pitfall 10) — the former '3-case forever' count is RETIRED deliberately (the union now carries the three automation kinds alongside the three note kinds; the invariant is the discriminant-only dispatch, not the case count). Scope is a oneOf [ClipScope, AutomationScope]; the scope↔op pairing (note ops require ClipScope, automation ops require AutomationScope) is enforced at the TS layer by validatePatchOrThrow (the 03-01 precedent — pure 2020-12 cannot express cross-property rules).",
   "type": "object",
   "required": ["patchId", "scope", "operations", "rationale", "reversibility", "risk"],
   "additionalProperties": false,
@@ -31,7 +31,7 @@
     },
     "transformIntent": {
       "type": "object",
-      "description": "D-01 metadata. Human/audit readability. The bridge NEVER branches on this field (Pitfall 7) — new transforms emit the SAME primitives, the bridge stays 3-case forever.",
+      "description": "D-01 metadata. Human/audit readability. The bridge NEVER branches on this field (Pitfall 7) — new transforms emit the SAME primitive kinds, and dispatch stays discriminant-only forever (the retired '3-case forever' count is deliberate: Phase 5 added the automation op kinds; the branch count grows with the union, transformIntent never grows a branch).",
       "additionalProperties": false,
       "properties": {
         "name": {
@@ -84,10 +84,17 @@
   },
   "$defs": {
     "Scope": {
+      "oneOf": [
+        { "$ref": "#/$defs/ClipScope" },
+        { "$ref": "#/$defs/AutomationScope" }
+      ],
+      "description": "D-02/Phase 5: a patch targets EXACTLY ONE scope variant — a single cursor clip (ClipScope) OR a single device parameter (AutomationScope). The scope↔op pairing (note ops require ClipScope; automation ops require AutomationScope) is enforced at the TS layer by validatePatchOrThrow (03-01 precedent — pure 2020-12 cannot express cross-property rules)."
+    },
+    "ClipScope": {
       "type": "object",
       "required": ["clipSid"],
       "additionalProperties": false,
-      "description": "D-02: P3 patches target a single cursor clip (multi-clip/multi-track deferred). clipSid MUST match the live cursor clip.",
+      "description": "D-02: P3 patches target a single cursor clip (multi-clip/multi-track deferred). clipSid MUST match the live cursor clip. Shape frozen in Phase 3 — field-for-field identical after the Phase 5 Scope->oneOf restructure.",
       "properties": {
         "clipSid": {
           "type": "string",
@@ -106,13 +113,58 @@
         }
       }
     },
+    "AutomationScope": {
+      "type": "object",
+      "required": ["deviceSid", "paramIndex", "paramSource", "region"],
+      "additionalProperties": false,
+      "description": "Phase 5 (05-05, D-05-14): a bounded automation patch targets EXACTLY ONE device parameter — the scope carries the only target; ops carry values/points only (a second parameter target is structurally unrepresentable). CROSS-PLAN EQUIVALENCE PIN (05-01/05-03): the parameter.changed event payload field deviceKey IS this deviceSid value — the same dev_+16-hex sha256 fingerprint computed bridge-side (Observers.java deriveDeviceSid); the event payload field source maps to paramSource (device_parameter|remote_page). 05-08's target resolution and 05-05's wrong_device_targeted compare both rely on that identity. D-05-06 (05-02 probe, 2026-08-22): the ONLY live-verified write envelope is the ARRANGER TRACK automation lane — this scope is track-targeted by construction; clip/launcher-targeted automation stays refused (ambiguous_target) pending live evidence.",
+      "properties": {
+        "deviceSid": {
+          "type": "string",
+          "pattern": "^dev_[0-9a-f]{16}$",
+          "description": "The target device's stable fingerprint id (16 hex chars after the 'dev_' prefix). IDENTICAL to the parameter.changed payload deviceKey (the cross-plan equivalence pin)."
+        },
+        "paramIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127,
+          "description": "The single targeted parameter index (D-05-14 bound: 0..127)."
+        },
+        "paramSource": {
+          "enum": ["device_parameter", "remote_page"],
+          "description": "The write surface the index addresses. remote_page = the live-proven CursorRemoteControlsPage knob path (05-02); device_parameter = the cursorDevice.getParameter(int) path (Java-side graceful degradation, live check flagged for the 05-10 UAT). Maps 1:1 to the parameter.changed payload source field."
+        },
+        "region": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startBar", "lengthBars"],
+          "description": "D-05-14: the authored region is bounded to ≤ 16 bars starting at an arranger bar.",
+          "properties": {
+            "startBar": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "First arranger bar (0-based)."
+            },
+            "lengthBars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16,
+              "description": "Region length in bars. D-05-14 hard bound: 1..16."
+            }
+          }
+        }
+      }
+    },
     "PrimitiveOp": {
       "oneOf": [
         { "$ref": "#/$defs/AddNoteOp" },
         { "$ref": "#/$defs/RemoveNoteOp" },
-        { "$ref": "#/$defs/UpdateNoteFieldOp" }
+        { "$ref": "#/$defs/UpdateNoteFieldOp" },
+        { "$ref": "#/$defs/SetParameterValueOp" },
+        { "$ref": "#/$defs/AutomationPointsOp" },
+        { "$ref": "#/$defs/RemoveAutomationPointsOp" }
       ],
-      "description": "D-01 canonical primitive CRUD union. The bridge apply.patch handler is 3-case forever (Pitfall 7)."
+      "description": "D-01 canonical primitive union (note kinds, Phase 3) + the automation kinds (Phase 5 05-05). The bridge NEVER branches on transformIntent; it dispatches ONLY on the primitive op discriminant (Pitfall 7 / Pitfall 10) — the former '3-case forever' count is retired deliberately (dispatch breadth follows the union; the invariant is discriminant-only dispatch, never transform metadata)."
     },
     "AddNoteOp": {
       "type": "object",
@@ -158,6 +210,72 @@
         "start": { "type": "number", "minimum": 0 },
         "length": { "type": "number", "minimum": 0 },
         "velocity": { "type": "integer", "minimum": 1, "maximum": 127 }
+      }
+    },
+    "SetParameterValueOp": {
+      "type": "object",
+      "required": ["op", "value"],
+      "additionalProperties": false,
+      "description": "Phase 5 (05-05): set the scoped parameter's current value. NOT per-op self-inverting — the inverse needs the apply-time prior value (D-05-07 author-aware inverse via buildAutomationInverse). Carries NO target fields (the AutomationScope carries the only target).",
+      "properties": {
+        "op": { "const": "set_parameter_value" },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Normalized target value (Pitfall 6 — the Parameter.set contract takes 0..1)."
+        }
+      }
+    },
+    "AutomationPointsOp": {
+      "type": "object",
+      "required": ["op", "points"],
+      "additionalProperties": false,
+      "description": "Phase 5 (05-05): author automation points for the scoped parameter within the scope region. D-05-14 hard bound: 1..64 points. Carries NO target fields.",
+      "properties": {
+        "op": { "const": "automation_points" },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "description": "D-05-14: at most 64 authored points per op.",
+          "items": { "$ref": "#/$defs/AutomationPoint" }
+        }
+      }
+    },
+    "RemoveAutomationPointsOp": {
+      "type": "object",
+      "required": ["op", "points"],
+      "additionalProperties": false,
+      "description": "Phase 5 (05-05): remove the listed authored points for the scoped parameter. Same 1..64 bound. Carries NO target fields.",
+      "properties": {
+        "op": { "const": "remove_automation_points" },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "description": "D-05-14: at most 64 points per op.",
+          "items": { "$ref": "#/$defs/AutomationPoint" }
+        }
+      }
+    },
+    "AutomationPoint": {
+      "type": "object",
+      "required": ["beat", "value"],
+      "additionalProperties": false,
+      "description": "One authored automation point: a beat position within the scope region + a normalized value.",
+      "properties": {
+        "beat": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Position in beats (region-relative >= 0)."
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Normalized target value (Pitfall 6 — 0..1)."
+        }
       }
     },
     "RiskClass": {

@@ -71,16 +71,66 @@ export const validatePatch: ValidateFunction<Patch> = ajv.getSchema(
  * Validate `data` and either return it typed as {@link Patch} or throw a
  * structured Error carrying the Ajv errors JSON.
  *
+ * Phase 5 (05-05): ALSO enforces the scope↔op pairing cross-property rule —
+ * note ops (add_note/remove_note/update_note_field) require the ClipScope
+ * variant; automation ops (set_parameter_value/automation_points/
+ * remove_automation_points) require the AutomationScope variant. Pure 2020-12
+ * cannot express cross-property rules without the non-standard $data keyword
+ * (which the Java bridge's Jackson parser would ignore), so this lives at the
+ * TS/runtime layer — the exact 03-01 precedent (Pitfall 2 layering).
+ *
  * @throws Error("patch invalid: <ajv errors>") if `data` fails schema
  *   validation. The thrown message includes the Ajv errors so the caller
  *   (and the user, when the daemon surfaces it) can see exactly which
  *   constraint was violated.
+ * @throws Error("patch invalid: scope/op pairing — ...") when an op kind and
+ *   the scope variant disagree (e.g. an automation op under a ClipScope).
  *
  * Mirrors `intent-store.ts:69`'s structured-throw pattern.
  */
+
+/** The note op discriminants (Phase 3 clip kinds). */
+const NOTE_OPS: ReadonlySet<string> = new Set(["add_note", "remove_note", "update_note_field"]);
+
+/** The automation op discriminants (Phase 5 05-05 kinds). */
+const AUTOMATION_OPS: ReadonlySet<string> = new Set([
+  "set_parameter_value",
+  "automation_points",
+  "remove_automation_points",
+]);
+
+/** Narrowing predicate: the AutomationScope variant of the Scope oneOf. */
+export function isAutomationScope(
+  scope: Patch["scope"],
+): scope is Extract<Patch["scope"], { deviceSid: string }> {
+  return "deviceSid" in scope;
+}
+
+/**
+ * The scope↔op pairing rule (05-05 Task 1): every op's kind must match the
+ * scope variant. Returns `null` when the pairing holds, or a human-readable
+ * violation message otherwise (mirrors the Ajv-error surfacing style).
+ */
+export function scopeOpPairingError(patch: Patch): string | null {
+  const automationScoped = isAutomationScope(patch.scope);
+  for (const op of patch.operations) {
+    if (automationScoped && NOTE_OPS.has(op.op)) {
+      return `patch invalid: scope/op pairing — note op '${op.op}' requires the clip scope (ClipScope), not the automation scope`;
+    }
+    if (!automationScoped && AUTOMATION_OPS.has(op.op)) {
+      return `patch invalid: scope/op pairing — automation op '${op.op}' requires the automation scope (AutomationScope), not the clip scope`;
+    }
+  }
+  return null;
+}
+
 export function validatePatchOrThrow(data: unknown): Patch {
   if (!validatePatch(data)) {
     throw new Error(`patch invalid: ${JSON.stringify(validatePatch.errors)}`);
+  }
+  const pairing = scopeOpPairingError(data as Patch);
+  if (pairing !== null) {
+    throw new Error(pairing);
   }
   return data as Patch;
 }
