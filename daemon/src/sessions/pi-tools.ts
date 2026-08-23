@@ -43,12 +43,53 @@ const editNoteSchema = {
   },
 } as const;
 
+// 05-05 Task 2: the automation kinds mirror patch.schema.json's
+// SetParameterValueOp / AutomationPointsOp / RemoveAutomationPointsOp bounds
+// (D-05-14: points 1..64; values normalized [0,1] — Pitfall 6).
+const automationPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["beat", "value"],
+  properties: {
+    beat: { type: "number", minimum: 0, maximum: 65_536 },
+    value: { type: "number", minimum: 0, maximum: 1 },
+  },
+} as const;
+
+const automationOperationSchemas = [
+  { type: "object", additionalProperties: false, required: ["op", "value"], properties: { op: { const: "set_parameter_value" }, value: { type: "number", minimum: 0, maximum: 1 } } },
+  { type: "object", additionalProperties: false, required: ["op", "points"], properties: { op: { const: "automation_points" }, points: { type: "array", minItems: 1, maxItems: 64, items: automationPointSchema } } },
+  { type: "object", additionalProperties: false, required: ["op", "points"], properties: { op: { const: "remove_automation_points" }, points: { type: "array", minItems: 1, maxItems: 64, items: automationPointSchema } } },
+] as const;
+
 const primitiveOperationSchema = {
   oneOf: [
     { type: "object", additionalProperties: false, required: ["op", "note"], properties: { op: { const: "add_note" }, note: editNoteSchema } },
     { type: "object", additionalProperties: false, required: ["op", "note"], properties: { op: { const: "remove_note" }, note: editNoteSchema } },
     { type: "object", additionalProperties: false, required: ["op", "before", "after"], properties: { op: { const: "update_note_field" }, before: editNoteSchema, after: editNoteSchema } },
+    ...automationOperationSchemas,
   ],
+} as const;
+
+// 05-05 Task 2: the automation-scope member mirrors patch.schema.json's
+// AutomationScope field bounds (deviceSid ^dev_+16hex; paramIndex 0..127;
+// region lengthBars 1..16 — D-05-14). additionalProperties:false everywhere;
+// explicit bounds on every numeric.
+const automationScopeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["deviceSid", "paramIndex", "paramSource", "region"],
+  properties: {
+    deviceSid: { type: "string", pattern: "^dev_[0-9a-f]{16}$", minLength: 20, maxLength: 20 },
+    paramIndex: { type: "integer", minimum: 0, maximum: 127 },
+    paramSource: { enum: ["device_parameter", "remote_page"] },
+    region: {
+      type: "object",
+      additionalProperties: false,
+      required: ["startBar", "lengthBars"],
+      properties: { startBar: { type: "integer", minimum: 0, maximum: 65_536 }, lengthBars: { type: "integer", minimum: 1, maximum: 16 } },
+    },
+  },
 } as const;
 
 /** Canonical Patch input without patchId, which is always minted by EditService. */
@@ -59,13 +100,21 @@ export const PREVIEW_EDIT_PARAMETERS = {
   properties: {
     undoLabel: { type: "string", minLength: 1, maxLength: 128 },
     scope: {
-      type: "object",
-      additionalProperties: false,
-      required: ["clipSid"],
-      properties: {
-        clipSid: { type: "string", pattern: "^clip_[0-9a-f]{16}$" },
-        region: { type: "object", additionalProperties: false, required: ["start", "end"], properties: { start: { type: "number", minimum: 0 }, end: { type: "number", minimum: 0 } } },
-      },
+      // 05-05 Task 2: oneOf [clip scope (unchanged), automation scope] —
+      // mirrors the patch.schema.json Scope oneOf. The clip member keeps its
+      // exact pre-existing shape (field-for-field).
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["clipSid"],
+          properties: {
+            clipSid: { type: "string", pattern: "^clip_[0-9a-f]{16}$" },
+            region: { type: "object", additionalProperties: false, required: ["start", "end"], properties: { start: { type: "number", minimum: 0 }, end: { type: "number", minimum: 0 } } },
+          },
+        },
+        automationScopeSchema,
+      ],
     },
     operations: { type: "array", minItems: 1, maxItems: 64, items: primitiveOperationSchema },
     rationale: { type: "string", minLength: 1, maxLength: 512 },

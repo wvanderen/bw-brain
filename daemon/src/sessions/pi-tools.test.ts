@@ -52,7 +52,8 @@ describe("restricted Pi tools", () => {
     });
     // 05-05 Task 2: scope is a oneOf carrying BOTH the unchanged clip member
     // and the bounded automation member (extended, not weakened).
-    const scope = ((previewEdit as PiToolWithParameters).parameters as { scope: { oneOf: object[] } }).scope;
+    const params = (previewEdit as PiToolWithParameters).parameters as { properties: { scope: { oneOf: object[] }; operations: { items: { oneOf: object[] } } } };
+    const scope = params.properties.scope;
     expect(scope.oneOf).toHaveLength(2);
     expect(scope.oneOf[0]).toMatchObject({ type: "object", additionalProperties: false, required: ["clipSid"] });
     expect(scope.oneOf[1]).toMatchObject({
@@ -61,7 +62,7 @@ describe("restricted Pi tools", () => {
       required: ["deviceSid", "paramIndex", "paramSource", "region"],
     });
     // The operations oneOf now carries SIX kinds (3 note + 3 automation).
-    const operations = ((previewEdit as PiToolWithParameters).parameters as { operations: { items: { oneOf: object[] } } }).operations;
+    const operations = params.properties.operations;
     expect(operations.items.oneOf).toHaveLength(6);
     const createProposal = tools.find(tool => tool.name === "create_proposal")!;
     expect((createProposal as PiToolWithParameters).parameters).toMatchObject({
