@@ -51,3 +51,26 @@
   automation entry reports apply_failed (Bitwig ⌘Z remains the recovery — the
   same posture as prior_unavailable). A verified removal surface (if any
   exists in extension-api:21) is a 05-10 UAT question.
+
+## 05-08 (2026-08-23)
+
+- **Daemon apply-wire scope threading STILL OPEN (carried from 05-06).** This
+  plan deliberately does not own the apply path: Task 2's acceptance criteria
+  pin approval-store.ts / proposal-dispatch.ts / edit-service.ts as UNTOUCHED
+  (RB-04 — construction only, authority reused), so
+  `boot.ts`'s `applyPatchOverBridge` still sends `{undoLabel, operations}`
+  without `payload.scope`. automation.propose mints candidates whose apply
+  rides `bw-edit apply` → the existing spine, which will surface apply_failed
+  for automation ops until the scope rides the wire (bridge half is
+  forward-compatible per 05-06). Owner: the apply-path plan (05-10 UAT will
+  trip it; a gap-close there or a dedicated plan threads it).
+
+- **previewPatch (patch-resolve.ts resolveOps) remains note-only for
+  automation ops — KNOWN GAP from 05-05, honestly not wired here.** This
+  plan's spec puts the preview signal in the propose result itself
+  (curve.points + pointCount/valueMin/valueMax/beatSpanBeats), so the
+  producer's preview story for proposals is complete WITHOUT patch-resolve
+  changes (patch-resolve.ts is outside this plan's file list). Consequence
+  that remains: `bw-edit preview` on a hand-authored automation patch still
+  yields an empty diff. A unified automation diff surface (edit.preview
+  rendering automation_points) is future work if a consumer needs it.

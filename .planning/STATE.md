@@ -6,14 +6,14 @@ current_phase: 5
 current_phase_name: Automation & Device Workflows (M4
 status: executing
 stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-08-23T15:07:43.309Z"
+last_updated: "2026-08-23T15:56:23.444Z"
 last_activity: 2026-08-22
 last_activity_desc: Phase 5 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 63
-  completed_plans: 59
+  completed_plans: 60
   percent: 67
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-22)
 ## Current Position
 
 Phase: 5 (Automation & Device Workflows (M4)) — EXECUTING
-Plan: 9 of 10
+Plan: 10 of 10
 Status: Ready to execute
 Last activity: 2026-08-22 — Phase 5 execution started
 
@@ -106,6 +106,7 @@ Progress: [████████████████████] 51/51 d
 | Phase 05 P09 | 10min | 2 tasks | 12 files |
 | Phase 05 P02 | 3h 43m elapsed (blocking human-verify + 3 live sessions; continuation ~5 min) | 3 tasks | 3 files |
 | Phase 5 P05 | 16min | 3 tasks | 13 files |
+| Phase 05 P08 | 18min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -232,6 +233,10 @@ single-source discipline + the MEM-02 allowlist gate working as designed
 - [Phase 5]: 05-05: write-arm (not transport) is the operative automation pre-flight gate — transport_stopped retired per the 2026-08-22 live probe; unarmed/unobserved arm refuses automation_write_disabled before dispatch
 - [Phase 5]: 05-05: automation ops floor at medium risk by op kind (D-05-10) — remote_page macro targets medium not high, never self-declared low
 - [Phase 5]: 05-05: prior honesty — bridge automation responses must carry capturedPriorValue or the daemon refuses prior_unavailable and journals nothing (never a guessed inverse)
+- [Phase 05]: [Phase 05 P08] AUTO-03 stays UNCHECKED in REQUIREMENTS.md (05-06's premature check reverted): code-complete end-to-end (curve-shapes + automation.propose + CLI, 1047/1047) but live approve→apply→revert is the 05-10 UAT — the 05-03/05-04/05-09 discipline
+- [Phase 05]: [Phase 05 P08] automation proposals OMIT transformIntent (Phase-3 enum frozen; audit metadata rides rationale/undoLabel/curve block) and declare reversibility manual-inverse with the author-aware-inverse disclosure (capturedPriorValue journal, D-05-07)
+- [Phase 05]: [Phase 05 P08] propose preview signal = the result's curve.points summary; previewPatch stays note-only for automation ops (deferred-items) and the daemon apply-wire scope threading (boot.ts payload.scope) remains open — 05-10 UAT will trip it (bridge half forward-compatible per 05-06)
+- [Phase 05]: [Phase 05 P08] automation.propose added to the MEM-02 ALLOWED_QUERY_OPS allowlist (Rule 3) — the midi.vary ephemeral-candidate class: no durable write until the existing edit.apply spine runs
 
 ### Pending Todos
 
@@ -265,6 +270,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-23T15:07:43.301Z
+Last session: 2026-08-23T15:56:04.208Z
 Stopped at: Completed 05-02-PLAN.md
 Resume file: None
