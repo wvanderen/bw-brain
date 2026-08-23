@@ -186,3 +186,70 @@ describe("Pitfall 8 corruption-skip (entries() never throws on malformed lines)"
     expect(found).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 05-05 Task 3 — the optional additive automationBinding field
+// (D-05-07). Legacy entries without it remain CAVEATED, NOT refused (the
+// clipSid migration precedent) — the data side of that policy is that
+// entries()/find() yield legacy lines untouched with automationBinding
+// undefined.
+// ---------------------------------------------------------------------------
+describe("automationBinding journal field (D-05-07 — additive, legacy-caveated)", () => {
+  const autoEntry = (patchId: string): PatchHistoryEntry => {
+    const patch: Patch = {
+      patchId,
+      scope: { deviceSid: "dev_0123456789abcdef", paramIndex: 5, paramSource: "remote_page", region: { startBar: 0, lengthBars: 8 } },
+      operations: [
+        { op: "automation_points", points: [{ beat: 0, value: 0.5 }] },
+        { op: "set_parameter_value", value: 0.8 },
+      ] as unknown as Patch["operations"],
+      rationale: "swell",
+      reversibility: "self-inverse",
+      risk: "medium",
+      undoLabel: `undo-${patchId}`,
+    };
+    return {
+      ...patch,
+      inverseOperations: [
+        { op: "remove_automation_points", points: [{ beat: 0, value: 0.5 }] },
+        { op: "set_parameter_value", value: 0.25 },
+      ],
+      appliedAt: 1_000,
+      stateHashBefore: "automation:dev_0123456789abcdef:5",
+      automationBinding: { deviceSid: "dev_0123456789abcdef", paramIndex: 5, paramSource: "remote_page", priorValue: 0.25 },
+    };
+  };
+
+  it("an automation entry round-trips through append/entries with automationBinding intact", async () => {
+    const hist = new PatchHistory(journalPath);
+    await hist.append(autoEntry("pt_automationroundtriptest1"));
+    const found = await hist.find("pt_automationroundtriptest1");
+    expect(found).not.toBeNull();
+    expect(found!.automationBinding).toEqual({
+      deviceSid: "dev_0123456789abcdef",
+      paramIndex: 5,
+      paramSource: "remote_page",
+      priorValue: 0.25,
+    });
+  });
+
+  it("a LEGACY line (pre-Phase-5, no automationBinding key) parses with automationBinding undefined — caveated, not refused", async () => {
+    const hist = new PatchHistory(journalPath);
+    await hist.append(entryFromOps("pt_legacylinelegacylinelega", [{ op: "add_note", note: note(60, 0) }], 2_000));
+    const found = await hist.find("pt_legacylinelegacylinelega");
+    expect(found).not.toBeNull();
+    expect(found!.automationBinding).toBeUndefined();
+    expect(found!.clipSid).toBeUndefined();
+  });
+
+  it("a journal mixing legacy and automation entries yields both in append order", async () => {
+    const hist = new PatchHistory(journalPath);
+    await hist.append(entryFromOps("pt_mixedlegacymixedlegacy1", [{ op: "add_note", note: note(60, 0) }], 1));
+    await hist.append(autoEntry("pt_mixedautomationmixedauto"));
+    const entries: PatchHistoryEntry[] = [];
+    for await (const e of hist.entries()) entries.push(e);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.automationBinding).toBeUndefined();
+    expect(entries[1]!.automationBinding?.priorValue).toBe(0.25);
+  });
+});

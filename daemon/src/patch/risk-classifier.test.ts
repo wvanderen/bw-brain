@@ -155,6 +155,59 @@ describe("risk-classifier — INV-9 scope containment (region)", () => {
   });
 });
 
+describe("risk-classifier — automation ops floor at medium (D-05-10)", () => {
+  // The automation-scope variant of scopeDeclared (Phase 5 05-05).
+  const autoScope = {
+    deviceSid: "dev_0123456789abcdef",
+    paramIndex: 5,
+    paramSource: "remote_page" as const,
+    region: { startBar: 0, lengthBars: 8 },
+  };
+  const autoPoints: PrimitiveOp[] = [
+    {
+      op: "automation_points",
+      points: [
+        { beat: 0, value: 0.0 },
+        { beat: 4, value: 0.5 },
+        { beat: 8, value: 1.0 },
+      ],
+    },
+  ];
+
+  it("declared low + one automation op → MEDIUM (classified by op kind, never self-declared low)", () => {
+    // Test 1 (D-05-10): an automation op is an explicitly selected control
+    // with producer-visible blast radius — the floor is medium regardless of
+    // what the transform engine declares.
+    expect(classifyRisk(riskInput(autoPoints, { scopeDeclared: autoScope }))).toBe("medium");
+  });
+
+  it("remote_page MACRO target → medium, NOT high (D-05-10: macro is the same class as a selected param)", () => {
+    expect(classifyRisk(riskInput(autoPoints, { scopeDeclared: autoScope }))).toBe("medium");
+    expect(classifyRisk(riskInput(autoPoints, { scopeDeclared: autoScope }))).not.toBe("high");
+  });
+
+  it("declared low + set_parameter_value op alone → medium (every automation kind floors medium)", () => {
+    const ops: PrimitiveOp[] = [{ op: "set_parameter_value", value: 0.8 }];
+    expect(classifyRisk(riskInput(ops, { scopeDeclared: autoScope }))).toBe("medium");
+  });
+
+  it("declared high + automation op stays high (INV-10 monotonicity — never downgrades)", () => {
+    expect(classifyRisk(riskInput(autoPoints, { declared: "high", scopeDeclared: autoScope }))).toBe("high");
+  });
+
+  it("automation + >20 ops → high (op-count floor still rises on top of the automation floor)", () => {
+    const many: PrimitiveOp[] = Array.from({ length: 21 }, (_, i) => ({
+      op: "automation_points" as const,
+      points: [{ beat: i, value: 0.5 }],
+    }));
+    expect(classifyRisk(riskInput(many, { scopeDeclared: autoScope }))).toBe("high");
+  });
+
+  it("automation + belowBar → high (D-09 override still forces high)", () => {
+    expect(classifyRisk(riskInput(autoPoints, { scopeDeclared: autoScope, belowBar: true }))).toBe("high");
+  });
+});
+
 describe("ScopeMismatchError", () => {
   it("is an Error subclass carrying the offending note start in the message", () => {
     const err = new ScopeMismatchError("op touches note at 7.5 outside declared region");
