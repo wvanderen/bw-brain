@@ -70,6 +70,13 @@ const ALLOWED_QUERY_OPS: ReadonlySet<string> = new Set([
   // automation.inspect refresh class. Purely advisory output (D-05-09) —
   // zero mutation surface anywhere on this op. MEM-02 holds.
   "device.macros_suggest",
+  // Phase 5 (05-08 — AUTO-03) — automation curve PROPOSAL (construction
+  // only, D-05-15). The same in-memory-candidate class as midi.vary: the
+  // mint lands in the EPHEMERAL candidate store; no durable write happens
+  // until the producer applies through the existing edit.apply spine (which
+  // itself is already allowlisted above). The op publishes/approves/applies
+  // NOTHING. MEM-02 holds.
+  "automation.propose",
 ]);
 
 /**

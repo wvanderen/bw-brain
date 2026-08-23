@@ -28,7 +28,7 @@
 // load (AGENTS.md 64-65 standalone-compiled pattern; mirrors reader.ts).
 
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import querySchema from "../../../schemas/cli-query/query.schema.json" with { type: "json" };
 import resultSchema from "../../../schemas/cli-query/result.schema.json" with { type: "json" };
 import { LineBuffer } from "../protocol/line-buffer.js";
@@ -77,6 +77,15 @@ import { AutomationSalience, type SaliencePriors, type RankedSalienceParam } fro
 // Phase 5 (Plan 05-07 — AUTO-02): the advisory macro/XY suggestion generator
 // (D-05-09 zero-mutation surface; consumes the 05-04 ranked salience entries).
 import { macroSuggest, type MacroSuggestion } from "../transforms/macro-suggest.js";
+// Phase 5 (Plan 05-08 — AUTO-03): the bounded six-shape curve vocabulary
+// (D-05-13/14) the automation.propose op constructs candidates from.
+import {
+  buildCurve,
+  defaultShapeOrder,
+  CurveSpecError,
+  MAX_CURVE_POINTS,
+  type ShapeName,
+} from "../transforms/curve-shapes.js";
 import { suggestTransitions, type TransitionObservation } from "../transforms/transition-suggest.js";
 import type { SectionSummary } from "../transforms/section-detector.js";
 import type { EnergyPoint } from "../transforms/energy-curve.js";
@@ -120,6 +129,13 @@ const LIVE_OPS = new Set([
   // 12). Reads the SAME durable salience snapshot through the SAME 05-04
   // freshness path; emits text evidence only — zero mutation surface.
   "device.macros_suggest",
+  // Phase 5 Plan 05-08 — automation curve proposals (AUTO-03/D-05-13/14/15).
+  // CONSTRUCTION ONLY: designates a salience-listed target (or an explicit
+  // unobserved fallback), builds a bounded curve, assembles the patch,
+  // validates + classifies (medium, D-05-10) + mints an ephemeral candidate.
+  // Approval/apply/revert ride the EXISTING edit spine untouched (RB-04) —
+  // the same in-memory-candidate class as midi.vary (MEM-02 holds).
+  "automation.propose",
 ]);
 
 /** Dependencies injected by the daemon boot sequence. */
@@ -428,6 +444,14 @@ export function startQueryServer(deps: QueryServerDeps): void {
     // the SHARED 05-04 read path (loadSalienceForRead — no forked semantics).
     if (op === "device.macros_suggest") {
       void handleDeviceMacrosSuggest(deps, state, intent, freshness, msg as { payload?: { refresh?: boolean } });
+      return;
+    }
+
+    // Phase 5 Plan 05-08 — automation.propose dispatch (AUTO-03). The mint
+    // path's async fire-and-forget shape (the prepareMidiDispatch analog);
+    // the handler resolves later + transport.send fires from the continuation.
+    if (op === "automation.propose") {
+      void handleAutomationPropose(deps, state, intent, freshness, msg as { payload?: AutomationProposePayload });
       return;
     }
 
@@ -1677,6 +1701,382 @@ async function handleDeviceMacrosSuggest(
     freshness,
     { suggestions: result.suggestions, manualHint: result.manualHint, pulledAt: snap.pulledAt },
     [...liveAssumptions(state, intent), saliencePulledAtAssumption(snap)],
+  );
+}
+
+// ============================================================================
+// Phase 5 Plan 05-08 — automation.propose (AUTO-03, D-05-13/14/15)
+// ============================================================================
+//
+// CONSTRUCTION ONLY — the op this plan adds; approval/apply/revert stay on the
+// EXISTING authority spine untouched (RB-04): the CLAP drawer's approval rides
+// the 04.2 proposal publish/approval paths, the CLI's apply rides bw-edit, and
+// revert rides the daemon-authoritative journal (05-05's automationBinding +
+// capturedPriorValue author-aware inverse). Nothing here publishes, approves,
+// applies, arms, or schedules — propose is strictly producer-initiated
+// (D-05-15 quiet-start; no scheduler code may appear on this path).
+//
+// Target resolution uses the 05-05 Task 1 cross-plan equivalence pin: the
+// salience entry's deviceKey IS the AutomationScope deviceSid (the same
+// dev_+16-hex sha256 fingerprint) and the observation source maps to
+// paramSource — no re-derivation or translation of identities.
+
+/** The explicit unobserved-fallback target (D-05-15 browsable fallback). */
+interface ExplicitTarget {
+  deviceKey: string;
+  paramIndex: number;
+  paramSource: "device_parameter" | "remote_page";
+  paramName?: string;
+}
+
+/** automation.propose payload (the query schema's payload is open; enforced here). */
+interface AutomationProposePayload {
+  target?: string | ExplicitTarget;
+  shape?: string;
+  depth?: number;
+  rate?: number;
+  lengthBars?: number;
+  startBar?: number;
+}
+
+/** The six D-05-13 shape names (kept local so the payload parse stays closed). */
+const SHAPE_NAMES: ReadonlySet<string> = new Set([
+  "ramp_up",
+  "ramp_down",
+  "dip_recover",
+  "rise_fall",
+  "slow_cycle",
+  "hold_then_move",
+]);
+
+const DEVICE_SID_RE = /^dev_[0-9a-f]{16}$/;
+
+/**
+ * Parse "N/M" into N (D-05-16 payoff: the project meter drives region math).
+ * Defaults to 4 with an honest disclosure assumption when unparseable.
+ */
+function beatsPerBarFromTimeSig(timeSignature: string | undefined, assumptions: Assumption[]): number {
+  const m = /^(\d+)\s*\/\s*\d+$/.exec(timeSignature ?? "");
+  const n = m ? Number.parseInt(m[1]!, 10) : 0;
+  if (n > 0) return n;
+  assumptions.push({
+    claim: `could not parse timeSignature "${timeSignature ?? ""}" — defaulted to 4 beats/bar`,
+    confidence: 0.5,
+    source: "default",
+  });
+  return 4;
+}
+
+/** Canonical JSON (keys sorted) — the proposal-store digest discipline. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Validate + narrow the explicit fallback target. Returns null on malformed input. */
+function parseExplicitTarget(raw: unknown): ExplicitTarget | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const { deviceKey, paramIndex, paramSource } = o;
+  if (
+    typeof deviceKey !== "string" ||
+    !DEVICE_SID_RE.test(deviceKey) ||
+    typeof paramIndex !== "number" ||
+    !Number.isInteger(paramIndex) ||
+    paramIndex < 0 ||
+    paramIndex > 127 ||
+    (paramSource !== "device_parameter" && paramSource !== "remote_page")
+  ) {
+    return null;
+  }
+  return {
+    deviceKey,
+    paramIndex,
+    paramSource,
+    ...(typeof o.paramName === "string" && o.paramName.length > 0 ? { paramName: o.paramName } : {}),
+  };
+}
+
+/**
+ * automation.propose handler (AUTO-03): designate the target → build the
+ * curve → assemble + validate + classify + mint the candidate. Construction
+ * only; the result carries candidate id + digest + preview points summary —
+ * NEVER an approval token (D-05-15).
+ *
+ * Named refusals (never silent, never a partial mint):
+ *   state_disconnected — the watchdog gate (the prepareMidiDispatch analog)
+ *   not_implemented    — candidateStore unwired, or salience unconfigured
+ *   invalid_query      — malformed target / curve params
+ *   unknown_param      — designated paramKey absent from the salience list
+ *   invalid_curve_spec — out-of-bounds spec (D-05-14 refuse-not-clamp)
+ *   invalid_patch      — assembled patch failed validation (defense-in-depth)
+ *   snapshot_invalid   — corrupt snapshot (the shared loadSalienceForRead arm)
+ */
+async function handleAutomationPropose(
+  deps: QueryServerDeps,
+  state: RawState,
+  intent: ProjectIntent | null,
+  freshness: "live" | "stale" | "disconnected",
+  msg: { payload?: AutomationProposePayload },
+): Promise<void> {
+  // Mint-path gates (the prepareMidiDispatch preamble analog): watchdog first.
+  if (freshness === "disconnected") {
+    safeSendErr(deps.transport, freshness, "state_disconnected");
+    return;
+  }
+  if (!deps.candidateStore) {
+    safeSendErr(deps.transport, freshness, "not_implemented");
+    return;
+  }
+
+  // --- Resolve the target: designated from the salience list, or explicit
+  // unobserved fallback (D-05-15 — the full bounded param list stays
+  // browsable via bw-automation inspect; the fallback never synthesizes
+  // evidence, it DISCLOSES absence).
+  const payload = msg.payload ?? {};
+  const rawTarget = payload.target;
+  let deviceKey: string;
+  let paramIndex: number;
+  let paramSource: "device_parameter" | "remote_page";
+  let identity: string;
+  let evidence: SalienceParamEntry | undefined;
+  let snap: SalienceSnapshot | null = null;
+
+  if (typeof rawTarget === "string" && rawTarget.length > 0) {
+    // Designated: read the salience snapshot through the SHARED 05-04 path
+    // (loadSalienceForRead — semantics reused, never forked).
+    const read = await loadSalienceForRead(deps, state, intent, freshness, false);
+    if (read.refused) return;
+    if (read.snap === null) {
+      safeSendErr(deps.transport, freshness, "no_snapshot");
+      return;
+    }
+    snap = read.snap;
+    const entry = flatRankedSalience(snap).find((p) => p.paramKey === rawTarget);
+    if (entry === undefined) {
+      safeSendErr(deps.transport, freshness, "unknown_param");
+      return;
+    }
+    deviceKey = entry.deviceKey;
+    paramIndex = entry.paramIndex;
+    paramSource = entry.source;
+    identity = entry.paramName !== undefined && entry.paramName.length > 0 ? entry.paramName : entry.paramKey;
+    evidence = entry;
+  } else if (rawTarget !== null && typeof rawTarget === "object") {
+    const explicit = parseExplicitTarget(rawTarget);
+    if (explicit === null) {
+      safeSendErr(deps.transport, freshness, "invalid_query");
+      return;
+    }
+    deviceKey = explicit.deviceKey;
+    paramIndex = explicit.paramIndex;
+    paramSource = explicit.paramSource;
+    identity =
+      explicit.paramName !== undefined && explicit.paramName.length > 0
+        ? explicit.paramName
+        : `${explicit.paramSource}:${explicit.paramIndex}`;
+    // The unobserved fallback proceeds WITHOUT reading the snapshot for
+    // evidence — but the automation subsystem must still be configured (a
+    // corrupt/absent snapshot is not evidence and never blocks the fallback).
+    if (!deps.salienceSnapshotPath) {
+      safeSendErr(deps.transport, freshness, "not_implemented");
+      return;
+    }
+    try {
+      snap = await loadSalienceSnapshot(deps.salienceSnapshotPath);
+    } catch {
+      snap = null; // unobserved path: a corrupt snapshot is not evidence
+    }
+  } else {
+    safeSendErr(deps.transport, freshness, "invalid_query");
+    return;
+  }
+
+  // --- Curve spec: overrides ?? profile-biased defaults (ARCH-02 — the
+  // profile ENHANCES the default shape choice; it never gates construction).
+  let profile: Profile | undefined;
+  const profileName = snap?.profile ?? intent?.projectIntent.profile;
+  try {
+    profile = loadProfile(profileName);
+  } catch {
+    profile = undefined; // unknown name degrades to unbiased defaults
+  }
+  const biased = profile?.automationShapes !== undefined;
+  const shape: ShapeName = SHAPE_NAMES.has(String(payload.shape))
+    ? (payload.shape as ShapeName)
+    : defaultShapeOrder(profile)[0]!;
+  const depthRange = profile?.automationShapes?.depthRange;
+  const rateRange = profile?.automationShapes?.rateRange;
+  const depth = typeof payload.depth === "number" ? payload.depth : (depthRange ? (depthRange[0] + depthRange[1]) / 2 : 0.5);
+  const rate = typeof payload.rate === "number" ? payload.rate : (rateRange ? (rateRange[0] + rateRange[1]) / 2 : 1.0);
+  const lengthBars = payload.lengthBars ?? 4;
+  const startBar = payload.startBar ?? 0;
+  // The region is bar-quantized by schema (integer startBar ≥ 0, integer
+  // lengthBars 1..16) — refuse non-integers rather than clamping them.
+  if (!Number.isInteger(lengthBars) || lengthBars < 1 || lengthBars > 16 || !Number.isInteger(startBar) || startBar < 0) {
+    safeSendErr(deps.transport, freshness, "invalid_curve_spec");
+    return;
+  }
+  if (!SHAPE_NAMES.has(shape) || typeof depth !== "number" || typeof rate !== "number") {
+    safeSendErr(deps.transport, freshness, "invalid_query");
+    return;
+  }
+
+  const assumptions: Assumption[] = [...liveAssumptions(state, intent)];
+  if (evidence !== undefined) {
+    // D-05-15: the salience evidence flows into assumptions[] (rationale below)
+    // — the designation claim + the SHARED pulledAt prior-source assumption
+    // (saliencePulledAtAssumption — the 05-04 single source, verbatim).
+    assumptions.push({
+      claim:
+        `target designated from salience: ${identity} (${evidence.paramKey}) moved ` +
+        `${Math.max(0, Math.round(evidence.movementCount))} times via ${evidence.source} ` +
+        `(salience ${evidence.salience}; profile ${snap?.profile ?? "generic"})`,
+      confidence: 1.0,
+      source: "selection",
+    });
+    assumptions.push(saliencePulledAtAssumption(snap));
+  } else {
+    // T-05-23 honest-absence: NEVER synthesized evidence.
+    assumptions.push({
+      claim:
+        `unobserved param — no salience evidence for ${deviceKey}:${paramSource}:${paramIndex}; ` +
+        `proposal built from the explicit browsable fallback target (D-05-15)`,
+      confidence: 0.5,
+      source: "default",
+    });
+  }
+  assumptions.push(
+    biased
+      ? {
+          claim: `default shape order biased by profile "${profile?.name ?? "unknown"}" automationShapes.shapeBias — ordering only, construction never gated (ARCH-02)`,
+          confidence: 1.0,
+          source: "config",
+        }
+      : {
+          claim: "no shape bias applied — profile absent or uniform (ARCH-02 generic core runs literally)",
+          confidence: 1.0,
+          source: "default",
+        },
+  );
+  const beatsPerBar = beatsPerBarFromTimeSig(state.project.timeSignature, assumptions);
+  assumptions.push({
+    claim:
+      "reversible via the author-aware inverse: the bridge captures the prior parameter value at apply time " +
+      "(capturedPriorValue) and revert replays it from the journal (D-05-07 automationBinding)",
+    confidence: 1.0,
+    source: "default",
+  });
+  assumptions.push({
+    claim:
+      "construction only — no approval token, no publish, no apply; preview the returned points and apply via " +
+      "`bw-edit apply <patchId> --confirm` (medium risk, D-05-10/D-05-15 quiet-start)",
+    confidence: 1.0,
+    source: "default",
+  });
+
+  // --- Build the curve (D-05-14 bounds enforced refuse-not-clamp in the pure
+  // transform; an out-of-contract request NEVER silently clamps).
+  const startBeat = startBar * beatsPerBar;
+  let curvePoints: Array<{ beat: number; value: number }>;
+  try {
+    curvePoints = buildCurve({ shape, depth, rate, lengthBars, startBeat }, beatsPerBar, MAX_CURVE_POINTS);
+  } catch (e) {
+    if (e instanceof CurveSpecError) {
+      safeSendErr(deps.transport, freshness, "invalid_curve_spec");
+      return;
+    }
+    throw e;
+  }
+  // AutomationPoint.beat is REGION-RELATIVE (patch.schema.json) — rebase.
+  const round4 = (v: number): number => Math.round(v * 10000) / 10000;
+  const points = curvePoints.map((p) => ({ beat: round4(p.beat - startBeat), value: round4(p.value) }));
+
+  // --- Assemble the patch (the evidence-backed rationale is the contract).
+  const evidenceClause =
+    evidence !== undefined
+      ? `grounded in observed movement — ${Math.max(0, Math.round(evidence.movementCount))} movements via ` +
+        `${evidence.source} (salience ${evidence.salience}, snapshot pulled ${snap?.pulledAt ?? "unknown"})`
+      : `unobserved param, browsable fallback target (no movement evidence claimed)`;
+  const rationale =
+    `automation.propose ${shape} on ${identity}: bounded ${lengthBars}-bar ${shape} curve ` +
+    `(depth ${depth.toFixed(2)}, rate ${rate}) from bar ${startBar} — ${evidenceClause}`;
+  const undoLabel = `bw-brain automation: ${shape} on ${identity}`;
+  const patchDraft = {
+    scope: {
+      deviceSid: deviceKey,
+      paramIndex,
+      paramSource,
+      region: { startBar, lengthBars },
+    },
+    operations: [{ op: "automation_points", points }],
+    rationale,
+    undoLabel,
+    // transformIntent deliberately OMITTED: the schema's name enum is the
+    // Phase-3 transform catalog (vary/counterline/voice-leading-fix/humanize/
+    // manual) and this plan freezes patch.schema.json — the audit metadata
+    // (shape/depth/rate/profile) rides in the rationale + undoLabel + the
+    // propose result's curve block instead. The bridge never reads it anyway
+    // (Pitfall 7 — discriminant-only dispatch).
+    // Reversibility: the author-aware inverse (capturedPriorValue captured by
+    // the bridge at apply time, replayed from the journal on revert) — NOT a
+    // structural self-inverse, so "manual-inverse" is the honest declaration.
+    reversibility: "manual-inverse" as const,
+    risk: "medium" as const,
+    assumptions,
+  };
+
+  // --- Validate (schema + scope↔op pairing) + classify (D-05-10: automation
+  // ops floor at medium — assert via classifyRisk, never re-implement) + mint.
+  let patch: Patch;
+  try {
+    patch = validatePatchOrThrow({ ...patchDraft, patchId: `pt_${randomUUID()}` });
+  } catch (e) {
+    console.error("[query-server] automation.propose patch validation failed:", (e as Error).message);
+    safeSendErr(deps.transport, freshness, "invalid_patch");
+    return;
+  }
+  const risk = classifyRisk({
+    declared: "medium",
+    operations: patch.operations as PrimitiveOp[],
+    scopeDeclared: patch.scope as Extract<Patch["scope"], { deviceSid: string }>,
+    belowBar: false,
+  });
+  const minted = deps.candidateStore.mint(
+    { ...patchDraft, risk } as Omit<Patch, "patchId">,
+    "", // previewClipSid is a clip-scope concept; automation targets a device (05-05's pre-flight ladder owns the gate)
+  );
+  // Digest over the patch SANS patchId — identical constructions digest
+  // identically while candidates stay distinct (Pitfall 5).
+  const digest = createHash("sha256").update(canonicalJson({ ...patchDraft, risk })).digest("hex");
+
+  const values = points.map((p) => p.value);
+  const beats = points.map((p) => p.beat);
+  safeSendOk(
+    deps.transport,
+    freshness,
+    {
+      candidate: { patchId: minted.patchId, digest, risk, undoLabel, shape, rationale },
+      target: { deviceSid: deviceKey, paramIndex, paramSource, identity },
+      curve: {
+        shape,
+        depth,
+        rate,
+        lengthBars,
+        startBar,
+        beatsPerBar,
+        pointCount: points.length,
+        valueMin: Math.min(...values),
+        valueMax: Math.max(...values),
+        beatSpanBeats: Math.max(...beats),
+        points,
+      },
+    },
+    assumptions,
   );
 }
 

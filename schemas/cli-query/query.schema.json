@@ -40,10 +40,11 @@
         "arrange.review",
         "arrange.current_section",
         "arrange.refresh",
-        "automation.inspect",
-        "device.macros_suggest"
-      ],
-      "description": "The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize + Phase 4 arrange.* (ARRANGE-01..05, UX-03): arrange.sections/repetition_report/energy_curve/review/current_section/refresh + Phase 5 (AUTO-01, Plan 05-04): automation.inspect — the ranked per-parameter salience read (observed movement → analyzer → durable snapshot, D-05-01..04). Result payload: {params: ranked list (salience desc), tracks, pulledAt} on ok:true; named refusals no_snapshot/snapshot_invalid/state_disconnected on ok:false. + Phase 5 (AUTO-02, Plan 05-07): device.macros_suggest — advisory macro/XY-pair suggestions built from the salience snapshot (evidence lines + assumptions[] + ≥1 alternative per suggestion, D-05-09/11/12; zero mutation surface). Result payload: {suggestions: ranked list, manualHint, pulledAt} on ok:true; the same named refusals on ok:false."
+    "automation.inspect",
+    "device.macros_suggest",
+    "automation.propose"
+  ],
+  "description": "The 5 live M1 ops + diff (promoted per D-05) + Phase 3 extensions (EDIT-02/04/05, MIDI-02..05): edit.preview/apply/revert + midi.vary/counterline/voice_leading_fix/humanize + Phase 4 arrange.* (ARRANGE-01..05, UX-03): arrange.sections/repetition_report/energy_curve/review/current_section/refresh + Phase 5 (AUTO-01, Plan 05-04): automation.inspect — the ranked per-parameter salience read (observed movement → analyzer → durable snapshot, D-05-01..04). Result payload: {params: ranked list (salience desc), tracks, pulledAt} on ok:true; named refusals no_snapshot/snapshot_invalid/state_disconnected on ok:false. + Phase 5 (AUTO-02, Plan 05-07): device.macros_suggest — advisory macro/XY-pair suggestions built from the salience snapshot (evidence lines + assumptions[] + ≥1 alternative per suggestion, D-05-09/11/12; zero mutation surface). Result payload: {suggestions: ranked list, manualHint, pulledAt} on ok:true; the same named refusals on ok:false. + Phase 5 (AUTO-03, Plan 05-08): automation.propose — CONSTRUCTION ONLY: designate a salience-listed target by paramKey (or an explicit unobserved {deviceKey,paramIndex,paramSource} fallback, D-05-15) + optional shape/depth/rate/lengthBars/startBar overrides → bounded six-shape curve (D-05-13/14) → patch assembly → validate → classifyRisk (medium, D-05-10) → ephemeral candidate mint. Result payload: {candidate: {patchId, digest, risk, undoLabel, shape, rationale}, target, curve: {shape, depth, rate, lengthBars, startBar, beatsPerBar, pointCount, valueMin, valueMax, beatSpanBeats, points}} on ok:true; approval/apply/revert ride the EXISTING edit spine (RB-04 quiet-start). Named refusals: state_disconnected/not_implemented/invalid_query/unknown_param/no_snapshot/invalid_curve_spec/invalid_patch/snapshot_invalid on ok:false."
     },
     "payload": {
       "type": "object",

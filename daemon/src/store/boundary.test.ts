@@ -26,7 +26,9 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
     // the M1 read-only 6 with the daemon-mediated edit + MIDI transform ops;
     // Phase 4 adds arrange.* (read from the durable snapshot + arrange.refresh);
     // Phase 5 (05-04) adds automation.inspect (AUTO-01 salience read);
-    // Phase 5 (05-07) adds device.macros_suggest (AUTO-02 advisory read).
+    // Phase 5 (05-07) adds device.macros_suggest (AUTO-02 advisory read);
+    // Phase 5 (05-08) adds automation.propose (AUTO-03 construction-only
+    // candidate mint — the midi.vary ephemeral-candidate class, MEM-02 holds).
     const ops = querySchema.properties?.op?.enum;
     expect(ops).toEqual([
       "focus.export",
@@ -50,6 +52,7 @@ describe("checkMemoryBoundary (MEM-02 / SC#5 — no ephemeral-write op)", () => 
       "arrange.refresh",
       "automation.inspect",
       "device.macros_suggest",
+      "automation.propose",
     ]);
   });
 

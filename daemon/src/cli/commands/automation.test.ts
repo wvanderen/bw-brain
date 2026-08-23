@@ -648,9 +648,12 @@ describe("automation.propose op (AUTO-03 — salience-grounded construction, D-0
       const payload = res.payload as ProposePayload;
       const candidate = store.get(payload.candidate.patchId);
       expect(candidate).toBeDefined();
-      // Patch-schema validation + the 05-05 scope↔op pairing both hold.
-      expect(validatePatch(candidate)).toBe(true);
-      expect(scopeOpPairingError(candidate!)).toBeNull();
+      // The stored envelope is Patch + previewClipSid (D-04 mint stamp) —
+      // validate the PATCH portion against the schema + the 05-05 pairing.
+      const { previewClipSid: _stamped, ...storedPatch } = candidate!;
+      void _stamped;
+      expect(validatePatch(storedPatch)).toBe(true);
+      expect(scopeOpPairingError(storedPatch as never)).toBeNull();
       // D-05-10: automation ops floor at MEDIUM (classifyRisk asserted, not re-implemented).
       expect(candidate!.risk).toBe("medium");
       expect("deviceSid" in candidate!.scope).toBe(true);
