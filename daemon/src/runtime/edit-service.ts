@@ -51,10 +51,13 @@ export interface NamedRefusal {
  *     armed across the probe's 21 steps) and stays refused pending evidence
  *     (D-05-06 probe-pins-refuse-rest). Only the arranger-armed track-lane
  *     path is live-verified.
- *  4. OVERRIDE — `automation_override_active` when an automation override is
- *     latched on (observed to latch mid-session and stay; the 05-02 table
- *     makes this a consistency signal whose precedence 05-05 owns — this
- *     ladder refuses on it).
+ *  4. OVERRIDE — NOT a refusal (live-evidence correction 2026-08-23: the
+ *     05-02 probe's STEP#7–21 all ran with override latched AND points
+ *     landed at exact target values — override masks the audible effect of
+ *     existing automation, it does NOT block envelope writes). The apply
+ *     proceeds and surfaces an override caveat assumption instead: the
+ *     written curve won't take audible effect until the producer clears
+ *     the override.
  *
  * The medium-risk confirmation gate (EDIT-06) runs AFTER this ladder in the
  * apply path; execution is immediate-after-gates (D-05-08 — no timers, no
@@ -106,16 +109,8 @@ export function automationPreFlight(state: RawState, scope: AutomationScopeRef):
       },
     };
   }
-  // 4. Override consistency signal (precedence owned by 05-05 → refuse).
-  if (arm.overrideActive) {
-    return {
-      error: "automation_override_active",
-      details: {
-        overrideActive: arm.overrideActive,
-        hint: "an automation override is latched on (observed to latch mid-session and stay) — clear the override, then re-apply",
-      },
-    };
-  }
+  // 4. Override: NOT refused (evidence correction — see docblock above). The
+  // apply path surfaces the caveat assumption when overrideActive is set.
   return null;
 }
 
@@ -211,6 +206,13 @@ export class EditService {
     const assumptions: EditResult["assumptions"] = [{ claim: `selected device ${scope.deviceSid} param ${scope.paramIndex} (${scope.paramSource})`, confidence: 1, source: "selection" }];
     const refusal = automationPreFlight(state, scope);
     if (refusal) return { ok: false, error: refusal.error, details: refusal.details, assumptions: [] };
+  // Override caveat (evidence correction 2026-08-23): override does NOT
+  // block writes (probe STEP#7–21 landed points with override latched) but
+  // it masks their audible effect until cleared — surface, don't refuse.
+  const armForCaveat = state.project?.transport?.automationWrite;
+  if (armForCaveat?.overrideActive) {
+    assumptions.push({ claim: "an automation override is latched on — the written curve lands on the envelope but will not take audible effect until the override is cleared in Bitwig", confidence: 1, source: "transport fold" });
+  }
     if (!input.force && (candidate.risk === "medium" || candidate.risk === "high") && !input.confirm) {
       return { ok: false, error: "confirmation_required", assumptions };
     }

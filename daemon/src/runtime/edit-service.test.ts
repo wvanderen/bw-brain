@@ -24,8 +24,10 @@ describe("EditService", () => it("does not journal or evict a failed controller 
 //   state_disconnected → candidate/validation → wrong_device_targeted →
 //   transport (write-arm) gates → confirmation.
 // The transport-gate internal order (pinned here):
-//   automation_write_disabled → ambiguous_target (launcher lane) →
-//   automation_override_active.
+//   automation_write_disabled → ambiguous_target (launcher lane).
+// (automation_override_active was removed from the refusal ladder by the
+//   2026-08-23 evidence correction — override does not block writes; the
+//   apply path surfaces a caveat assumption instead.)
 // ---------------------------------------------------------------------------
 
 const AUTO_SCOPE = { deviceSid: "dev_0123456789abcdef", paramIndex: 5, paramSource: "remote_page", region: { startBar: 0, lengthBars: 8 } } as const;
@@ -115,14 +117,19 @@ describe("EditService automation apply — named refusals from folded state (Tes
     expect(bridge).not.toHaveBeenCalled();
   });
 
-  it("override active (arranger armed) → automation_override_active", async () => {
+  it("override active (arranger armed) → apply PROCEEDS with an override caveat assumption (evidence correction 2026-08-23)", async () => {
+    // Live-evidence correction: the 05-02 probe's STEP#7–21 all ran with
+    // override latched AND envelope points landed at exact target values —
+    // override masks audible effect, it does NOT block writes. The refusal
+    // was over-strict and contradicted the recorded capabilities evidence
+    // (surfed live in the 05-10 UAT when a session-latched override blocked
+    // every legal apply).
     const { service, bridge } = autoService();
     const state = autoState({ deviceSid: AUTO_SCOPE.deviceSid }, arm({ overrideActive: true }));
     const result = await service.apply(state as any, null, "live", { patchId: "pt_auto1", confirm: true });
-    expect(result.ok).toBe(false);
-    expect(result.error).toBe("automation_override_active");
-    expect((result.details as Record<string, unknown>).hint).toBeTruthy();
-    expect(bridge).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(bridge).toHaveBeenCalledTimes(1);
+    expect(result.assumptions.some((a) => /override is latched/i.test(a.claim))).toBe(true);
   });
 
   it("candidate deviceSid ≠ live selected device → wrong_device_targeted with {expectedDeviceSid, actualDeviceSid, hint} BEFORE any bridge round-trip (Test 4)", async () => {
