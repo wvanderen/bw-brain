@@ -13,7 +13,13 @@
   belongs with the 05-06 bridge-execution surface or a UX pass. Out of 05-05's
   task scopes (patch-resolve.ts is not in any 05-05 task file list).
 
-- **state.selection.deviceSid is not yet populated by any fold.** The
+- **state.selection.deviceSid is not yet populated by any fold. — CLOSED
+  2026-08-23 (orchestrator gap fix, RED→GREEN, suite 1053/1053 + bridge 79/79,
+  extension repackaged).** `device.name_changed` now carries `deviceSid`
+  (bridge, deriveDeviceSid — same caches as parameter.changed deviceKey) and
+  BOTH folds (device.name_changed payload + parameter.changed deviceKey)
+  populate `selection.deviceSid`. The 05-05 wrong_device_targeted compare now
+  has its live-identity input. Original entry retained for history: the
   05-05 gates read it as the live folded selected-device identity
   (unverifiable → ambiguous_target refusal, so applies fail closed today).
   05-03's bridge emits deviceSid on device.name_changed payloads
