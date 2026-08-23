@@ -311,7 +311,7 @@ Plans:
   4. Device inspection and automation workflows cover third-party VST/AU plugins loaded in the chain, not just native Bitwig devices.
   5. The CLAP device workspace renders chain summary, parameter targets, macro opportunities, and mutation outcome; Pi remains behind the daemon and the CLI remains a secondary contract.
 
-**Plans**: 7/10 plans executed
+**Plans**: 8/10 plans executed
 **UI hint**: yes
 **Research needed**: automation salience statistics; bounded automation generation with genre-profile constraints.
 
@@ -332,7 +332,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05-06-PLAN.md — Bridge automation execution: ParameterWriter + applyOps dispatch + prior capture (probe-gated) (Wave 4)
+- [x] 05-06-PLAN.md — Bridge automation execution: ParameterWriter + applyOps dispatch + prior capture (probe-gated) (Wave 4)
 - [x] 05-07-PLAN.md — Macro/XY advisory suggestions + device.macros_suggest + bw-device macros-suggest (AUTO-02 complete, D-05-09..12) (Wave 4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
@@ -359,4 +359,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 03.1 → 4 → 04.1 → 04.2 
 | 04.1. CLAP Capability & Host Evidence Gate | 4/4 | Complete   | 2026-08-10 |
 | 04.2. Hybrid CLAP Companion Product | 11/11 | Complete   | 2026-08-20 |
 | 04.3. CLAP-First Product Rebaseline | 8/8 | Complete    | 2026-08-22 |
-| 5. Automation & Device Workflows (M4) | 7/10 | In Progress|  |
+| 5. Automation & Device Workflows (M4) | 8/10 | In Progress|  |

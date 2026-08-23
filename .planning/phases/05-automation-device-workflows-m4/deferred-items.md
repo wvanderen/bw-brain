@@ -28,3 +28,26 @@
   profile-loader.ts tuple cast, boot.test.ts socket/arity, project-session-
   manager.test.ts readonly variance, energy-curve.test.ts implicit any.
   Verified 05-05-touched files are type-clean via targeted tsc run.
+
+## 05-06 (2026-08-23)
+
+- **The daemon's apply.patch wire send does not yet include the patch scope.**
+  `daemon/src/runtime/boot.ts` applyPatchOverBridge sends
+  `{undoLabel, operations}` only, while the bridge's `handleApplyPatch` now
+  reads `payload.scope.{paramIndex, paramSource}` (the AutomationScope carries
+  the only target — ops carry values only). Until the scope rides the wire,
+  automation ops arriving at the bridge fail honestly per-op
+  (unresolvable target index) and the daemon reports apply_failed. Threading
+  the AutomationScope through applyPatchOverBridge belongs to 05-08 (target
+  resolution / automation.propose — the plan that owns composing automation
+  patches end-to-end). Bridge half is forward-compatible: no bridge change
+  will be needed when the daemon starts sending the scope.
+
+- **remove_automation_points refuses at the bridge (removal_surface_unverified)
+  — automation REVERT will surface apply_failed.** The 05-05 frozen inverse
+  emits remove_automation_points for authored additions, and the bridge
+  honestly refuses removals because the 2026-08-22 probe verified writes only
+  (D-05-06 probe-pins-refuse-rest). Consequence: reverting an applied
+  automation entry reports apply_failed (Bitwig ⌘Z remains the recovery — the
+  same posture as prior_unavailable). A verified removal surface (if any
+  exists in extension-api:21) is a 05-10 UAT question.
