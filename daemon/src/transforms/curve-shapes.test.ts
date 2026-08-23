@@ -50,7 +50,7 @@ const SHAPES: readonly ShapeName[] = [
 
 const arbShape = fc.constantFrom(...SHAPES);
 const arbDepth = fc.float({ min: 0, max: 1, noNaN: true });
-const arbRate = fc.float({ min: 0.001, max: 4, noNaN: true });
+const arbRate = fc.float({ min: 1 / 1024, max: 4, noNaN: true });
 const arbLengthBars = fc.float({ min: 1, max: 16, noNaN: true });
 const arbStartBeat = fc.float({ min: 0, max: 128, noNaN: true });
 const arbSpec = fc.record({
