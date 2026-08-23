@@ -451,12 +451,34 @@ public final class Observers {
      * skipFirstFire guard because there is nothing to suppress.</p>
      */
     private void wireTransportMeta(final Transport transport) {
-        transport.tempo().addValueObserver((DoubleValueChangedCallback) (double bpm) -> {
-            tempo = bpm;
-        });
-        transport.timeSignature().addValueObserver((StringValueChangedCallback) (String sig) -> {
-            timeSignature = sig == null || sig.isEmpty() ? "4/4" : sig;
-        });
+        // Live 2026-08-23 (producer UAT session): the host rejects
+        // addValueObserver called DIRECTLY on a Parameter proxy —
+        // "This has been deprecated since API version 2 - use
+        // value.useValueObserver(callback) instead" — and the unguarded
+        // tempo() registration aborted init() (extension BLOCKING). The fix
+        // routes the observer through Parameter.value() (SettableRangedValue
+        // proxy — the getLoopLength() pattern live-proven since 03.1, and the
+        // exact shape the 2026-08-22 JS probe used live: p.value()
+        // .addValueObserver). Defensive per-registration try/catch follows the
+        // wireParameterWindow precedent: a host that still rejects it degrades
+        // project-meta to daemon defaults instead of killing init().
+        try {
+            transport.tempo().value().addValueObserver((DoubleValueChangedCallback) (double bpm) -> {
+                tempo = bpm;
+            });
+        } catch (final Throwable e) {
+            // Degrade: tempo stays the daemon default (120) — M1 LIMITATION
+            // posture; the pull path surfaces the default honestly.
+        }
+        try {
+            transport.timeSignature().addValueObserver((StringValueChangedCallback) (String sig) -> {
+                timeSignature = sig == null || sig.isEmpty() ? "4/4" : sig;
+            });
+        } catch (final Throwable e) {
+            // Degrade: time signature stays "4/4" (TimeSignatureValue is a
+            // plain Value subtype — the M1 StringValue pattern — but the
+            // host's newer proxy layer gets the same defensive guard).
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -535,7 +557,10 @@ public final class Observers {
                 p.name().addValueObserver((StringValueChangedCallback) (String name) -> {
                     paramNames.put(idx, name == null ? "" : name);
                 });
-                p.addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                p.value().addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                    // Through Parameter.value() — the host rejects direct
+                    // addValueObserver on Parameter proxies (live 2026-08-23:
+                    // "use value.useValueObserver(callback) instead").
                     paramValues.put(idx, v);
                     coalescer.onValue(paramKey(SOURCE_DEVICE_PARAMETER, idx), idx,
                             paramNames.getOrDefault(idx, ""), SOURCE_DEVICE_PARAMETER_NAME, v);
@@ -577,7 +602,10 @@ public final class Observers {
                 knob.name().addValueObserver((StringValueChangedCallback) (String name) -> {
                     remoteNames.put(slot, name == null ? "" : name);
                 });
-                knob.addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                knob.value().addValueObserver((DoubleValueChangedCallback) (double v) -> {
+                    // Through Parameter.value() — same live fix as the device
+                    // window (direct addValueObserver on Parameter proxies is
+                    // host-deprecated; the JS probe used .value() live).
                     remoteValues.put(slot, v);
                     coalescer.onValue(paramKey(SOURCE_REMOTE_PAGE, slot), slot,
                             remoteNames.getOrDefault(slot, ""), SOURCE_REMOTE_PAGE_NAME, v);
