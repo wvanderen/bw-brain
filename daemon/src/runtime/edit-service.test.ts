@@ -225,3 +225,42 @@ describe("EditService automation apply — D-05-08 execute-immediately (Test 10,
     expect(src).not.toMatch(/schedul/i);
   });
 });
+
+describe("EditService automation apply — scope rides the wire (deferred-items gap closure)", () => {
+  // The bridge resolves automation targets from payload.scope.{paramIndex,
+  // paramSource} (PullHandlers.handleApplyPatch reads them); ops carry values
+  // only. Until the scope rides the wire every automation op fails honestly
+  // per-op (unresolvable target) — deferred-items 05-06/05-08.
+  it("applyAutomation passes the AutomationScope as the third applyPatchOverBridge arg", async () => {
+    const { service, bridge } = autoService();
+    const result = await service.apply(autoState() as any, null, "live", { patchId: "pt_auto1", confirm: true });
+    expect(result.ok).toBe(true);
+    expect(bridge).toHaveBeenCalledTimes(1);
+    const [undoLabel, operations, scope] = bridge.mock.calls[0];
+    expect(undoLabel).toBe("auto swell");
+    expect(operations).toBe(AUTO_OPS as any);
+    expect(scope).toEqual(AUTO_SCOPE);
+  });
+
+  it("revertAutomation passes the entry scope on the wire too (revert re-targets the same param)", async () => {
+    const { service, bridge, append } = autoService();
+    await service.apply(autoState() as any, null, "live", { patchId: "pt_auto1", confirm: true });
+    const entry = append.mock.calls[0][0];
+    expect(entry.automationBinding).toMatchObject({ deviceSid: AUTO_SCOPE.deviceSid, priorValue: 0.25 });
+    bridge.mockClear();
+    const reverted = await service.revert(autoState() as any, "pt_auto1");
+    expect(reverted.ok).toBe(true);
+    expect(bridge).toHaveBeenCalledTimes(1);
+    const [, , scope] = bridge.mock.calls[0];
+    expect(scope).toEqual(AUTO_SCOPE);
+  });
+
+  it("the clip path still calls applyPatchOverBridge with two args (scope undefined — clip targeting is previewClipSid-based)", async () => {
+    const candidate = { patchId: "pt_clip", scope: { clipSid: "clip_a" }, operations: [{ op: "add_note", pitch: 60, start: 0, duration: 1, velocity: 100 }], rationale: "x", reversibility: "self-inverse", risk: "low", previewClipSid: "clip_a", undoLabel: "clip edit" };
+    const bridge = vi.fn(async () => ({ applied: 1, failed: 0 }));
+    const service = new EditService({ candidateStore: { get: () => candidate, evict: vi.fn() } as any, patchHistory: { append: vi.fn() } as any, applyPatchOverBridge: bridge as any });
+    const res = await service.apply({ selection: { clipSid: "clip_a" } } as any, null, "live", { patchId: "pt_clip" });
+    expect(res.ok).toBe(true);
+    expect(bridge.mock.calls[0][2]).toBeUndefined();
+  });
+});
