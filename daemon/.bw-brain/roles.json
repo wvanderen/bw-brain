@@ -1,0 +1,169 @@
+{
+  "version": "1.0",
+  "classifiedAt": "2026-08-22T15:26:50.942Z",
+  "profile": "generic",
+  "tracks": {
+    "Main Pluck": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "Bass": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "Pluck": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "v0 Kick": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "v1 Clap": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "v9 Hat Open": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "Electroshock 1": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "v9 Snare": {
+      "role": "hats",
+      "confidence": 0.8482248437132315,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7799562887129347
+        },
+        {
+          "role": "lead",
+          "score": 0.7780314133914211
+        },
+        {
+          "role": "fx",
+          "score": 0.6863265454186431
+        }
+      ]
+    },
+    "Lead": {
+      "role": "hats",
+      "confidence": 0.8562993161016687,
+      "alternatives": [
+        {
+          "role": "percussion",
+          "score": 0.7951886392670969
+        },
+        {
+          "role": "lead",
+          "score": 0.7934027087138078
+        },
+        {
+          "role": "fx",
+          "score": 0.6981134428709771
+        }
+      ]
+    }
+  }
+}

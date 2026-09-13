@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "pulledAt": "2026-08-23T18:12:44.044Z",
+  "profile": "generic",
+  "tracks": [
+    {
+      "trackKey": "trk_bc11dc3cc22b1c2b",
+      "params": [
+        {
+          "paramKey": "remote_page:2",
+          "deviceKey": "dev_29ef0e2e750ad12f",
+          "paramIndex": 2,
+          "paramName": "M3: Filter Balance",
+          "source": "remote_page",
+          "movementCount": 9,
+          "valueRange": 0.455,
+          "lastValue": 0.8599999904632573,
+          "salience": 0.897
+        }
+      ]
+    }
+  ]
+}

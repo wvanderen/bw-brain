@@ -1,0 +1,405 @@
+{
+  "version": "1.0",
+  "pulledAt": "2026-08-23T18:23:37.418Z",
+  "profile": "generic",
+  "sceneCount": 16,
+  "trackCount": 3,
+  "grid": {
+    "tracks": [
+      {
+        "trackSid": "Surge XT",
+        "name": "Surge XT",
+        "scenes": [
+          {
+            "sceneIdx": 0,
+            "clipSid": "clip_8d40f0dcc01afcac",
+            "hasContent": true,
+            "loopBeats": 4,
+            "notes": [
+              {
+                "key": "n:62:0.0000",
+                "pitch": 62,
+                "start": 0,
+                "length": 0.25,
+                "velocity": 100
+              },
+              {
+                "key": "n:65:0.1250",
+                "pitch": 65,
+                "start": 0.125,
+                "length": 0.25,
+                "velocity": 100
+              },
+              {
+                "key": "n:56:0.3750",
+                "pitch": 56,
+                "start": 0.375,
+                "length": 0.25,
+                "velocity": 100
+              }
+            ]
+          },
+          {
+            "sceneIdx": 1,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 2,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 3,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 4,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 5,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 6,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 7,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 8,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 9,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 10,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 11,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 12,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 13,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 14,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 15,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          }
+        ]
+      },
+      {
+        "trackSid": "FX 1",
+        "name": "FX 1",
+        "scenes": [
+          {
+            "sceneIdx": 0,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 1,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 2,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 3,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 4,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 5,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 6,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 7,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 8,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 9,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 10,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 11,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 12,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 13,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 14,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 15,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          }
+        ]
+      },
+      {
+        "trackSid": "Master",
+        "name": "Master",
+        "scenes": [
+          {
+            "sceneIdx": 0,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 1,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 2,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 3,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 4,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 5,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 6,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 7,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 8,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 9,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 10,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 11,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 12,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 13,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 14,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          },
+          {
+            "sceneIdx": 15,
+            "clipSid": "clip_0000000000000000",
+            "hasContent": false,
+            "loopBeats": 0,
+            "notes": []
+          }
+        ]
+      }
+    ],
+    "sceneNames": [
+      "Scene 1",
+      "Scene 2",
+      "Scene 3",
+      "Scene 4",
+      "Scene 5",
+      "Scene 6",
+      "Scene 7",
+      "Scene 8",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  }
+}
