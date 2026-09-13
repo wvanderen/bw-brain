@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Migration notice (2026-09-12): GSD has been uninstalled from this machine.** The GSD-managed sections below can no longer be regenerated. This project still carries GSD planning artifacts in `.planning/`. Before substantive work here, migrate planning to Matt Pocock's skill framework (the new planning system): absorb `.planning/STATE.md` and the current phase/plan docs into the new system, then replace this file's GSD-managed content and retire the `.planning/` artifacts.
+
 <!-- GSD:project-start source:PROJECT.md -->
 
 ## Project
