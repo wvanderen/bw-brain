@@ -25,8 +25,7 @@
     "test": "vitest run",
     "test:property": "vitest run --testNamePattern property",
     "check:capabilities": "node ../scripts/check-capabilities-doc.mjs",
-    "check:bridge-artifact": "node ../scripts/check-bridge-artifact.mjs",
-    "check:docs": "node ../scripts/check-docs-rebaseline.mjs"
+    "check:bridge-artifact": "node ../scripts/check-bridge-artifact.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.0",

@@ -412,7 +412,7 @@ compiles as a javac warning only (Maven build succeeds) but throws inside
 Phase-2 UAT blocker (Plan 02-06) was exactly this regression:
 `trackBank.getTrack(i)` at `Observers.java:139` failed the live host
 despite a clean compile + `javap` "method exists" check. See
-`.planning/debug/extension-load-deprecated-getchannel.md` for the
+`docs/debug/resolved/extension-load-deprecated-getchannel.md` for the
 diagnosis evidence and `scripts/check-deprecated-bridge.mjs` for the
 mechanical gate that now flags any deprecated call site at verification
 time (closing the javap-vs-deprecation gap).

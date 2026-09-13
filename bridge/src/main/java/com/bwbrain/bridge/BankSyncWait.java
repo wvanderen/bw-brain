@@ -3,8 +3,9 @@
 // Phase 4 Plan 04.3-06 (04.3 gap closure / DEFECT A bridge half) — the pure
 // bounded bank-sync settle wait that gates the get.launcher_clips cursor walk.
 //
-// DEFECT A ROOT CAUSE (2026-08-21 live UAT, .planning/phases/
-// 04.3-clap-first-product-rebaseline-and-roadmap-reconciliation/04.3-UAT.md
+// DEFECT A ROOT CAUSE (2026-08-21 live UAT; diagnosis in git history,
+// .planning/phases/04.3-...-reconciliation/04.3-UAT.md; decision in
+// docs/adr/0007-confidence-gated-labels.md
 // Findings): the FIRST get.launcher_clips pull after connect completed fast
 // against UNSYNCED TrackBank/SceneBank/ClipLauncherSlotBank caches — the walk
 // read empty trackSids (tracks 4-7) and all 128 cells hasContent:false, and

@@ -13,7 +13,7 @@
 //
 // This is the exact root cause of the Phase-03.1 UAT Test-3 blocker
 // (artifact mtime 2026-07-04 10:42:38 vs ClipSid commit 2026-07-04 20:30:11,
-// diagnosed in `.planning/debug/clipsid-not-populating.md`): the daemon's
+// diagnosed in `docs/debug/clipsid-not-populating.md`): the daemon's
 // backward-compat folds NO-OP'd against the stale artifact, leaving
 // `selection: {}`, and the failure surfaced only at live UAT. This gate
 // converts that class of regression into a sub-second mechanical check that
@@ -300,7 +300,7 @@ function main(argv) {
     );
     console.error(`  delta (source is newer by): ${deltaStr}`);
     console.error(
-      "  The packaged .bwextension is older than the newest source commit. Run `mvn -pl bridge package` to rebuild, then reinstall the artifact into Bitwig (restart Bitwig or toggle the bw-brain controller) before UAT. (This regression class caused the Phase-03.1 UAT Test-3 blocker — see .planning/debug/clipsid-not-populating.md.)",
+      "  The packaged .bwextension is older than the newest source commit. Run `mvn -pl bridge package` to rebuild, then reinstall the artifact into Bitwig (restart Bitwig or toggle the bw-brain controller) before UAT. (This regression class caused the Phase-03.1 UAT Test-3 blocker — see docs/debug/clipsid-not-populating.md.)",
     );
     process.exit(1);
   }
