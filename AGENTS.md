@@ -1,6 +1,19 @@
 # AGENTS.md
 
-> [!IMPORTANT]
-> **Migration notice (2026-09-12): GSD has been uninstalled from this machine.** This project still carries GSD planning artifacts in `.planning/`. Before substantive work here, migrate planning to Matt Pocock's skill framework (the new planning system): absorb `.planning/STATE.md` and the current phase/plan docs into the new system, then retire the `.planning/` artifacts.
+> **Planning migration (2026-09-12): complete.** GSD planning artifacts (formerly `.planning/`) were absorbed into the new system — decisions in `docs/adr/`, domain model in `CONTEXT.md`, outstanding work in GitHub Issues — and the originals were retired (git history retains them). Historical debug investigations live in `docs/debug/`.
 
-Further project agent instructions live in [`.claude/AGENTS.md`](.claude/AGENTS.md) (GSD-managed; also flagged for migration).
+Further project agent instructions live in [`.claude/AGENTS.md`](.claude/AGENTS.md).
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on wvanderen/bw-brain (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical triage labels (label string = role name). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
